@@ -1724,9 +1724,9 @@ sub	ReplaceReadingsVal($@) {
     Voice output over TTS.<br>
     Example: set <rhasspyDevice> say siteId="default" text="This is a test"
   </li>
-  <li>password &lt;password&gt; value<br>
-  set the password, which is stored in the FHEM/FhemUtils/uniqueID file.
-  If the argument is empty, the password will be deleted.
+  <li>
+    textCommand<br>
+    Snips per Text steuern.
   </li>
 </ul>
 <p></p>
