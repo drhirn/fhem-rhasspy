@@ -1,15 +1,11 @@
-#######################################################
+##############################################
 #
 # FHEM snips.ai modul  http://snips.ai)
 #
 # written 2018 by Tobias Wiedenmann (Thyraz)
 # thanks to Matthias Kleine
 #
-# adapted for Rhasspy (https://github.com/rhasspy)
-#
-# $Id$
-#
-#######################################################
+##############################################
 
 
 use strict;
@@ -24,11 +20,11 @@ my %gets = (
 
 my %sets = (
     "say" => "",
-#    "play" => "",
+    "play" => "",
     "updateSlots" => "",
     "textCommand" => "",
-    "trainRhasspy" => ""
-#    "volume" => ""
+    "trainRhasspy" => "",
+    "volume" => ""
 );
 
 # MQTT Topics die das Modul automatisch abonniert
@@ -40,27 +36,29 @@ my @topics = qw(
 );
 
 
-sub RHASSPY_Initialize($) {
+sub SNIPS_Initialize($) {
     my $hash = shift @_;
 
-    # Attribute rhasspyName und rhasspyRoom für andere Devices zur Verfügung abbestellen
-    addToAttrList("rhasspyName");
-    addToAttrList("rhasspyRoom");
-    addToAttrList("rhasspyMapping:textField-long");
+    # Attribute snipsName und snipsRoom für andere Devices zur Verfügung abbestellen
+    addToAttrList("snipsName");
+    addToAttrList("snipsRoom");
+    addToAttrList("snipsMapping:textField-long");
     
+#    Log3($hash->{NAME},1,$hash->{NAME});
+
     # Consumer
-    $hash->{DefFn} = "RHASSPY::Define";
-    $hash->{UndefFn} = "RHASSPY::Undefine";
-    $hash->{SetFn} = "RHASSPY::Set";
-    $hash->{AttrFn} = "RHASSPY::Attr";
-    $hash->{AttrList} = "IODev defaultRoom rhasspyIntents:textField-long shortcuts:textField-long rhasspyMaster response:textField-long " . $main::readingFnAttributes;
-    $hash->{OnMessageFn} = "RHASSPY::onmessage";
+    $hash->{DefFn} = "SNIPS::Define";
+    $hash->{UndefFn} = "SNIPS::Undefine";
+    $hash->{SetFn} = "SNIPS::Set";
+    $hash->{AttrFn} = "SNIPS::Attr";
+    $hash->{AttrList} = "IODev defaultRoom snipsIntents:textField-long shortcuts:textField-long rhasspyMaster response:textField-long " . $main::readingFnAttributes;
+    $hash->{OnMessageFn} = "SNIPS::onmessage";
 
     main::LoadModule("MQTT");
 }
 
 # Cmd in main:: ausführen damit User den Prefix nicht vor alle Perl-Aufrufe schreiben muss
-sub RHASSPY_execute($$$$$) {
+sub SNIPS_execute($$$$$) {
     my ($hash, $device, $cmd, $value, $siteId) = @_;
     my $returnVal;
 
@@ -76,7 +74,7 @@ sub RHASSPY_execute($$$$$) {
     return $returnVal;
 }
 
-package RHASSPY;
+package SNIPS;
 
 use strict;
 use warnings;
@@ -86,8 +84,8 @@ use JSON;
 use Net::MQTT::Constants;
 use Encode;
 use HttpUtils;
-#use Data::Dumper;
 
+# use Data::Dumper 'Dumper';
 
 BEGIN {
     MQTT->import(qw(:all));
@@ -122,7 +120,7 @@ sub Define() {
     my @args = split("[ \t]+", $def);
 
     # Minimale Anzahl der nötigen Argumente vorhanden?
-    return "Invalid number of arguments: define <name> RHASSPY IODev DefaultRoom" if (int(@args) < 4);
+    return "Invalid number of arguments: define <name> SNIPS IODev DefaultRoom" if (int(@args) < 4);
 
     my ($name, $type, $IODev, $defaultRoom) = @args;
     $hash->{MODULE_VERSION} = "0.2";
@@ -161,25 +159,25 @@ sub Set($$$@) {
     # Say Cmd
     if ($command eq "say") {
         my $text = join (" ", @values);
-        RHASSPY::say($hash, $text);
+        SNIPS::say($hash, $text);
     }
     # TextCommand Cmd
     elsif ($command eq "textCommand") {
         my $text = join (" ", @values);
-        RHASSPY::textCommand($hash, $text);
+        SNIPS::textCommand($hash, $text);
     }
     # Update Model Cmd
     elsif ($command eq "updateSlots") {
-        RHASSPY::updateSlots($hash);
+        SNIPS::updateSlots($hash);
     }
     # Volume Cmd
     elsif ($command eq "volume") {
         my $params = join (" ", @values);
-        RHASSPY::setVolume($hash, $params);
+        SNIPS::setVolume($hash, $params);
     }
     # TrainRhasspy Cmd
     elsif ($command eq "trainRhasspy") {
-        RHASSPY::trainRhasspy($hash);
+        SNIPS::trainRhasspy($hash);
     }
 }
 
@@ -226,15 +224,15 @@ sub unsubscribeTopics($) {
 
 
 # Alle Gerätenamen sammeln
-sub allRhasspyNames() {
+sub allSnipsNames() {
     my @devices, my @sorted;
     my %devicesHash;
-    my $devspec = "room=Rhasspy";
+    my $devspec = "room=Snips";
     my @devs = devspec2array($devspec);
 
-    # Alle RhasspyNames sammeln
+    # Alle SnipsNames sammeln
     foreach (@devs) {
-        push @devices, split(',', AttrVal($_,"rhasspyName",undef));
+        push @devices, split(',', AttrVal($_,"snipsName",undef));
     }
 
     # Doubletten rausfiltern
@@ -249,15 +247,15 @@ sub allRhasspyNames() {
 
 
 # Alle Raumbezeichnungen sammeln
-sub allRhasspyRooms() {
+sub allSnipsRooms() {
     my @rooms, my @sorted;
     my %roomsHash;
-    my $devspec = "room=Rhasspy";
+    my $devspec = "room=Snips";
     my @devs = devspec2array($devspec);
 
-    # Alle RhasspyNames sammeln
+    # Alle SnipsNames sammeln
     foreach (@devs) {
-        push @rooms, split(',', AttrVal($_,"rhasspyRoom",undef));
+        push @rooms, split(',', AttrVal($_,"snipsRoom",undef));
     }
 
     # Doubletten rausfiltern
@@ -272,15 +270,15 @@ sub allRhasspyRooms() {
 
 
 # Alle Sender sammeln
-sub allRhasspyChannels() {
+sub allSnipsChannels() {
     my @channels, my @sorted;
     my %channelsHash;
-    my $devspec = "room=Rhasspy";
+    my $devspec = "room=Snips";
     my @devs = devspec2array($devspec);
 
-    # Alle RhasspyNames sammeln
+    # Alle SnipsNames sammeln
     foreach (@devs) {
-        my @rows = split(/\n/, AttrVal($_,"rhasspyChannels",undef));
+        my @rows = split(/\n/, AttrVal($_,"snipsChannels",undef));
         foreach (@rows) {
             my @tokens = split('=', $_);
             my $channel = shift(@tokens);
@@ -300,15 +298,15 @@ sub allRhasspyChannels() {
 
 
 # Alle NumericTypes sammeln
-sub allRhasspyTypes() {
+sub allSnipsTypes() {
     my @types, my @sorted;
     my %typesHash;
-    my $devspec = "room=Rhasspy";
+    my $devspec = "room=Snips";
     my @devs = devspec2array($devspec);
 
-    # Alle RhasspyNames sammeln
+    # Alle SnipsNames sammeln
     foreach (@devs) {
-        my @mappings = split(/\n/, AttrVal($_,"rhasspyMapping",undef));
+        my @mappings = split(/\n/, AttrVal($_,"snipsMapping",undef));
         foreach (@mappings) {
             # Nur GetNumeric und SetNumeric verwenden
             next unless $_ =~ m/^(SetNumeric|GetNumeric)/;
@@ -331,15 +329,15 @@ sub allRhasspyTypes() {
 
 
 # Alle Farben sammeln
-sub allRhasspyColors() {
+sub allSnipsColors() {
     my @colors, my @sorted;
     my %colorHash;
-    my $devspec = "room=Rhasspy";
+    my $devspec = "room=Snips";
     my @devs = devspec2array($devspec);
 
-    # Alle RhasspyNames sammeln
+    # Alle SnipsNames sammeln
     foreach (@devs) {
-        my @rows = split(/\n/, AttrVal($_,"rhasspyColors",undef));
+        my @rows = split(/\n/, AttrVal($_,"snipsColors",undef));
         foreach (@rows) {
             my @tokens = split('=', $_);
             my $color = shift(@tokens);
@@ -359,7 +357,7 @@ sub allRhasspyColors() {
 
 
 # Alle Shortcuts sammeln
-sub allRhasspyShortcuts($) {
+sub allSnipsShortcuts($) {
     my ($hash) = @_;
     my @shortcuts, my @sorted;
 
@@ -400,7 +398,7 @@ sub roomName ($$) {
 sub getDeviceByName($$$) {
     my ($hash, $room, $name) = @_;
     my $device;
-    my $devspec = "room=Rhasspy";
+    my $devspec = "room=Snips";
     my @devices = devspec2array($devspec);
 
     # devspec2array sendet bei keinen Treffern als einziges Ergebnis den devSpec String zurück
@@ -408,8 +406,8 @@ sub getDeviceByName($$$) {
 
     foreach (@devices) {
         # 2 Arrays bilden mit Namen und Räumen des Devices
-        my @names = split(',', AttrVal($_,"rhasspyName",undef));
-        my @rooms = split(',', AttrVal($_,"rhasspyRoom",undef));
+        my @names = split(',', AttrVal($_,"snipsName",undef));
+        my @rooms = split(',', AttrVal($_,"snipsRoom",undef));
 
         # Case Insensitive schauen ob der gesuchte Name (oder besser Name und Raum) in den Arrays vorhanden ist
         if (grep( /^$name$/i, @names)) {
@@ -429,7 +427,7 @@ sub getDeviceByName($$$) {
 sub getDevicesByIntentAndType($$$$) {
     my ($hash, $room, $intent, $type) = @_;
     my @matchesInRoom, my @matchesOutsideRoom;
-    my $devspec = "room=Rhasspy";
+    my $devspec = "room=Snips";
     my @devices = devspec2array($devspec);
 
     # devspec2array sendet bei keinen Treffern als einziges Ergebnis den devSpec String zurück
@@ -437,9 +435,9 @@ sub getDevicesByIntentAndType($$$$) {
 
     foreach (@devices) {
         # Array bilden mit Räumen des Devices
-        my @rooms = split(',', AttrVal($_,"rhasspyRoom",undef));
+        my @rooms = split(',', AttrVal($_,"snipsRoom",undef));
         # Mapping mit passendem Intent vorhanden?
-        my $mapping = RHASSPY::getMapping($hash, $_, $intent, $type, 1);
+        my $mapping = SNIPS::getMapping($hash, $_, $intent, $type, 1);
         next unless defined($mapping);
 
         my $mappingType = $mapping->{'type'} if (defined($mapping->{'type'}));
@@ -519,7 +517,7 @@ sub getActiveDeviceForIntentAndType($$$$) {
 sub getDeviceByMediaChannel($$$) {
     my ($hash, $room, $channel) = @_;
     my $device;
-    my $devspec = "room=Rhasspy";
+    my $devspec = "room=Snips";
     my @devices = devspec2array($devspec);
 
     # devspec2array sendet bei keinen Treffern als einziges Ergebnis den devSpec String zurück
@@ -527,9 +525,9 @@ sub getDeviceByMediaChannel($$$) {
 
     foreach (@devices) {
         # Array bilden mit Räumen des Devices
-        my @rooms = split(',', AttrVal($_,"rhasspyRoom",undef));
+        my @rooms = split(',', AttrVal($_,"snipsRoom",undef));
         # Cmd mit passendem Intent vorhanden?
-        my $cmd = getCmd($hash, $_, "rhasspyChannels", $channel, 1);
+        my $cmd = getCmd($hash, $_, "snipsChannels", $channel, 1);
         next unless defined($cmd);
 
         # Erster Treffer wälen, überschreiben falls besserer Treffer (Raum matched auch) kommt
@@ -581,11 +579,11 @@ sub splitMappingString($) {
 }
 
 
-# rhasspyMapping parsen und gefundene Settings zurückliefern
+# snipsMapping parsen und gefundene Settings zurückliefern
 sub getMapping($$$$;$) {
     my ($hash, $device, $intent, $type, $disableLog) = @_;
     my @mappings, my $matchedMapping;
-    my $mappingsString = AttrVal($device, "rhasspyMapping", undef);
+    my $mappingsString = AttrVal($device, "snipsMapping", undef);
 
     if (defined($mappingsString)) {
         # String in einzelne Mappings teilen
@@ -601,7 +599,7 @@ sub getMapping($$$$;$) {
             if (!defined($matchedMapping) || (defined($type) && lc($matchedMapping->{'type'}) ne lc($type) && lc($currentMapping{'type'}) eq lc($type))) {
                 $matchedMapping = \%currentMapping;
 
-                Log3($hash->{NAME}, 5, "rhasspyMapping selected: $_") if (!defined($disableLog) || (defined($disableLog) && $disableLog != 1));
+                Log3($hash->{NAME}, 5, "snipsMapping selected: $_") if (!defined($disableLog) || (defined($disableLog) && $disableLog != 1));
             }
         }
     }
@@ -641,7 +639,7 @@ sub runCmd($$$;$$) {
     # Perl Command
     if ($cmd =~ m/^\s*{.*}\s*$/) {
         # CMD ausführen
-        $returnVal = main::RHASSPY_execute($hash, $device, $cmd, $val,$siteId);
+        $returnVal = main::SNIPS_execute($hash, $device, $cmd, $val,$siteId);
     }
     # String in Anführungszeichen (mit ReplaceSetMagic)
     elsif ($cmd =~ m/^\s*".*"\s*$/) {
@@ -762,7 +760,7 @@ sub parseJSON($$) {
             my $slotValue;
 
             $slotValue = $slot->{'value'}{'value'} if (exists($slot->{'value'}{'value'}));
-            $slotValue = $slot->{'value'} if (exists($slot->{'entity'}) && $slot->{'entity'} eq "rhasspy/duration");
+            $slotValue = $slot->{'value'} if (exists($slot->{'entity'}) && $slot->{'entity'} eq "snips/duration");
 
             $data->{$slotName} = $slotValue;
         }
@@ -797,12 +795,12 @@ sub parseJSON($$) {
 # Daten vom MQTT Modul empfangen -> Device und Room ersetzen, dann erneut an NLU übergeben
 sub onmessage($$$) {
     my ($hash, $topic, $message) = @_;
-    my $data = RHASSPY::parseJSON($hash, $message);
+    my $data = SNIPS::parseJSON($hash, $message);
     my $input = $data->{'input'} if defined($data->{'input'});
 
     # Hotword Erkennung
     if ($topic =~ m/^hermes\/dialogueManager/) {
-        my $data = RHASSPY::parseJSON($hash, $message);
+        my $data = SNIPS::parseJSON($hash, $message);
         my $room = roomName($hash, $data);
 
         if (defined($room)) {
@@ -820,7 +818,7 @@ sub onmessage($$$) {
     }
 
     # Shortcut empfangen -> Code direkt ausführen
-    elsif ($topic =~ qr/^hermes\/intent\/.*:/ && defined($input) && grep( /^$input$/i, allRhasspyShortcuts($hash))) {
+    elsif ($topic =~ qr/^hermes\/intent\/.*:/ && defined($input) && grep( /^$input$/i, allSnipsShortcuts($hash))) {
       my $error;
       my $response = getResponse($hash, "DefaultError");
       my $type      = ($topic eq "hermes/intent/FHEM:TextCommand") ? "text" : "voice";
@@ -839,7 +837,7 @@ sub onmessage($$$) {
       respond($hash, $type, $sessionId, $siteId, $response);
     }
 
-    # Sprachintent von Rhasspy empfangen -> Geräte- und Raumnamen ersetzen und Request erneut an NLU senden
+    # Sprachintent von Snips empfangen -> Geräte- und Raumnamen ersetzen und Request erneut an NLU senden
 #    elsif (($topic =~ qr/^hermes\/intent\/.*:/ && ($message !~ m/fhem.voiceCommand/ && $message !~ m/fhem.textCommand/)) || $topic =~ qr/^hermes\/intent\/FHEM:TextCommand/){
 #    }
 
@@ -847,16 +845,16 @@ sub onmessage($$$) {
     elsif ($topic =~ qr/^hermes\/intent\/.*:/) {
         my $info, my $sendData;
         my $device, my $room, my $channel, my $color, my $type;
-        my @devices = allRhasspyNames();
-        my @rooms = allRhasspyRooms();
-        my @channels = allRhasspyChannels();
-        my @colors = allRhasspyColors();
-        my @types = allRhasspyTypes();
+        my @devices = allSnipsNames();
+        my @rooms = allSnipsRooms();
+        my @channels = allSnipsChannels();
+        my @colors = allSnipsColors();
+        my @types = allSnipsTypes();
         my $json, my $infoJson;
         my $sessionId;
         my $command = $data->{'input'};
 
-        # Geräte- und Raumbezeichnungen im Kommando gegen die Defaultbezeichnung aus dem Rhasspy-Slot tauschen, damit NLU uns versteht
+        # Geräte- und Raumbezeichnungen im Kommando gegen die Defaultbezeichnung aus dem Snips-Slot tauschen, damit NLU uns versteht
         # Alle Werte in ein Array und der Länge nach sortieren, damit z.B. "Jazz Radio" nicht fehlerhafterweise als "Radio" erkannt wird
         my @keys = (@devices, @rooms, @channels, @colors, @types);
         my @sortedKeys = sort { length($b) <=> length($a) } @keys;
@@ -932,25 +930,25 @@ sub onmessage($$$) {
 
         # Passenden Intent-Handler aufrufen
         if ($intent eq 'SetOnOff') {
-            RHASSPY::handleIntentSetOnOff($hash, $data);
+            SNIPS::handleIntentSetOnOff($hash, $data);
         } elsif ($intent eq 'GetOnOff') {
-            RHASSPY::handleIntentGetOnOff($hash, $data);
+            SNIPS::handleIntentGetOnOff($hash, $data);
         } elsif ($intent eq 'SetNumeric') {
-            RHASSPY::handleIntentSetNumeric($hash, $data);
+            SNIPS::handleIntentSetNumeric($hash, $data);
         } elsif ($intent eq 'GetNumeric') {
-            RHASSPY::handleIntentGetNumeric($hash, $data);
+            SNIPS::handleIntentGetNumeric($hash, $data);
         } elsif ($intent eq 'Status') {
-            RHASSPY::handleIntentStatus($hash, $data);
+            SNIPS::handleIntentStatus($hash, $data);
         } elsif ($intent eq 'MediaControls') {
-            RHASSPY::handleIntentMediaControls($hash, $data);
+            SNIPS::handleIntentMediaControls($hash, $data);
         } elsif ($intent eq 'MediaChannels') {
-            RHASSPY::handleIntentMediaChannels($hash, $data);
+            SNIPS::handleIntentMediaChannels($hash, $data);
         } elsif ($intent eq 'SetColor') {
-              RHASSPY::handleIntentSetColor($hash, $data);
+              SNIPS::handleIntentSetColor($hash, $data);
         } elsif ($intent eq 'GetTime') {
-              RHASSPY::handleIntentGetTime($hash, $data);
+              SNIPS::handleIntentGetTime($hash, $data);
         } else {
-            RHASSPY::handleCustomIntent($hash, $intent, $data);
+            SNIPS::handleCustomIntent($hash, $intent, $data);
         }
     }
 }
@@ -998,7 +996,7 @@ sub getResponse($$) {
 }
 
 
-# Text Kommando an RHASSPY
+# Text Kommando an SNIPS
 sub textCommand($$) {
     my ($hash, $text) = @_;
 
@@ -1016,7 +1014,7 @@ sub textCommand($$) {
 }
 
 
-# Sprachausgabe / TTS über RHASSPY
+# Sprachausgabe / TTS über SNIPS
 sub say($$) {
     my ($hash, $cmd) = @_;
     my $sendData, my $json;
@@ -1041,38 +1039,37 @@ sub say($$) {
 }
 
 
-# Sprachausgabe / TTS über RHASSPY
-#sub setVolume($$) {
-#    my ($hash, $params) = @_;
-#    my $sendData, my $json;
-#    my $siteId, my $volume;
-#    my($unnamedParams, $namedParams) = parseParams($params);
-#
-#    if (defined($namedParams->{'siteId'}) && defined($namedParams->{'volume'})) {
-#        $siteId = $namedParams->{'siteId'};
-#        $volume = $namedParams->{'volume'};
-#
-#        $sendData =  {
-#            siteId => $siteId,
-#            volume => $volume
-#        };
-#
-#        $json = toJSON($sendData);
-#        Log3($hash->{NAME}, 3, "Response: $json");
-#        MQTT::send_publish($hash->{IODev}, topic => 'hermes/sound/setvolume', message => $json, qos => 0, retain => "0");
-#    }
-#}
+# Sprachausgabe / TTS über SNIPS
+sub setVolume($$) {
+    my ($hash, $params) = @_;
+    my $sendData, my $json;
+    my $siteId, my $volume;
+    my($unnamedParams, $namedParams) = parseParams($params);
+
+    if (defined($namedParams->{'siteId'}) && defined($namedParams->{'volume'})) {
+        $siteId = $namedParams->{'siteId'};
+        $volume = $namedParams->{'volume'};
+
+        $sendData =  {
+            siteId => $siteId,
+            volume => $volume
+        };
+
+        $json = toJSON($sendData);
+        MQTT::send_publish($hash->{IODev}, topic => 'hermes/sound/setvolume', message => $json, qos => 0, retain => "0");
+    }
+}
 
 
-# Update vom Rhasspy Model / ASR Injection
+# Update vom Snips Model / ASR Injection
 sub updateSlots($) {
     my ($hash) = @_;
-    my @devices = allRhasspyNames();
-    my @rooms = allRhasspyRooms();
-    my @channels = allRhasspyChannels();
-    my @colors = allRhasspyColors();
-    my @types = allRhasspyTypes();
-    my @shortcuts = allRhasspyShortcuts($hash);
+    my @devices = allSnipsNames();
+    my @rooms = allSnipsRooms();
+    my @channels = allSnipsChannels();
+    my @colors = allSnipsColors();
+    my @types = allSnipsTypes();
+    my @shortcuts = allSnipsShortcuts($hash);
 
     # JSON Struktur erstellen
     if (@devices > 0 || @rooms > 0 || @channels > 0 || @types > 0 || @shortcuts > 0) {
@@ -1138,7 +1135,7 @@ sub sendToApi($$$$) {
     my ($hash,$url,$method,$data) = @_;
     
     #Retrieve URL of Rhasspy-Master from attribute
-    $url = AttrVal($hash->{NAME}, "rhasspyMaster", undef).$url;
+    my $url = AttrVal($hash->{NAME}, "rhasspyMaster", undef).$url;
     
     my $apiRequest = {
         url        => $url,
@@ -1177,7 +1174,7 @@ sub X_ParseHttpResponse($)
 sub handleCustomIntent($$$) {
     my ($hash, $intentName, $data) = @_;
     my @intents, my $intent;
-    my $intentsString = AttrVal($hash->{NAME},"rhasspyIntents",undef);
+    my $intentsString = AttrVal($hash->{NAME},"snipsIntents",undef);
     my $response;
     my $error;
 
@@ -1189,7 +1186,7 @@ sub handleCustomIntent($$$) {
         next unless $_ =~ qr/^$intentName/;
 
         $intent = $_;
-        Log3($hash->{NAME}, 5, "rhasspyIntent selected: $_");
+        Log3($hash->{NAME}, 5, "snipsIntent selected: $_");
     }
 
     # Gerät setzen falls Slot Device vorhanden
@@ -1351,7 +1348,7 @@ sub handleIntentSetNumeric($$) {
             if (defined($mapping) && defined($mapping->{'cmd'})) {
                 my $cmd     = $mapping->{'cmd'};
                 my $part    = $mapping->{'part'};
-                my $minVal  = (defined($mapping->{'minVal'})) ? $mapping->{'minVal'} : 0; # Rhasspy kann keine negativen Nummern bisher, daher erzwungener minVal
+                my $minVal  = (defined($mapping->{'minVal'})) ? $mapping->{'minVal'} : 0; # Snips kann keine negativen Nummern bisher, daher erzwungener minVal
                 my $maxVal  = $mapping->{'maxVal'};
                 my $diff    = (defined($value)) ? $value : ((defined($mapping->{'step'})) ? $mapping->{'step'} : 10);
                 my $up      = (defined($change) && ($change =~ m/^(höher|heller|lauter|wärmer)$/)) ? 1 : 0;
@@ -1577,7 +1574,7 @@ sub handleIntentGetTime($$) {
 #            $device = getDeviceByMediaChannel($hash, $room, $channel);
 #        }
 
-#        $cmd = getCmd($hash, $device, "rhasspyChannels", $channel, undef);
+#        $cmd = getCmd($hash, $device, "snipsChannels", $channel, undef);
 
 #        if (defined($device) && defined($cmd)) {
 #            $response = getResponse($hash, "DefaultConfirmation");
@@ -1611,7 +1608,7 @@ sub handleIntentMediaChannels($$) {
             $device = getDeviceByMediaChannel($hash, $room, $channel);
         }
 
-        $cmd = getCmd($hash, $device, "rhasspyChannels", $channel, undef);
+        $cmd = getCmd($hash, $device, "snipsChannels", $channel, undef);
 
         if (defined($device) && defined($cmd)) {
             $response = getResponse($hash, "DefaultConfirmation");
@@ -1641,7 +1638,7 @@ sub handleIntentSetColor($$) {
 
         # Passendes Gerät & Cmd suchen
         $device = getDeviceByName($hash, $room, $data->{'Device'});
-        $cmd = getCmd($hash, $device, "rhasspyColors", $color, undef);
+        $cmd = getCmd($hash, $device, "snipsColors", $color, undef);
 
         if (defined($device) && defined($cmd)) {
             $response = getResponse($hash, "DefaultConfirmation");
@@ -1698,45 +1695,16 @@ sub	ReplaceReadingsVal($@) {
 =item summary Control FHEM with Rhasspy voice assistant
 =item summary_DE Steuerung von FHEM mittels Rhasspy Sprach-Assistent
 =begin html
+<ul>
+<a name="Rhasspy"></a>
+<h3>Rhasspy</h3>
+  <a name="Rhasspyattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <br><code>rhasspyMaster</code><br>
+    Define the URL to the Rhasspy Master for sending requests to the HTTP-API. Has to be in Format <code>protocol://fqdn:port</code> (e.g. <i>http://rhasspy.example.com:12101</i>).
+  </ul>
 
-<a name="RHASSPY"></a>
-<h3>RHASSPY</h3>
-<ul>
-<p>This module receives, processes and executes voice commands coming from Rhasspy voice assistent.</p>
-<a name="RHASSPYdefine"></a>
-<p><b>Define</b></p>
-<p><code>define &lt;name&gt; RHASSPY &lt;MqttDevice&gt; &lt;DefaultRoom&gt;</code></p>
-<ul>
-  <li>MqttDevice: Name of the MQTT Devices in FHEM which connects to Rhasspys MQTT server</li>
-  <li>DefaultRoom: Room name of the Rhasspy master. Used to speak commands without a room name (e.g. &quot;turn lights on&quot; to turn on the lights in the &quot;default room&quot;)</li>
 </ul>
-<p>Example for defining an MQTT device and the Rhasspy device in FHEM:</p>
-<p>
-  <code>define rhasspyMQTT MQTT &lt;ip-or-hostname-of-rhasspy-master&gt;:1883</code><br>
-  <code>define Rhasspy RHASSPY rhasspyMQTT Wohnzimmer</code>
-</p>
-<p></p>
-<a name="RHASSPYset"></a>
-<p><b>Set</b></p>
-<ul>
-  <li>
-    say<br>
-    Voice output over TTS.<br>
-    Example: set <rhasspyDevice> say siteId="default" text="This is a test"
-  </li>
-  <li>password &lt;password&gt; value<br>
-  set the password, which is stored in the FHEM/FhemUtils/uniqueID file.
-  If the argument is empty, the password will be deleted.
-  </li>
-</ul>
-<p></p>
-<a name="RHASSPYattr"></a>
-<b>Attributes</b>
-<ul>
-  <br><code>rhasspyMaster</code><br>
-  Define the URL to the Rhasspy Master for sending requests to the HTTP-API. Has to be in Format <code>protocol://fqdn:port</code> (e.g. <i>http://rhasspy.example.com:12101</i>).
-</ul>
-</ul>
-
 =end html
 =cut
