@@ -4,3 +4,4 @@
 # But not these files...
 !.gitignore
 !10_RHASSPY.pm
+!README.md
