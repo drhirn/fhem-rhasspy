@@ -1728,6 +1728,10 @@ sub	ReplaceReadingsVal($@) {
     textCommand<br>
     Snips per Text steuern.
   </li>
+  <li>
+    updateSlots<br>
+    Update all slots on Rhasspy with actual FHEM-devices, rooms, etc.
+  </li>
 </ul>
 <p></p>
 <a name="RHASSPYattr"></a>
