@@ -31,6 +31,8 @@ my %sets = (
 #    "volume" => ""
 );
 
+my $language = lc AttrVal("global", "language", "de");
+print $language;
 # MQTT Topics die das Modul automatisch abonniert
 my @topics = qw(
     hermes/intent/+
@@ -86,7 +88,8 @@ use JSON;
 use Net::MQTT::Constants;
 use Encode;
 use HttpUtils;
-#use Data::Dumper;
+use DateTime;
+use Data::Dumper 'Dumper';
 
 
 BEGIN {
@@ -847,19 +850,19 @@ sub onmessage($$$) {
     elsif ($topic =~ qr/^hermes\/intent\/.*:/) {
         my $info, my $sendData;
         my $device, my $room, my $channel, my $color, my $type;
-        my @devices = allRhasspyNames();
-        my @rooms = allRhasspyRooms();
-        my @channels = allRhasspyChannels();
-        my @colors = allRhasspyColors();
-        my @types = allRhasspyTypes();
+#        my @devices = allRhasspyNames();
+#        my @rooms = allRhasspyRooms();
+#        my @channels = allRhasspyChannels();
+#        my @colors = allRhasspyColors();
+#        my @types = allRhasspyTypes();
         my $json, my $infoJson;
         my $sessionId;
         my $command = $data->{'input'};
 
         # Geräte- und Raumbezeichnungen im Kommando gegen die Defaultbezeichnung aus dem Rhasspy-Slot tauschen, damit NLU uns versteht
         # Alle Werte in ein Array und der Länge nach sortieren, damit z.B. "Jazz Radio" nicht fehlerhafterweise als "Radio" erkannt wird
-        my @keys = (@devices, @rooms, @channels, @colors, @types);
-        my @sortedKeys = sort { length($b) <=> length($a) } @keys;
+#        my @keys = (@devices, @rooms, @channels, @colors, @types);
+#        my @sortedKeys = sort { length($b) <=> length($a) } @keys;
 
 #        foreach my $key (@sortedKeys) {
 #            if ($command =~ qr/$key/i) {
@@ -887,27 +890,27 @@ sub onmessage($$$) {
 #        }
 
         # Info Hash wird mit an NLU übergeben um die Rückmeldung später dem Request zuordnen zu können
-        $info = {
-            input       => $data->{'input'},
-            sessionId   => $data->{'sessionId'},
-            siteId      => $data->{'siteId'},
-            Device      => $device,
-            Room        => $room,
-            Channel     => $channel,
-            Color       => $color,
-            Type        => $type
-        };
-        $infoJson = toJSON($info);
+        # $info = {
+            # input       => $data->{'input'},
+            # # sessionId   => $data->{'sessionId'},
+            # siteId      => $data->{'siteId'},
+            # Device      => $device,
+            # Room        => $room,
+            # Channel     => $channel,
+            # Color       => $color,
+            # Type        => $type
+        # };
+        # $infoJson = toJSON($info);
 
         # Message an NLU Senden
-       $sessionId = ($topic eq "hermes/intent/FHEM:TextCommand") ? "fhem.textCommand" :"fhem.voiceCommand";
-       $sendData =  {
-           sessionId => $sessionId,
-            input => $command,
-            id => $infoJson
-        };
+#       $sessionId = ($topic eq "hermes/intent/FHEM:TextCommand") ? "fhem.textCommand" :"fhem.voiceCommand";
+#       $sendData =  {
+#           sessionId => $sessionId,
+#            input => $command,
+#            id => $infoJson
+#        };
 
-        $json = toJSON($sendData);
+#        $json = toJSON($sendData);
 #        MQTT::send_publish($hash->{IODev}, topic => 'hermes/nlu/query', message => $json, qos => 0, retain => "0");
 
 #        Log3($hash->{NAME}, 5, "sending message to NLU: " . $json);
@@ -918,11 +921,12 @@ sub onmessage($$$) {
         my $intent;
 #        my $type = ($message =~ m/fhem.voiceCommand/) ? "voice" : "text";
         $type = ($message =~ m/fhem.textCommand/) ? "text" : "voice";
-
+        
+Log3($hash->{NAME}, 3, "WakewordId: " . $data->{'wakewordId'});
+        $type = ($data->{'wakewordId'}) ? "voice" : "text";
+Log3($hash->{NAME}, 3, "Type: " . $type);
         $data->{'requestType'} = $type;
         $intent = $data->{'intent'};
-
-#Log3($hash->{NAME}, 5, "Intent: " . $intent);
 
         # Readings updaten
         readingsBeginUpdate($hash);
@@ -949,6 +953,8 @@ sub onmessage($$$) {
               RHASSPY::handleIntentSetColor($hash, $data);
         } elsif ($intent eq 'GetTime') {
               RHASSPY::handleIntentGetTime($hash, $data);
+        } elsif ($intent eq 'GetWeekday') {
+              RHASSPY::handleIntentGetWeekday($hash, $data);
         } else {
             RHASSPY::handleCustomIntent($hash, $intent, $data);
         }
@@ -960,6 +966,9 @@ sub onmessage($$$) {
 sub respond($$$$$) {
     my ($hash, $type, $sessionId, $siteId, $response) = @_;
     my $json;
+
+Log3($hash->{NAME}, 3, "Response: $response");
+Log3($hash->{NAME}, 3, "Type: $type");
 
     if ($type eq "voice") {
         my $sendData =  {
@@ -973,7 +982,6 @@ sub respond($$$$$) {
         readingsSingleUpdate($hash, "voiceResponse", $response, 1);
     }
     elsif ($type eq "text") {
-        Log3($hash->{NAME}, 5, "Response: $response");
         readingsSingleUpdate($hash, "textResponse", $response, 1);
     }
     readingsSingleUpdate($hash, "responseType", $type, 0);
@@ -1023,6 +1031,9 @@ sub say($$) {
     my $siteId = "default";
     my $text = $cmd;
     my($unnamedParams, $namedParams) = parseParams($cmd);
+
+    my $test = 'set name test1 test2=abc test3 "test4 test4" test5="test5 test5" test6=\'test6=test6\' test7= test8="\'" test9=\'"\' {my $x = "abc"} test10={ { my $abc ="xyz" } }';
+	print Dumper parseParams( $test );
 
     if (defined($namedParams->{'siteId'}) && defined($namedParams->{'text'})) {
         $siteId = $namedParams->{'siteId'};
@@ -1565,27 +1576,23 @@ sub handleIntentGetTime($$) {
     $response = "Es ist " . qx(date +%R);
     Log3($hash->{NAME}, 5, "Response: $response");
 
-    # Mindestens Channel muss übergeben worden sein
-#    if (exists($data->{'Channel'})) {
-#        $room = roomName($hash, $data);
-#        $channel = $data->{'Channel'};
+    # Antwort senden
+    respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+}
 
-        # Passendes Gerät suchen
-#        if (exists($data->{'Device'})) {
-#            $device = getDeviceByName($hash, $room, $data->{'Device'});
-#        } else {
-#            $device = getDeviceByMediaChannel($hash, $room, $channel);
-#        }
+# Eingehende "GetWeekday" Intents bearbeiten
+sub handleIntentGetWeekday($$) {
+    my ($hash, $data) = @_;
+    my $channel, my $device, my $room;
+    my $cmd;
+    my $response = getResponse($hash, "DefaultError");
 
-#        $cmd = getCmd($hash, $device, "rhasspyChannels", $channel, undef);
+    $language = lc $data->{'lang'} if (exists($data->{'lang'}));
+    Log3($hash->{NAME}, 5, "handleIntentGetWeekday called");
 
-#        if (defined($device) && defined($cmd)) {
-#            $response = getResponse($hash, "DefaultConfirmation");
+    $response = "Heute ist " . DateTime->now(locale => $language)->day_name;
+    Log3($hash->{NAME}, 5, "Response: $response");
 
-            # Cmd ausführen
-#            runCmd($hash, $device, $cmd);
-#        }
-#    }
     # Antwort senden
     respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
 }
