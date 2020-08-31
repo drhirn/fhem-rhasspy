@@ -14,8 +14,7 @@
 
 use strict;
 use warnings;
-
-
+use Data::Dumper;
 
 my %gets = (
     "version" => "",
@@ -31,8 +30,6 @@ my %sets = (
 #    "volume" => ""
 );
 
-my $language = lc AttrVal("global", "language", "de");
-print $language;
 # MQTT Topics die das Modul automatisch abonniert
 my @topics = qw(
     hermes/intent/+
@@ -60,6 +57,9 @@ sub RHASSPY_Initialize($) {
 
     main::LoadModule("MQTT");
 }
+
+#    my $test = 'set name test1 test2=abc test3 "test4 test4" test5="test5 test5" test6=\'test6=test6\' test7= test8="\'" test9=\'"\' {my $x = "abc"} test10={ { my $abc ="xyz" } }';
+#	print Dumper parseParams( $test );
 
 # Cmd in main:: ausführen damit User den Prefix nicht vor alle Perl-Aufrufe schreiben muss
 sub RHASSPY_execute($$$$$) {
@@ -89,8 +89,10 @@ use Net::MQTT::Constants;
 use Encode;
 use HttpUtils;
 use DateTime;
-use Data::Dumper 'Dumper';
 
+
+#    my $test = 'set name test1 test2=abc test3 "test4 test4" test5="test5 test5" test6=\'test6=test6\' test7= test8="\'" test9=\'"\' {my $x = "abc"} test10={ { my $abc ="xyz" } }';
+#	print Dumper parseParams( $test );
 
 BEGIN {
     MQTT->import(qw(:all));
@@ -1016,6 +1018,9 @@ sub textCommand($$) {
     };
     my $message = toJSON($data);
 
+    my ($a,$h)=parseParams('say siteId="test" text="test"');
+    print "A: ".join(",",@{$a})."\nH: ".join(" ",map { "$_=>$h->{$_}" } keys %{$h});
+
     # Send fake command, so it's forwarded to NLU
 #    my $topic2 = "hermes/intent/FHEM:TextCommand";
     my $topic = "hermes/nlu/query";
@@ -1031,9 +1036,12 @@ sub say($$) {
     my $siteId = "default";
     my $text = $cmd;
     my($unnamedParams, $namedParams) = parseParams($cmd);
+    
+#    my ($a,$h)=parseParams('say siteId="test" text="test"');
+#    print "A: ".join(",",@{$a})."\nH: ".join(" ",map { "$_=>$h->{$_}" } keys %{$h});
 
-    my $test = 'set name test1 test2=abc test3 "test4 test4" test5="test5 test5" test6=\'test6=test6\' test7= test8="\'" test9=\'"\' {my $x = "abc"} test10={ { my $abc ="xyz" } }';
-	print Dumper parseParams( $test );
+#    my $test = 'set name test1 test2=abc test3 "test4 test4" test5="test5 test5" test6=\'test6=test6\' test7= test8="\'" test9=\'"\' {my $x = "abc"} test10={ { my $abc ="xyz" } }';
+#	print Dumper parseParams( $test );
 
     if (defined($namedParams->{'siteId'}) && defined($namedParams->{'text'})) {
         $siteId = $namedParams->{'siteId'};
@@ -1586,6 +1594,10 @@ sub handleIntentGetWeekday($$) {
     my $channel, my $device, my $room;
     my $cmd;
     my $response = getResponse($hash, "DefaultError");
+    
+    # Get configured language from attribut "language" of device "global"
+    # to determine locale for DateTime
+    my $language = lc AttrVal("global", "language", "de");
 
     $language = lc $data->{'lang'} if (exists($data->{'lang'}));
     Log3($hash->{NAME}, 5, "handleIntentGetWeekday called");
