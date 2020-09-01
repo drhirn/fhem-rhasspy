@@ -32,6 +32,7 @@ my %sets = (
 my @topics = qw(
     hermes/intent/+
     hermes/nlu/intentParsed
+    hermes/nlu/intentNotRecognized
     hermes/dialogueManager/sessionStarted
     hermes/dialogueManager/sessionEnded
 );
@@ -561,7 +562,7 @@ sub getMapping($$$$;$) {
 # Cmd von Attribut mit dem Format value=cmd pro Zeile lesen
 sub STE_getCmd($$$$;$) {
     my ($hash, $device, $reading, $key, $disableLog) = @_;
-    
+
     my @rows, my $cmd;
     my $attrString = AttrVal($device, $reading, undef);
 
@@ -747,7 +748,10 @@ sub STE_onmessage($$$) {
     my ($hash, $topic, $message) = @_;
     my $data = parseJSON($hash, $message);
     my $input = $data->{'input'} if defined($data->{'input'});
-
+    my $type = $data->{'type'} if defined($data->{'type'});
+    my $sessionId = $data->{'sessionId'} if defined($data->{'sessionId'});
+    my $siteId = $data->{'siteId'} if defined($data->{'siteId'});
+    
     # Hotword Erkennung
     if ($topic =~ m/^hermes\/dialogueManager/) {
         my $data = parseJSON($hash, $message);
@@ -771,10 +775,10 @@ sub STE_onmessage($$$) {
     elsif ($topic =~ qr/^hermes\/intent\/.*:/ && defined($input) && grep( /^$input$/i, allRhasspyShortcuts($hash))) {
       my $error;
       my $response = getResponse($hash, "DefaultError");
-      my $type      = ($topic eq "hermes/intent/FHEM:TextCommand") ? "text" : "voice";
-      my $sessionId = ($topic eq "hermes/intent/FHEM:TextCommand") ? ""     : $data->{'sessionId'};
+#      my $type      = ($topic eq "hermes/intent/FHEM:TextCommand") ? "text" : "voice";
+#      my $sessionId = ($topic eq "hermes/intent/FHEM:TextCommand") ? ""     : $data->{'sessionId'};
       my $cmd = STE_getCmd($hash, $hash->{NAME}, "shortcuts", $input);
-      my $siteId = $data->{'siteId'};
+#      my $siteId = $data->{'siteId'};
 
       if (defined($cmd)) {
           # Cmd ausführen
@@ -791,13 +795,11 @@ sub STE_onmessage($$$) {
         my $info, my $sendData;
         my $device, my $room, my $channel, my $color;
         my $json, my $infoJson;
-        my $sessionId;
+#        my $sessionId;
         my $command = $data->{'input'};
         my $intent;
-        my $type = ($message =~ m/fhem.textCommand/) ? "text" : "voice";
-        
-print $type ."\n";
-
+#        my $type = ($message =~ m/fhem.textCommand/) ? "text" : "voice";
+        $type = ($message =~ m/fhem.textCommand/) ? "text" : "voice";
         $data->{'requestType'} = $type;
         $intent = $data->{'intent'};
 
@@ -832,6 +834,13 @@ print $type ."\n";
             handleCustomIntent($hash, $intent, $data);
         }
     }
+    
+    elsif ($topic =~ qr/^hermes\/nlu\/intentNotRecognized/) {
+        my $response = getResponse($hash, "IntentNotRecognized");
+$type = "voice";
+        respond($hash,$type,$sessionId,$siteId,$response);
+print "intentNotRecognized: $response";
+   }
 }
     
 # Antwort ausgeben
@@ -865,7 +874,8 @@ sub getResponse($$) {
     my %messages = (
         DefaultError => "Da ist etwas schief gegangen.",
         NoActiveMediaDevice => "Kein Wiedergabegerät aktiv.",
-        DefaultConfirmation => "Ok."
+        DefaultConfirmation => "Ok.",
+        IntentNotRecognized => "Ich habe dich leider nicht verstanden"
     );
 
     $response = STE_getCmd($hash, $hash->{NAME}, "response", $identifier);
@@ -1414,7 +1424,8 @@ sub handleIntentGetTime($$) {
 
     Log3($hash->{NAME}, 5, "handleIntentGetTime called");
 
-    $response = "Es ist " . qx(date +%R);
+    (my $sec,my $min,my $hour,my $mday,my $mon,my $year,my $wday,my $yday,my $isdst) = localtime();
+    $response = "Es ist $hour:$min";
     Log3($hash->{NAME}, 5, "Response: $response");
 
     # Antwort senden
