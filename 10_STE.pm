@@ -701,6 +701,11 @@ sub parseJSON($$) {
     $data->{'sessionId'} = $decoded->{'sessionId'};
     $data->{'siteId'} = $decoded->{'siteId'};
     $data->{'input'} = $decoded->{'input'};
+    $data->{'rawInput'} = $decoded->{'rawInput'};
+
+    if (defined($data->{'rawInput'})) {
+        $data->{'rawInput'} = ($data->{'rawInput'} =~ m/^.*bitte.*/) ? "nice" : undef;
+    }
 
     # Überprüfen ob Slot Array existiert
     if (exists($decoded->{'slots'})) {
@@ -754,7 +759,7 @@ sub STE_onmessage($$$) {
     
     # Hotword Erkennung
     if ($topic =~ m/^hermes\/dialogueManager/) {
-        my $data = parseJSON($hash, $message);
+#        my $data = parseJSON($hash, $message);
         my $room = roomName($hash, $data);
 
         if (defined($room)) {
@@ -867,16 +872,31 @@ sub respond($$$$$) {
 
 
 # Antworttexte festlegen
-sub getResponse($$) {
-    my ($hash, $identifier) = @_;
+sub getResponse($$;$) {
+    my ($hash, $identifier, $friendly) = @_;
+#    my ($hash, $identifier) = @_;
     my $response;
+    my %messages;
 
-    my %messages = (
-        DefaultError => "Da ist etwas schief gegangen.",
-        NoActiveMediaDevice => "Kein Wiedergabegerät aktiv.",
-        DefaultConfirmation => "Ok.",
-        IntentNotRecognized => "Ich habe dich leider nicht verstanden"
-    );
+#print "Friendly: " . Dumper($friendly) . "\n\n";
+
+    if (defined($friendly)){
+        %messages = (
+            DefaultError => "Da ist leider etwas schief gegangen.",
+            NoActiveMediaDevice => "Tut mir leid, es ist kein Wiedergabegerät aktiv.",
+            DefaultConfirmation => "Mache ich doch sehr gerne",
+            IntentNotRecognized => "Ich habe dich leider nicht verstanden"
+        );
+    } else {
+        %messages = (
+            DefaultError => "Da ist etwas schief gegangen.",
+            NoActiveMediaDevice => "Kein Wiedergabegerät aktiv.",
+            DefaultConfirmation => "Ok.",
+            IntentNotRecognized => "Ich habe dich leider nicht verstanden"
+        );
+    }
+
+#print "Aber hallo:\n\n".Dumper(%messages)."\n\n";
 
     $response = STE_getCmd($hash, $hash->{NAME}, "response", $identifier);
     $response = $messages{$identifier} if (!defined($response));
@@ -1026,7 +1046,7 @@ sub X_ParseHttpResponse($)
     if($err ne "")
     {
         Log3 $name, 3, "error while requesting ".$param->{url}." - $err";
-        readingsSingleUpdate($hash, "lastHttpApiResponse", "ERROR", 1);
+        readingsSingleUpdate($hash, "lastHttpApiResponse", "ERROR: $err", 1);
     }
     elsif($data ne "")
     {
@@ -1458,8 +1478,12 @@ sub handleIntentMediaChannels($$) {
     my ($hash, $data) = @_;
     my $channel, my $device, my $room;
     my $cmd;
-    my $response = getResponse($hash, "DefaultError");
+    my $response = getResponse($hash, "DefaultError", $data->{'rawInput'});
 
+#print "Dump:\n\n" . Dumper($data) . "\n\n";
+
+#    print "Response: $response\n";
+    
     Log3($hash->{NAME}, 5, "handleIntentMediaChannels called");
 
     # Mindestens Channel muss übergeben worden sein
@@ -1477,12 +1501,12 @@ sub handleIntentMediaChannels($$) {
         $cmd = STE_getCmd($hash, $device, "rhasspyChannels", $channel, undef);
 
         if (defined($device) && defined($cmd)) {
-            $response = getResponse($hash, "DefaultConfirmation");
-
+            $response = getResponse($hash, "DefaultConfirmation",$data->{'rawInput'});
             # Cmd ausführen
             runCmd($hash, $device, $cmd);
         }
     }
+#    print "Response: $response\n";
     # Antwort senden
     respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
 }
