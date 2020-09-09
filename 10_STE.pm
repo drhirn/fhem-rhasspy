@@ -584,7 +584,7 @@ sub STE_getCmd($$$$;$) {
 
 
 # Cmd String im Format 'cmd', 'device:cmd', 'fhemcmd1; fhemcmd2' oder '{<perlcode}' ausführen
-sub runCmd($$$;$$) {
+sub STE_runCmd($$$;$$) {
     my ($hash, $device, $cmd, $val, $siteId) = @_;
     my $error;
     my $returnVal;
@@ -630,7 +630,6 @@ sub runCmd($$$;$$) {
     }
     Log3($hash->{NAME}, 1, $_) if (defined($error));
 
-#    Log3($hash->{NAME}, 1, "returnVal: $cmd");
     return $returnVal;
 }
 
@@ -639,15 +638,15 @@ sub getValue($$$;$$) {
     my ($hash, $device, $getString, $val, $siteId) = @_;
     my $value;
 
-    # Perl Command? -> Umleiten zu runCmd
+    # Perl Command? -> Umleiten zu STE_runCmd
     if ($getString =~ m/^\s*{.*}\s*$/) {
         # Wert lesen
-        $value = runCmd($hash, $device, $getString, $val, $siteId);
+        $value = STE_runCmd($hash, $device, $getString, $val, $siteId);
     }
-    # String in Anführungszeichen -> Umleiten zu runCmd
+    # String in Anführungszeichen -> Umleiten zu STE_runCmd
     elsif ($getString =~ m/^\s*".*"\s*$/) {
         # Wert lesen
-        $value = runCmd($hash, $device, $getString, $val, $siteId);
+        $value = STE_runCmd($hash, $device, $getString, $val, $siteId);
     }
     # Reading oder Device:Reading
     else {
@@ -787,7 +786,7 @@ sub STE_onmessage($$$) {
 
       if (defined($cmd)) {
           # Cmd ausführen
-          my $returnVal = runCmd($hash, undef, $cmd, undef, $data->{'siteId'});
+          my $returnVal = STE_runCmd($hash, undef, $cmd, undef, $data->{'siteId'});
 
           $response = (defined($returnVal)) ? $returnVal : getResponse($hash, "DefaultConfirmation");
       }
@@ -840,12 +839,12 @@ sub STE_onmessage($$$) {
         }
     }
     
-    elsif ($topic =~ qr/^hermes\/nlu\/intentNotRecognized/) {
-        my $response = getResponse($hash, "IntentNotRecognized");
-$type = "voice";
-        respond($hash,$type,$sessionId,$siteId,$response);
-print "intentNotRecognized: $response";
-   }
+#    elsif ($topic =~ qr/^hermes\/nlu\/intentNotRecognized/) {
+#        my $response = getResponse($hash, "IntentNotRecognized");
+#$type = "voice";
+#        respond($hash,$type,$sessionId,$siteId,$response);
+#print "intentNotRecognized: $response";
+#   }
 }
     
 # Antwort ausgeben
@@ -1133,7 +1132,7 @@ sub handleIntentSetOnOff($$) {
             my $cmd = ($value eq 'an') ? $cmdOn : $cmdOff;
 
             # Cmd ausführen
-            runCmd($hash, $device, $cmd);
+            STE_runCmd($hash, $device, $cmd);
             Log3($hash->{NAME}, 5, "Running command $cmd on device $device" );
             
             # Antwort bestimmen
@@ -1276,7 +1275,7 @@ sub handleIntentSetNumeric($$) {
                     $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
 
                     # Cmd ausführen
-                    runCmd($hash, $device, $cmd, $newVal);
+                    STE_runCmd($hash, $device, $cmd, $newVal);
                     
                     # Antwort festlegen
                     if (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $newVal, $room); }
@@ -1422,7 +1421,7 @@ sub handleIntentMediaControls($$) {
 
             if (defined($cmd)) {
                 # Cmd ausführen
-                runCmd($hash, $device, $cmd);
+                STE_runCmd($hash, $device, $cmd);
                 
                 # Antwort festlegen
                 if (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $command, $room); }
@@ -1503,7 +1502,7 @@ sub handleIntentMediaChannels($$) {
         if (defined($device) && defined($cmd)) {
             $response = getResponse($hash, "DefaultConfirmation",$data->{'rawInput'});
             # Cmd ausführen
-            runCmd($hash, $device, $cmd);
+            STE_runCmd($hash, $device, $cmd);
         }
     }
 #    print "Response: $response\n";
@@ -1534,7 +1533,7 @@ sub handleIntentSetColor($$) {
             $response = getResponse($hash, "DefaultConfirmation");
 
             # Cmd ausführen
-            runCmd($hash, $device, $cmd);
+            STE_runCmd($hash, $device, $cmd);
         }
     }
     # Antwort senden
