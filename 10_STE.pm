@@ -868,13 +868,11 @@ sub STE_respond($$$$$) {
 sub STE_getResponse($$) {
     my ($hash, $identifier) = @_;
     my $response;
-    my %messages;
 
-    %messages = (
+    my %messages = (
         DefaultError => "Da ist leider etwas schief gegangen.",
         NoActiveMediaDevice => "Tut mir leid, es ist kein Wiedergabegerät aktiv.",
-        DefaultConfirmation => "Mache ich doch sehr gerne",
-        IntentNotRecognized => "Ich habe dich leider nicht verstanden"
+        DefaultConfirmation => "Mache ich doch sehr gerne"
     );
 
     $response = STE_getCmd($hash, $hash->{NAME}, "response", $identifier);
@@ -926,9 +924,11 @@ sub STE_speak($$) {
     MQTT::send_publish($hash->{IODev}, topic => 'hermes/tts/say', message => $json, qos => 0, retain => "0");
 }
 
-# Update vom Rhasspy Model / ASR Injection
+# Send all devices, rooms, etc. to Rhasspy HTTP-API to update the slots
 sub STE_updateSlots($) {
     my ($hash) = @_;
+    
+    # Collect everything and store it in arrays
     my @devices = STE_allRhasspyNames();
     my @rooms = STE_allRhasspyRooms();
     my @channels = STE_allRhasspyChannels();
@@ -936,57 +936,29 @@ sub STE_updateSlots($) {
     my @types = STE_allRhasspyTypes();
     my @shortcuts = STE_allRhasspyShortcuts($hash);
 
-    # JSON Struktur erstellen
+    # If there are any devices, rooms, etc. found, create JSON structure and send it the the API
     if (@devices > 0 || @rooms > 0 || @channels > 0 || @types > 0 || @shortcuts > 0) {
       my $json;
-      my $injectData, my $deviceData, my $roomData, my $channelData, my $colorData, my $typeData, my $shortcutData;
-      my @operations, my @deviceOperation, my @roomOperation, my @channelOperation, my @ccolorOperation, my @typeOperation, my @shortcutOperation;
+      my $deviceData;
+      my $url = "/api/slots";
+      my $method = "POST";
 
       $deviceData->{'de.fhem.Device'} = \@devices if @devices > 0;
-      #@deviceOperation = ('add', $deviceData);
-#      @deviceOperation = ($deviceData);
-
-#      $roomData->{'de.fhem.Room'} = \@rooms;
       $deviceData->{'de.fhem.Room'} = \@rooms if @rooms > 0;
-#      @roomOperation = ('add', $roomData);
-
       $deviceData->{'de.fhem.MediaChannels'} = \@channels if @channels > 0;
-#      @channelOperation = ('add', $channelData);
-
       $deviceData->{'de.fhem.Color'} = \@colors if @colors > 0;
-#      @ccolorOperation = ('add', $colorData);
-
       $deviceData->{'de.fhem.NumericType'} = \@types if @types > 0;
-#      @typeOperation = ('add', $typeData);
-
       $deviceData->{'de.fhem.Shortcuts'} = \@shortcuts if @shortcuts > 0;
-#      @shortcutOperation = ('add', $shortcutData);
 
-#      push(@operations, \@deviceOperation) if @devices > 0;
-#      push(@operations, \@roomOperation) if @rooms > 0;
-#      push(@operations, \@channelOperation) if @channels > 0;
-#      push(@operations, \@ccolorOperation) if @colors > 0;
-#      push(@operations, \@typeOperation) if @types > 0;
-#      push(@operations, \@shortcutOperation) if @shortcuts > 0;
-
-#      $injectData->{'operations'} = \@operations;
-#      $injectData->{''} = \@deviceOperation;
-#      $json = eval { toJSON($injectData) };
       $json = eval { toJSON($deviceData) };
 
       Log3($hash->{NAME}, 5, "Updating Rhasspy Slots with data: $json");
       
-
-      my $url = "/api/slots";
-      my $method = "POST";
-
       STE_sendToApi($hash, $url, $method, $json);
-
-      # ASR Inject über MQTT senden
-#      MQTT::send_publish($hash->{IODev}, topic => 'hermes/injection/perform', message => $json, qos => 0, retain => "0");
     }
 }
 
+# Use the HTTP-API to instruct Rhasspy to re-train it's data
 sub STE_trainRhasspy($) {
     my ($hash) = @_;
     my $url = "/api/train";
