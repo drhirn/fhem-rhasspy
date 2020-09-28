@@ -478,7 +478,10 @@ sub STE_getDeviceByMediaChannel($$$) {
 
     foreach (@devices) {
         # Array bilden mit Räumen des Devices
-        my @rooms = split(',', AttrVal($_,"rhasspyRoom",undef));
+        my @rooms = AttrVal($_,"rhasspyRoom",undef);
+        if (index(@rooms, ",") != -1) {
+            my @rooms = split(',', AttrVal($_,"rhasspyRoom",undef));
+        }
         # Cmd mit passendem Intent vorhanden?
         my $cmd = STE_getCmd($hash, $_, "rhasspyChannels", $channel, 1);
         next unless defined($cmd);
