@@ -1413,10 +1413,6 @@ sub STE_handleIntentMediaChannels($$) {
     my $cmd;
     my $response = STE_getResponse($hash, "DefaultError");
 
-#print "Dump:\n\n" . Dumper($data) . "\n\n";
-
-#    print "Response: $response\n";
-    
     Log3($hash->{NAME}, 5, "handleIntentMediaChannels called");
 
     # Mindestens Channel muss übergeben worden sein
@@ -1439,7 +1435,7 @@ sub STE_handleIntentMediaChannels($$) {
             STE_runCmd($hash, $device, $cmd);
         }
     }
-#    print "Response: $response\n";
+
     # Antwort senden
     STE_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
 }
