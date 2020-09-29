@@ -11,9 +11,6 @@ use HttpUtils;
 use DateTime;
 use Data::Dumper;
 
-#    my $test = 'set name test1 test2=abc test3 "test4 test4" test5="test5 test5" test6=\'test6=test6\' test7= test8="\'" test9=\'"\' {my $x = "abc"} test10={ { my $abc ="xyz" } }';
-#print Dumper parseParams( $test );
-
 my %gets = (
     "version" => "",
     "status" => ""
@@ -35,8 +32,6 @@ my @topics = qw(
     hermes/dialogueManager/sessionEnded
 );
 
-#    hermes/nlu/intentParsed
-#    hermes/nlu/intentNotRecognized
 
 sub STE_Initialize($)
 {
