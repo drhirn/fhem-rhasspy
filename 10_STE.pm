@@ -356,7 +356,7 @@ sub STE_getDeviceByName($$$) {
         # 2 Arrays bilden mit Namen und Räumen des Devices
         my @names = split(',', AttrVal($_,"rhasspyName",undef));
         my @rooms = split(',', AttrVal($_,"rhasspyRoom",undef));
-Dumper(@names,@rooms);
+
         # Case Insensitive schauen ob der gesuchte Name (oder besser Name und Raum) in den Arrays vorhanden ist
         if (grep( /^$name$/i, @names)) {
             if (!defined($device) || grep( /^$room$/i, @rooms)) {
@@ -718,23 +718,6 @@ sub STE_parseJSON($$) {
         }
     }
 
-    # Falls Info Dict angehängt ist, handelt es sich um einen mit Standardwerten über NLU umgeleiteten Request. -> Originalwerte wiederherstellen
-#    if (exists($decoded->{'id'})) {
-#        my $info = eval { decode_json(encode_utf8($decoded->{'id'})) };
-#        if ($@) {
-#            $info = undef;
-#        }
-#
-#        $data->{'input'} = $info->{'input'} if defined($info->{'input'});
-#        $data->{'sessionId'} = $info->{'sessionId'} if defined($info->{'sessionId'});
-#        $data->{'siteId'} = $info->{'siteId'} if defined($info->{'siteId'});
-#        $data->{'Device'} = $info->{'Device'} if defined($info->{'Device'});
-#        $data->{'Room'} = $info->{'Room'} if defined($info->{'Room'});
-#        $data->{'Channel'} = $info->{'Channel'} if defined($info->{'Channel'});
-#        $data->{'Color'} = $info->{'Color'} if defined($info->{'Color'});
-#        $data->{'Type'} = $info->{'Type'} if defined($info->{'Type'});
-#    }
-
     foreach (keys %{ $data }) {
         my $value = $data->{$_};
         Log3($hash->{NAME}, 5, "Parsed value: $value for key: $_");
@@ -795,7 +778,6 @@ sub STE_onmessage($$$) {
         my $info, my $sendData;
         my $device, my $room, my $channel, my $color;
         my $json, my $infoJson;
-#        my $sessionId;
         my $command = $data->{'input'};
         my $intent;
 #        my $type = ($message =~ m/fhem.textCommand/) ? "text" : "voice";
@@ -922,6 +904,9 @@ sub STE_speak($$) {
 # Send all devices, rooms, etc. to Rhasspy HTTP-API to update the slots
 sub STE_updateSlots($) {
     my ($hash) = @_;
+    
+#Example for updating shortcuts (sentences -> intents/test.ini)
+#curl -X POST "http://localhost:12101/api/sentences" -H  "accept: text/plain" -H  "Content-Type: application/json" -d "{\"intents/test.ini\":\"[test]\\\\\[bitte] weift du [bitte] welcher Tag heute ist\Dudlidu\"}"    
     
     # Collect everything and store it in arrays
     my @devices = STE_allRhasspyNames();
@@ -1080,8 +1065,8 @@ sub STE_handleIntentSetOnOff($$) {
 
             # Cmd ausführen
             STE_runCmd($hash, $device, $cmd);
-            Log3($hash->{NAME}, 5, "Running command $cmd on device $device" );
-            
+            Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
+
             # Antwort bestimmen
             $numericValue = ($value eq 'an') ? 1 : 0;
             if (defined($mapping->{'response'})) { $response = STE_getValue($hash, $device, $mapping->{'response'}, $numericValue, $room); }
