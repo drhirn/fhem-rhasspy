@@ -759,10 +759,7 @@ sub STE_onmessage($$$) {
     elsif ($topic =~ qr/^hermes\/intent\/.*:/ && defined($input) && grep( /^$input$/i, STE_allRhasspyShortcuts($hash))) {
       my $error;
       my $response = STE_getResponse($hash, "DefaultError");
-#      my $type      = ($topic eq "hermes/intent/FHEM:TextCommand") ? "text" : "voice";
-#      my $sessionId = ($topic eq "hermes/intent/FHEM:TextCommand") ? ""     : $data->{'sessionId'};
       my $cmd = STE_getCmd($hash, $hash->{NAME}, "shortcuts", $input);
-#      my $siteId = $data->{'siteId'};
 
       if (defined($cmd)) {
           # Cmd ausführen
