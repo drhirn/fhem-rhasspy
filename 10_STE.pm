@@ -731,10 +731,11 @@ sub STE_onmessage($$$) {
     my ($hash, $topic, $message) = @_;
     my $data = STE_parseJSON($hash, $message);
     my $input = $data->{'input'} if defined($data->{'input'});
-    my $type = $data->{'type'} if defined($data->{'type'});
+    my $type = "text";
+    $type = $data->{'type'} if defined($data->{'type'});
     my $sessionId = $data->{'sessionId'} if defined($data->{'sessionId'});
     my $siteId = $data->{'siteId'} if defined($data->{'siteId'});
-    
+
     # Hotword Erkennung
     if ($topic =~ m/^hermes\/dialogueManager/) {
 #        my $data = STE_parseJSON($hash, $message);
@@ -823,21 +824,30 @@ sub STE_respond($$$$$) {
     my ($hash, $type, $sessionId, $siteId, $response) = @_;
     my $json;
 
-    if ($type eq "voice") {
-        my $sendData =  {
-            sessionId => $sessionId,
-            siteId => $siteId,
-            text => $response
-        };
+    my $sendData =  {
+        sessionId => $sessionId,
+        siteId => $siteId,
+        text => $response
+    };
 
-        $json = toJSON($sendData);
-        MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
+    $json = toJSON($sendData);
+
+    if ($type eq "voice") {
+#        my $sendData =  {
+#            sessionId => $sessionId,
+#            siteId => $siteId,
+#            text => $response
+#        };
+
+#        $json = toJSON($sendData);
+#        MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
         readingsSingleUpdate($hash, "voiceResponse", $response, 1);
     }
     elsif ($type eq "text") {
         readingsSingleUpdate($hash, "textResponse", $response, 1);
     }
     readingsSingleUpdate($hash, "responseType", $type, 1);
+    MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
 }
 
 
@@ -905,9 +915,6 @@ sub STE_speak($$) {
 sub STE_updateSlots($) {
     my ($hash) = @_;
     
-#Example for updating shortcuts (sentences -> intents/test.ini)
-#curl -X POST "http://localhost:12101/api/sentences" -H  "accept: text/plain" -H  "Content-Type: application/json" -d "{\"intents/test.ini\":\"[test]\\\\\[bitte] weift du [bitte] welcher Tag heute ist\Dudlidu\"}"    
-    
     # Collect everything and store it in arrays
     my @devices = STE_allRhasspyNames();
     my @rooms = STE_allRhasspyRooms();
@@ -916,8 +923,26 @@ sub STE_updateSlots($) {
     my @types = STE_allRhasspyTypes();
     my @shortcuts = STE_allRhasspyShortcuts($hash);
 
+    if (@shortcuts > 0) {
+        my $json;
+        my $deviceData;
+        my $url = "/api/sentences";
+        my $method = "POST";
+        
+        $deviceData='{"intents/de.fhem.Shortcuts.ini":"[de.fhem:Shortcuts]\n';
+        foreach (@shortcuts)
+        {
+            $deviceData = $deviceData . ($_) . '\n';
+        }
+        $deviceData = $deviceData . '"}';
+        
+        Log3($hash->{NAME}, 5, "Updating Rhasspy Sentences with data: $deviceData");
+          
+        STE_sendToApi($hash, $url, $method, $deviceData);
+    }
+
     # If there are any devices, rooms, etc. found, create JSON structure and send it the the API
-    if (@devices > 0 || @rooms > 0 || @channels > 0 || @types > 0 || @shortcuts > 0) {
+    if (@devices > 0 || @rooms > 0 || @channels > 0 || @types > 0) {
       my $json;
       my $deviceData;
       my $url = "/api/slots";
@@ -928,7 +953,6 @@ sub STE_updateSlots($) {
       $deviceData->{'de.fhem.MediaChannels'} = \@channels if @channels > 0;
       $deviceData->{'de.fhem.Color'} = \@colors if @colors > 0;
       $deviceData->{'de.fhem.NumericType'} = \@types if @types > 0;
-      $deviceData->{'de.fhem.Shortcuts'} = \@shortcuts if @shortcuts > 0;
 
       $json = eval { toJSON($deviceData) };
 
@@ -1059,7 +1083,7 @@ sub STE_handleIntentSetOnOff($$) {
 
         # Mapping gefunden?
         if (defined($device) && defined($mapping)) {
-            my $cmdOn  = (defined($mapping->{'cmdOn'}))  ? $mapping->{'cmdOn'}  :  "on";
+            my $cmdOn  = (defined($mapping->{'cmdOn'}))  ? $mapping->{'cmdOn'}  : "on";
             my $cmdOff = (defined($mapping->{'cmdOff'})) ? $mapping->{'cmdOff'} : "off";
             my $cmd = ($value eq 'an') ? $cmdOn : $cmdOff;
 
