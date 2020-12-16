@@ -33,7 +33,7 @@ my @topics = qw(
 );
 
 
-sub STE_Initialize($)
+sub RHASSPY_Initialize($)
 {
     my ($hash)  = @_;
 
@@ -43,18 +43,18 @@ sub STE_Initialize($)
     addToAttrList("rhasspyMapping:textField-long");
     
     # Consumer
-    $hash->{DefFn} = "STE_Define";
-    $hash->{UndefFn} = "STE_Undefine";
-    $hash->{SetFn} = "STE_Set";
-    $hash->{AttrFn} = "STE_Attr";
+    $hash->{DefFn} = "RHASSPY_Define";
+    $hash->{UndefFn} = "RHASSPY_Undefine";
+    $hash->{SetFn} = "RHASSPY_Set";
+    $hash->{AttrFn} = "RHASSPY_Attr";
     $hash->{AttrList} = "IODev defaultRoom rhasspyIntents:textField-long shortcuts:textField-long rhasspyMaster response:textField-long " . $readingFnAttributes;
-    $hash->{OnMessageFn} = "STE_onmessage";
+    $hash->{OnMessageFn} = "RHASSPY_onmessage";
 
     main::LoadModule("MQTT");
 }
 
 # Device anlegen
-sub STE_Define() {
+sub RHASSPY_Define() {
     my ($hash, $def) = @_;
     my @args = split("[ \t]+", $def);
 
@@ -70,24 +70,24 @@ sub STE_Define() {
     MQTT::Client_Define($hash, $def);
 
     # Benötigte MQTT Topics abonnieren
-    STE_subscribeTopics($hash);
+    RHASSPY_subscribeTopics($hash);
 
     return undef;
 };
 
 # Device löschen
-sub STE_Undefine($$) {
+sub RHASSPY_Undefine($$) {
     my ($hash, $name) = @_;
 
     # MQTT Abonnements löschen
-    STE_unsubscribeTopics($hash);
+    RHASSPY_unsubscribeTopics($hash);
 
     # Weitere Schritte an das MQTT Modul übergeben, damit man dort als Client ausgetragen wird
     return MQTT::Client_Undefine($hash);
 }
 
 # Set Befehl aufgerufen
-sub STE_Set($$$@) {
+sub RHASSPY_Set($$$@) {
     my ($hash, $name, $command, @values) = @_;
     return "Unknown argument $command, choose one of " . join(" ", sort keys %sets) if(!defined($sets{$command}));
 
@@ -96,16 +96,16 @@ sub STE_Set($$$@) {
     # Speak Cmd
     if ($command eq "speak") {
         my $text = join (" ", @values);
-        STE_speak($hash, $text);
+        RHASSPY_speak($hash, $text);
     }
     # TextCommand Cmd
     elsif ($command eq "textCommand") {
         my $text = join (" ", @values);
-        STE_textCommand($hash, $text);
+        RHASSPY_textCommand($hash, $text);
     }
     # Update Model Cmd
     elsif ($command eq "updateSlots") {
-        STE_updateSlots($hash);
+        RHASSPY_updateSlots($hash);
     }
     # Volume Cmd
     elsif ($command eq "volume") {
@@ -114,12 +114,12 @@ sub STE_Set($$$@) {
     }
     # TrainRhasspy Cmd
     elsif ($command eq "trainRhasspy") {
-        STE_trainRhasspy($hash);
+        RHASSPY_trainRhasspy($hash);
     }
 }
 
 # Attribute setzen / löschen
-sub STE_Attr($$$$) {
+sub RHASSPY_Attr($$$$) {
     my ($command, $name, $attribute, $value) = @_;
     my $hash = $defs{$name};
 
@@ -132,7 +132,7 @@ sub STE_Attr($$$$) {
     return undef;
 }
 
-sub STE_execute($$$$$) {
+sub RHASSPY_execute($$$$$) {
     my ($hash, $device, $cmd, $value, $siteId) = @_;
     my $returnVal;
 
@@ -149,7 +149,7 @@ sub STE_execute($$$$$) {
 }
 
 # Topics abonnieren
-sub STE_subscribeTopics($) {
+sub RHASSPY_subscribeTopics($) {
     my ($hash) = @_;
 
     foreach (@topics) {
@@ -161,7 +161,7 @@ sub STE_subscribeTopics($) {
 }
 
 # Topics abbestellen
-sub STE_unsubscribeTopics($) {
+sub RHASSPY_unsubscribeTopics($) {
     my ($hash) = @_;
 
     foreach (@topics) {
@@ -173,7 +173,7 @@ sub STE_unsubscribeTopics($) {
 }
 
 # Alle Gerätenamen sammeln
-sub STE_allRhasspyNames() {
+sub RHASSPY_allRhasspyNames() {
     my @devices, my @sorted;
     my %devicesHash;
     my $devspec = "room=Rhasspy";
@@ -195,7 +195,7 @@ sub STE_allRhasspyNames() {
 }
 
 # Alle Raumbezeichnungen sammeln
-sub STE_allRhasspyRooms() {
+sub RHASSPY_allRhasspyRooms() {
     my @rooms, my @sorted;
     my %roomsHash;
     my $devspec = "room=Rhasspy";
@@ -218,7 +218,7 @@ sub STE_allRhasspyRooms() {
 
 
 # Alle Sender sammeln
-sub STE_allRhasspyChannels() {
+sub RHASSPY_allRhasspyChannels() {
     my @channels, my @sorted;
     my %channelsHash;
     my $devspec = "room=Rhasspy";
@@ -246,7 +246,7 @@ sub STE_allRhasspyChannels() {
 
 
 # Alle NumericTypes sammeln
-sub STE_allRhasspyTypes() {
+sub RHASSPY_allRhasspyTypes() {
     my @types, my @sorted;
     my %typesHash;
     my $devspec = "room=Rhasspy";
@@ -259,7 +259,7 @@ sub STE_allRhasspyTypes() {
             # Nur GetNumeric und SetNumeric verwenden
             next unless $_ =~ m/^(SetNumeric|GetNumeric)/;
             $_ =~ s/(SetNumeric|GetNumeric)://;
-            my %mapping = STE_splitMappingString($_);
+            my %mapping = RHASSPY_splitMappingString($_);
 
             push @types, $mapping{'type'} if (defined($mapping{'type'}));
         }
@@ -277,7 +277,7 @@ sub STE_allRhasspyTypes() {
 
 
 # Alle Farben sammeln
-sub STE_allRhasspyColors() {
+sub RHASSPY_allRhasspyColors() {
     my @colors, my @sorted;
     my %colorHash;
     my $devspec = "room=Rhasspy";
@@ -305,7 +305,7 @@ sub STE_allRhasspyColors() {
 
 
 # Alle Shortcuts sammeln
-sub STE_allRhasspyShortcuts($) {
+sub RHASSPY_allRhasspyShortcuts($) {
     my ($hash) = @_;
     my @shortcuts, my @sorted;
 
@@ -324,7 +324,7 @@ sub STE_allRhasspyShortcuts($) {
 
 
 # Raum aus gesprochenem Text oder aus siteId verwenden? (siteId "default" durch Attr defaultRoom ersetzen)
-sub STE_roomName ($$) {
+sub RHASSPY_roomName ($$) {
     my ($hash, $data) = @_;
 
     my $room;
@@ -343,7 +343,7 @@ sub STE_roomName ($$) {
 
 
 # Gerät über Raum und Namen suchen.
-sub STE_getDeviceByName($$$) {
+sub RHASSPY_getDeviceByName($$$) {
     my ($hash, $room, $name) = @_;
     my $device;
     my $devspec = "room=Rhasspy";
@@ -372,7 +372,7 @@ sub STE_getDeviceByName($$$) {
 
 
 # Sammelt Geräte über Raum, Intent und optional Type
-sub STE_getDevicesByIntentAndType($$$$) {
+sub RHASSPY_getDevicesByIntentAndType($$$$) {
     my ($hash, $room, $intent, $type) = @_;
     my @matchesInRoom, my @matchesOutsideRoom;
     my $devspec = "room=Rhasspy";
@@ -385,7 +385,7 @@ sub STE_getDevicesByIntentAndType($$$$) {
         # Array bilden mit Räumen des Devices
         my @rooms = split(',', AttrVal($_,"rhasspyRoom",undef));
         # Mapping mit passendem Intent vorhanden?
-        my $mapping = STE_getMapping($hash, $_, $intent, $type, 1);
+        my $mapping = RHASSPY_getMapping($hash, $_, $intent, $type, 1);
         next unless defined($mapping);
 
         my $mappingType = $mapping->{'type'} if (defined($mapping->{'type'}));
@@ -410,12 +410,12 @@ sub STE_getDevicesByIntentAndType($$$$) {
 
 
 # Geräte über Raum, Intent und ggf. Type suchen.
-sub STE_getDeviceByIntentAndType($$$$) {
+sub RHASSPY_getDeviceByIntentAndType($$$$) {
     my ($hash, $room, $intent, $type) = @_;
     my $device;
 
     # Devices sammeln
-    my ($matchesInRoom, $matchesOutsideRoom) = STE_getDevicesByIntentAndType($hash, $room, $intent, $type);
+    my ($matchesInRoom, $matchesOutsideRoom) = RHASSPY_getDevicesByIntentAndType($hash, $room, $intent, $type);
 
     # Erstes Device im passenden Raum zurückliefern falls vorhanden, sonst erstes Device außerhalb
     $device = (@{$matchesInRoom} > 0) ? shift @{$matchesInRoom} : shift @{$matchesOutsideRoom};
@@ -427,10 +427,10 @@ sub STE_getDeviceByIntentAndType($$$$) {
 
 
 # Eingeschaltetes Gerät mit bestimmten Intent und optional Type suchen
-sub STE_getActiveDeviceForIntentAndType($$$$) {
+sub RHASSPY_getActiveDeviceForIntentAndType($$$$) {
     my ($hash, $room, $intent, $type) = @_;
     my $device;
-    my ($matchesInRoom, $matchesOutsideRoom) = STE_getDevicesByIntentAndType($hash, $room, $intent, $type);
+    my ($matchesInRoom, $matchesOutsideRoom) = RHASSPY_getDevicesByIntentAndType($hash, $room, $intent, $type);
 
     # Anonyme Funktion zum finden des aktiven Geräts
     my $activeDevice = sub ($$) {
@@ -438,10 +438,10 @@ sub STE_getActiveDeviceForIntentAndType($$$$) {
         my $match;
 
         foreach (@{$devices}) {
-            my $mapping = STE_getMapping($hash, $_, "GetOnOff", undef, 1);
+            my $mapping = RHASSPY_getMapping($hash, $_, "GetOnOff", undef, 1);
             if (defined($mapping)) {
                 # Gerät ein- oder ausgeschaltet?
-                my $value = STE_getOnOffState($hash, $_, $mapping);
+                my $value = RHASSPY_getOnOffState($hash, $_, $mapping);
                 if ($value == 1) {
                     $match = $_;
                     last;
@@ -462,7 +462,7 @@ sub STE_getActiveDeviceForIntentAndType($$$$) {
 
 
 # Gerät mit bestimmtem Sender suchen
-sub STE_getDeviceByMediaChannel($$$) {
+sub RHASSPY_getDeviceByMediaChannel($$$) {
     my ($hash, $room, $channel) = @_;
     my $device;
     my $devspec = "room=Rhasspy";
@@ -478,7 +478,7 @@ sub STE_getDeviceByMediaChannel($$$) {
             my @rooms = split(',', AttrVal($_,"rhasspyRoom",undef));
         }
         # Cmd mit passendem Intent vorhanden?
-        my $cmd = STE_getCmd($hash, $_, "rhasspyChannels", $channel, 1);
+        my $cmd = RHASSPY_getCmd($hash, $_, "rhasspyChannels", $channel, 1);
         next unless defined($cmd);
 
         # Erster Treffer wälen, überschreiben falls besserer Treffer (Raum matched auch) kommt
@@ -494,7 +494,7 @@ sub STE_getDeviceByMediaChannel($$$) {
 
 
 # Mappings in Key/Value Paare aufteilen
-sub STE_splitMappingString($) {
+sub RHASSPY_splitMappingString($) {
     my ($mapping) = @_;
     my @tokens, my $token = '';
     my $char, my $lastChar = '';
@@ -531,7 +531,7 @@ sub STE_splitMappingString($) {
 
 
 # rhasspyMapping parsen und gefundene Settings zurückliefern
-sub STE_getMapping($$$$;$) {
+sub RHASSPY_getMapping($$$$;$) {
     my ($hash, $device, $intent, $type, $disableLog) = @_;
     my @mappings, my $matchedMapping;
     my $mappingsString = AttrVal($device, "rhasspyMapping", undef);
@@ -544,7 +544,7 @@ sub STE_getMapping($$$$;$) {
             # Nur Mappings vom gesuchten Typ verwenden
             next unless $_ =~ qr/^$intent/;
             $_ =~ s/$intent://;
-            my %currentMapping = STE_splitMappingString($_);
+            my %currentMapping = RHASSPY_splitMappingString($_);
 
             # Erstes Mapping vom passenden Intent wählen (unabhängig vom Type), dann ggf. weitersuchen ob noch ein besserer Treffer mit passendem Type kommt
             if (!defined($matchedMapping) || (defined($type) && lc($matchedMapping->{'type'}) ne lc($type) && lc($currentMapping{'type'}) eq lc($type))) {
@@ -559,7 +559,7 @@ sub STE_getMapping($$$$;$) {
 
 
 # Cmd von Attribut mit dem Format value=cmd pro Zeile lesen
-sub STE_getCmd($$$$;$) {
+sub RHASSPY_getCmd($$$$;$) {
     my ($hash, $device, $reading, $key, $disableLog) = @_;
 
     my @rows, my $cmd;
@@ -583,7 +583,7 @@ sub STE_getCmd($$$$;$) {
 
 
 # Cmd String im Format 'cmd', 'device:cmd', 'fhemcmd1; fhemcmd2' oder '{<perlcode}' ausführen
-sub STE_runCmd($$$;$$) {
+sub RHASSPY_runCmd($$$;$$) {
     my ($hash, $device, $cmd, $val, $siteId) = @_;
     my $error;
     my $returnVal;
@@ -591,7 +591,7 @@ sub STE_runCmd($$$;$$) {
     # Perl Command
     if ($cmd =~ m/^\s*{.*}\s*$/) {
         # CMD ausführen
-        $returnVal = STE_execute($hash, $device, $cmd, $val,$siteId);
+        $returnVal = RHASSPY_execute($hash, $device, $cmd, $val,$siteId);
     }
     # String in Anführungszeichen (mit ReplaceSetMagic)
     elsif ($cmd =~ m/^\s*".*"\s*$/) {
@@ -607,7 +607,7 @@ sub STE_runCmd($$$;$$) {
         eval { $cmd =~ s/(\$\w+)/$1/eeg; };
 
         # [DEVICE:READING] Einträge erstzen
-        $returnVal = STE_ReplaceReadingsVal($hash, $cmd);
+        $returnVal = RHASSPY_ReplaceReadingsVal($hash, $cmd);
         # Escapte Kommas wieder durch normale ersetzen
         $returnVal =~ s/\\,/,/;
     }
@@ -633,19 +633,19 @@ sub STE_runCmd($$$;$$) {
 }
 
 # Wert über Format 'reading', 'device:reading' oder '{<perlcode}' lesen
-sub STE_getValue($$$;$$) {
+sub RHASSPY_getValue($$$;$$) {
     my ($hash, $device, $getString, $val, $siteId) = @_;
     my $value;
 
-    # Perl Command? -> Umleiten zu STE_runCmd
+    # Perl Command? -> Umleiten zu RHASSPY_runCmd
     if ($getString =~ m/^\s*{.*}\s*$/) {
         # Wert lesen
-        $value = STE_runCmd($hash, $device, $getString, $val, $siteId);
+        $value = RHASSPY_runCmd($hash, $device, $getString, $val, $siteId);
     }
-    # String in Anführungszeichen -> Umleiten zu STE_runCmd
+    # String in Anführungszeichen -> Umleiten zu RHASSPY_runCmd
     elsif ($getString =~ m/^\s*".*"\s*$/) {
         # Wert lesen
-        $value = STE_runCmd($hash, $device, $getString, $val, $siteId);
+        $value = RHASSPY_runCmd($hash, $device, $getString, $val, $siteId);
     }
     # Reading oder Device:Reading
     else {
@@ -661,11 +661,11 @@ sub STE_getValue($$$;$$) {
 
 
 # Zustand eines Gerätes über GetOnOff Mapping abfragen
-sub STE_getOnOffState ($$$) {
+sub RHASSPY_getOnOffState ($$$) {
     my ($hash, $device, $mapping) = @_;
     my $valueOn   = (defined($mapping->{'valueOn'}))  ? $mapping->{'valueOn'}  : undef;
     my $valueOff  = (defined($mapping->{'valueOff'})) ? $mapping->{'valueOff'} : undef;
-    my $value = STE_getValue($hash, $device, $mapping->{'currentVal'});
+    my $value = RHASSPY_getValue($hash, $device, $mapping->{'currentVal'});
 
     # Entscheiden ob $value 0 oder 1 ist
     if (defined($valueOff)) {
@@ -682,7 +682,7 @@ sub STE_getOnOffState ($$$) {
 
 
 # JSON parsen
-sub STE_parseJSON($$) {
+sub RHASSPY_parseJSON($$) {
     my ($hash, $json) = @_;
     my $data;
 
@@ -727,9 +727,9 @@ sub STE_parseJSON($$) {
 }
 
 # Daten vom MQTT Modul empfangen -> Device und Room ersetzen, dann erneut an NLU übergeben
-sub STE_onmessage($$$) {
+sub RHASSPY_onmessage($$$) {
     my ($hash, $topic, $message) = @_;
-    my $data = STE_parseJSON($hash, $message);
+    my $data = RHASSPY_parseJSON($hash, $message);
     my $input = $data->{'input'} if defined($data->{'input'});
     my $type = "text";
     $type = $data->{'type'} if defined($data->{'type'});
@@ -738,8 +738,8 @@ sub STE_onmessage($$$) {
 
     # Hotword Erkennung
     if ($topic =~ m/^hermes\/dialogueManager/) {
-#        my $data = STE_parseJSON($hash, $message);
-        my $room = STE_roomName($hash, $data);
+#        my $data = RHASSPY_parseJSON($hash, $message);
+        my $room = RHASSPY_roomName($hash, $data);
 
         if (defined($room)) {
             my %umlauts = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss" );
@@ -756,20 +756,20 @@ sub STE_onmessage($$$) {
     }
 
     # Shortcut empfangen -> Code direkt ausführen
-    elsif ($topic =~ qr/^hermes\/intent\/.*:/ && defined($input) && grep( /^$input$/i, STE_allRhasspyShortcuts($hash))) {
+    elsif ($topic =~ qr/^hermes\/intent\/.*:/ && defined($input) && grep( /^$input$/i, RHASSPY_allRhasspyShortcuts($hash))) {
       my $error;
-      my $response = STE_getResponse($hash, "DefaultError");
-      my $cmd = STE_getCmd($hash, $hash->{NAME}, "shortcuts", $input);
+      my $response = RHASSPY_getResponse($hash, "DefaultError");
+      my $cmd = RHASSPY_getCmd($hash, $hash->{NAME}, "shortcuts", $input);
 
       if (defined($cmd)) {
           # Cmd ausführen
-          my $returnVal = STE_runCmd($hash, undef, $cmd, undef, $data->{'siteId'});
+          my $returnVal = RHASSPY_runCmd($hash, undef, $cmd, undef, $data->{'siteId'});
 
-          $response = (defined($returnVal)) ? $returnVal : STE_getResponse($hash, "DefaultConfirmation");
+          $response = (defined($returnVal)) ? $returnVal : RHASSPY_getResponse($hash, "DefaultConfirmation");
       }
 
       # Antwort senden
-      STE_respond($hash, $type, $sessionId, $siteId, $response);
+      RHASSPY_respond($hash, $type, $sessionId, $siteId, $response);
     }
 
     elsif ($topic =~ qr/^hermes\/intent\/.*:/) {
@@ -791,33 +791,33 @@ sub STE_onmessage($$$) {
 
         # Passenden Intent-Handler aufrufen
         if ($intent eq 'SetOnOff') {
-            STE_handleIntentSetOnOff($hash, $data);
+            RHASSPY_handleIntentSetOnOff($hash, $data);
         } elsif ($intent eq 'GetOnOff') {
-            STE_handleIntentGetOnOff($hash, $data);
+            RHASSPY_handleIntentGetOnOff($hash, $data);
         } elsif ($intent eq 'SetNumeric') {
-            STE_handleIntentSetNumeric($hash, $data);
+            RHASSPY_handleIntentSetNumeric($hash, $data);
         } elsif ($intent eq 'GetNumeric') {
-            STE_handleIntentGetNumeric($hash, $data);
+            RHASSPY_handleIntentGetNumeric($hash, $data);
         } elsif ($intent eq 'Status') {
-            STE_handleIntentStatus($hash, $data);
+            RHASSPY_handleIntentStatus($hash, $data);
         } elsif ($intent eq 'MediaControls') {
-            STE_handleIntentMediaControls($hash, $data);
+            RHASSPY_handleIntentMediaControls($hash, $data);
         } elsif ($intent eq 'MediaChannels') {
-            STE_handleIntentMediaChannels($hash, $data);
+            RHASSPY_handleIntentMediaChannels($hash, $data);
         } elsif ($intent eq 'SetColor') {
-            STE_handleIntentSetColor($hash, $data);
+            RHASSPY_handleIntentSetColor($hash, $data);
         } elsif ($intent eq 'GetTime') {
-            STE_handleIntentGetTime($hash, $data);
+            RHASSPY_handleIntentGetTime($hash, $data);
         } elsif ($intent eq 'GetWeekday') {
-            STE_handleIntentGetWeekday($hash, $data);
+            RHASSPY_handleIntentGetWeekday($hash, $data);
         } else {
-            STE_handleCustomIntent($hash, $intent, $data);
+            RHASSPY_handleCustomIntent($hash, $intent, $data);
         }
     }
 }
     
 # Antwort ausgeben
-sub STE_respond($$$$$) {
+sub RHASSPY_respond($$$$$) {
     my ($hash, $type, $sessionId, $siteId, $response) = @_;
     my $json;
 
@@ -849,7 +849,7 @@ sub STE_respond($$$$$) {
 
 
 # Antworttexte festlegen
-sub STE_getResponse($$) {
+sub RHASSPY_getResponse($$) {
     my ($hash, $identifier) = @_;
     my $response;
 
@@ -859,7 +859,7 @@ sub STE_getResponse($$) {
         DefaultConfirmation => "Mache ich doch sehr gerne"
     );
 
-    $response = STE_getCmd($hash, $hash->{NAME}, "response", $identifier);
+    $response = RHASSPY_getCmd($hash, $hash->{NAME}, "response", $identifier);
     $response = $messages{$identifier} if (!defined($response));
 
     return $response;
@@ -867,7 +867,7 @@ sub STE_getResponse($$) {
 
 
 # Send text command to Rhasspy NLU
-sub STE_textCommand($$) {
+sub RHASSPY_textCommand($$) {
     my ($hash, $text) = @_;
 
     my $data = {
@@ -885,7 +885,7 @@ sub STE_textCommand($$) {
 
 
 # Sprachausgabe / TTS über RHASSPY
-sub STE_speak($$) {
+sub RHASSPY_speak($$) {
     my ($hash, $cmd) = @_;
     my $sendData, my $json;
     my $siteId = "default";
@@ -909,16 +909,16 @@ sub STE_speak($$) {
 }
 
 # Send all devices, rooms, etc. to Rhasspy HTTP-API to update the slots
-sub STE_updateSlots($) {
+sub RHASSPY_updateSlots($) {
     my ($hash) = @_;
     
     # Collect everything and store it in arrays
-    my @devices = STE_allRhasspyNames();
-    my @rooms = STE_allRhasspyRooms();
-    my @channels = STE_allRhasspyChannels();
-    my @colors = STE_allRhasspyColors();
-    my @types = STE_allRhasspyTypes();
-    my @shortcuts = STE_allRhasspyShortcuts($hash);
+    my @devices = RHASSPY_allRhasspyNames();
+    my @rooms = RHASSPY_allRhasspyRooms();
+    my @channels = RHASSPY_allRhasspyChannels();
+    my @colors = RHASSPY_allRhasspyColors();
+    my @types = RHASSPY_allRhasspyTypes();
+    my @shortcuts = RHASSPY_allRhasspyShortcuts($hash);
 
     if (@shortcuts > 0) {
         my $json;
@@ -935,7 +935,7 @@ sub STE_updateSlots($) {
         
         Log3($hash->{NAME}, 5, "Updating Rhasspy Sentences with data: $deviceData");
           
-        STE_sendToApi($hash, $url, $method, $deviceData);
+        RHASSPY_sendToApi($hash, $url, $method, $deviceData);
     }
 
     # If there are any devices, rooms, etc. found, create JSON structure and send it the the API
@@ -955,21 +955,21 @@ sub STE_updateSlots($) {
 
       Log3($hash->{NAME}, 5, "Updating Rhasspy Slots with data: $json");
       
-      STE_sendToApi($hash, $url, $method, $json);
+      RHASSPY_sendToApi($hash, $url, $method, $json);
     }
 }
 
 # Use the HTTP-API to instruct Rhasspy to re-train it's data
-sub STE_trainRhasspy($) {
+sub RHASSPY_trainRhasspy($) {
     my ($hash) = @_;
     my $url = "/api/train";
     my $method = "POST";
     
-    STE_sendToApi($hash, $url, $method, undef);
+    RHASSPY_sendToApi($hash, $url, $method, undef);
 }
 
 # Send request to HTTP-API of Rhasspy
-sub STE_sendToApi($$$$) {
+sub RHASSPY_sendToApi($$$$) {
     my ($hash,$url,$method,$data) = @_;
     
     #Retrieve URL of Rhasspy-Master from attribute
@@ -982,14 +982,14 @@ sub STE_sendToApi($$$$) {
         method     => $method,
         header     => "Content-Type: application/json",
         data       => $data,
-        callback   => \&STE_ParseHttpResponse
+        callback   => \&RHASSPY_ParseHttpResponse
     };
 
     HttpUtils_NonblockingGet($apiRequest);
 }
 
 # Parse the response of the request to the HTTP-API
-sub STE_ParseHttpResponse($)
+sub RHASSPY_ParseHttpResponse($)
 {
     my ($param, $err, $data) = @_;
     my $hash = $param->{hash};
@@ -1009,7 +1009,7 @@ sub STE_ParseHttpResponse($)
 
 
 # Eingehender Custom-Intent
-sub STE_handleCustomIntent($$$) {
+sub RHASSPY_handleCustomIntent($$$) {
     my ($hash, $intentName, $data) = @_;
     my @intents, my $intent;
     my $intentsString = AttrVal($hash->{NAME},"rhasspyIntents",undef);
@@ -1029,8 +1029,8 @@ sub STE_handleCustomIntent($$$) {
 
     # Gerät setzen falls Slot Device vorhanden
     if (exists($data->{'Device'})) {
-      my $room = STE_roomName($hash, $data);
-      my $device = STE_getDeviceByName($hash, $room, $data->{'Device'});
+      my $room = RHASSPY_roomName($hash, $data);
+      my $device = RHASSPY_getDeviceByName($hash, $room, $data->{'Device'});
       $data->{'Device'} = $device;
     }
 
@@ -1055,28 +1055,28 @@ sub STE_handleCustomIntent($$$) {
                 Log3($hash->{NAME}, 5, $@);
             }
         }
-        $response = STE_getResponse($hash, "DefaultError") if (!defined($response));
+        $response = RHASSPY_getResponse($hash, "DefaultError") if (!defined($response));
 
         # Antwort senden
-        STE_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+        RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
     }
 }
 
 # Eingehende "SetOnOff" Intents bearbeiten
-sub STE_handleIntentSetOnOff($$) {
+sub RHASSPY_handleIntentSetOnOff($$) {
     my ($hash, $data) = @_;
     my $value, my $numericValue, my $device, my $room, my $siteId;
     my $mapping;
-    my $response = STE_getResponse($hash, "DefaultError");
+    my $response = RHASSPY_getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentSetOnOff called");
 
     # Mindestens Gerät und Wert müssen übergeben worden sein
     if (exists($data->{'Device'}) && exists($data->{'Value'})) {
-        $room = STE_roomName($hash, $data);
+        $room = RHASSPY_roomName($hash, $data);
         $value = $data->{'Value'};
-        $device = STE_getDeviceByName($hash, $room, $data->{'Device'});
-        $mapping = STE_getMapping($hash, $device, "SetOnOff", undef);
+        $device = RHASSPY_getDeviceByName($hash, $room, $data->{'Device'});
+        $mapping = RHASSPY_getMapping($hash, $device, "SetOnOff", undef);
 
         # Mapping gefunden?
         if (defined($device) && defined($mapping)) {
@@ -1085,43 +1085,43 @@ sub STE_handleIntentSetOnOff($$) {
             my $cmd = ($value eq 'an') ? $cmdOn : $cmdOff;
 
             # Cmd ausführen
-            STE_runCmd($hash, $device, $cmd);
+            RHASSPY_runCmd($hash, $device, $cmd);
             Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
 
             # Antwort bestimmen
             $numericValue = ($value eq 'an') ? 1 : 0;
-            if (defined($mapping->{'response'})) { $response = STE_getValue($hash, $device, $mapping->{'response'}, $numericValue, $room); }
-            else { $response = STE_getResponse($hash, "DefaultConfirmation"); }
+            if (defined($mapping->{'response'})) { $response = RHASSPY_getValue($hash, $device, $mapping->{'response'}, $numericValue, $room); }
+            else { $response = RHASSPY_getResponse($hash, "DefaultConfirmation"); }
         }
     }
     # Antwort senden
-    STE_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
 }
 
 
 # Eingehende "GetOnOff" Intents bearbeiten
-sub STE_handleIntentGetOnOff($$) {
+sub RHASSPY_handleIntentGetOnOff($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room, my $status;
     my $mapping;
-    my $response = STE_getResponse($hash, "DefaultError");
+    my $response = RHASSPY_getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentGetOnOff called");
 
     # Mindestens Gerät und Status-Art wurden übergeben
     if (exists($data->{'Device'}) && exists($data->{'Status'})) {
-        $room = STE_roomName($hash, $data);
-        $device = STE_getDeviceByName($hash, $room, $data->{'Device'});
-        $mapping = STE_getMapping($hash, $device, "GetOnOff", undef);
+        $room = RHASSPY_roomName($hash, $data);
+        $device = RHASSPY_getDeviceByName($hash, $room, $data->{'Device'});
+        $mapping = RHASSPY_getMapping($hash, $device, "GetOnOff", undef);
         $status = $data->{'Status'};
 
         # Mapping gefunden?
         if (defined($mapping)) {
             # Gerät ein- oder ausgeschaltet?
-            $value = STE_getOnOffState($hash, $device, $mapping);
+            $value = RHASSPY_getOnOffState($hash, $device, $mapping);
 
             # Antwort bestimmen
-            if    (defined($mapping->{'response'})) { $response = STE_getValue($hash, $device, $mapping->{'response'}, $value, $room); }
+            if    (defined($mapping->{'response'})) { $response = RHASSPY_getValue($hash, $device, $mapping->{'response'}, $value, $room); }
             elsif ($status =~ m/^(an|aus)$/ && $value == 1) { $response = $data->{'Device'} . " ist eingeschaltet"; }
             elsif ($status =~ m/^(an|aus)$/ && $value == 0) { $response = $data->{'Device'} . " ist ausgeschaltet"; }
             elsif ($status =~ m/^(auf|zu)$/ && $value == 1) { $response = $data->{'Device'} . " ist geöffnet"; }
@@ -1133,17 +1133,17 @@ sub STE_handleIntentGetOnOff($$) {
         }
     }
     # Antwort senden
-    STE_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
 }
 
 
 # Eingehende "SetNumeric" Intents bearbeiten
-sub STE_handleIntentSetNumeric($$) {
+sub RHASSPY_handleIntentSetNumeric($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room, my $change, my $type, my $unit;
     my $mapping;
     my $validData = 0;
-    my $response = STE_getResponse($hash, "DefaultError");
+    my $response = RHASSPY_getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentSetNumeric called");
 
@@ -1161,7 +1161,7 @@ sub STE_handleIntentSetNumeric($$) {
         $type = $data->{'Type'};
         $value = $data->{'Value'};
         $change = $data->{'Change'};
-        $room = STE_roomName($hash, $data);
+        $room = RHASSPY_roomName($hash, $data);
 
         # Type nicht belegt -> versuchen Type über change Value zu bestimmen
         if (!defined($type) && defined($change)) {
@@ -1172,14 +1172,14 @@ sub STE_handleIntentSetNumeric($$) {
 
         # Gerät über Name suchen, oder falls über Lautstärke ohne Device getriggert wurde das ActiveMediaDevice suchen
         if (exists($data->{'Device'})) {
-            $device = STE_getDeviceByName($hash, $room, $data->{'Device'});
+            $device = RHASSPY_getDeviceByName($hash, $room, $data->{'Device'});
         } elsif (defined($type) && $type =~ m/^Lautstärke$/i) {
-            $device = STE_getActiveDeviceForIntentAndType($hash, $room, "SetNumeric", $type);
-            $response = STE_getResponse($hash, "NoActiveMediaDevice") if (!defined($device));
+            $device = RHASSPY_getActiveDeviceForIntentAndType($hash, $room, "SetNumeric", $type);
+            $response = RHASSPY_getResponse($hash, "NoActiveMediaDevice") if (!defined($device));
         }
 
         if (defined($device)) {
-            $mapping = STE_getMapping($hash, $device, "SetNumeric", $type);
+            $mapping = RHASSPY_getMapping($hash, $device, "SetNumeric", $type);
 
             # Mapping und Gerät gefunden -> Befehl ausführen
             if (defined($mapping) && defined($mapping->{'cmd'})) {
@@ -1192,7 +1192,7 @@ sub STE_handleIntentSetNumeric($$) {
                 my $forcePercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent") ? 1 : 0;
 
                 # Alten Wert bestimmen
-                my $oldVal  = STE_getValue($hash, $device, $mapping->{'currentVal'});
+                my $oldVal  = RHASSPY_getValue($hash, $device, $mapping->{'currentVal'});
                 if (defined($part)) {
                     my @tokens = split(/ /, $oldVal);
                     $oldVal = $tokens[$part] if (@tokens >= $part);
@@ -1228,42 +1228,42 @@ sub STE_handleIntentSetNumeric($$) {
                     $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
 
                     # Cmd ausführen
-                    STE_runCmd($hash, $device, $cmd, $newVal);
+                    RHASSPY_runCmd($hash, $device, $cmd, $newVal);
                     
                     # Antwort festlegen
-                    if (defined($mapping->{'response'})) { $response = STE_getValue($hash, $device, $mapping->{'response'}, $newVal, $room); }
-                    else { $response = STE_getResponse($hash, "DefaultConfirmation"); }
+                    if (defined($mapping->{'response'})) { $response = RHASSPY_getValue($hash, $device, $mapping->{'response'}, $newVal, $room); }
+                    else { $response = RHASSPY_getResponse($hash, "DefaultConfirmation"); }
                 }
             }
         }
     }
     # Antwort senden
-    STE_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
 }
 
 
 # Eingehende "GetNumeric" Intents bearbeiten
-sub STE_handleIntentGetNumeric($$) {
+sub RHASSPY_handleIntentGetNumeric($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room, my $type;
     my $mapping;
-    my $response = STE_getResponse($hash, "DefaultError");
+    my $response = RHASSPY_getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentGetNumeric called");
 
     # Mindestens Type oder Device muss existieren
     if (exists($data->{'Type'}) || exists($data->{'Device'})) {
         $type = $data->{'Type'};
-        $room = STE_roomName($hash, $data);
+        $room = RHASSPY_roomName($hash, $data);
 
         # Passendes Gerät suchen
         if (exists($data->{'Device'})) {
-            $device = STE_getDeviceByName($hash, $room, $data->{'Device'});
+            $device = RHASSPY_getDeviceByName($hash, $room, $data->{'Device'});
         } else {
-            $device = STE_getDeviceByIntentAndType($hash, $room, "GetNumeric", $type);
+            $device = RHASSPY_getDeviceByIntentAndType($hash, $room, "GetNumeric", $type);
         }
 
-        $mapping = STE_getMapping($hash, $device, "GetNumeric", $type) if (defined($device));
+        $mapping = RHASSPY_getMapping($hash, $device, "GetNumeric", $type) if (defined($device));
 
         # Mapping gefunden
         if (defined($mapping)) {
@@ -1275,7 +1275,7 @@ sub STE_handleIntentGetNumeric($$) {
             my $isNumber;
 
             # Zurückzuliefernden Wert bestimmen
-            $value = STE_getValue($hash, $device, $mapping->{'currentVal'});
+            $value = RHASSPY_getValue($hash, $device, $mapping->{'currentVal'});
             if (defined($part)) {
               my @tokens = split(/ /, $value);
               $value = $tokens[$part] if (@tokens >= $part);
@@ -1287,7 +1287,7 @@ sub STE_handleIntentGetNumeric($$) {
             $value =~ s/\./\,/g;
 
             # Antwort falls Custom Response definiert ist
-            if    (defined($mapping->{'response'})) { $response = STE_getValue($hash, $device, $mapping->{'response'}, $value, $room); }
+            if    (defined($mapping->{'response'})) { $response = RHASSPY_getValue($hash, $device, $mapping->{'response'}, $value, $room); }
 
             # Antwort falls mappingType matched
             elsif ($mappingType =~ m/^(Helligkeit|Lautstärke|Sollwert)$/i) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
@@ -1311,57 +1311,57 @@ sub STE_handleIntentGetNumeric($$) {
         }
     }
     # Antwort senden
-    STE_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
 }
 
 
 # Eingehende "Status" Intents bearbeiten
-sub STE_handleIntentStatus($$) {
+sub RHASSPY_handleIntentStatus($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room;
     my $mapping;
-    my $response = STE_getResponse($hash, "DefaultError");
+    my $response = RHASSPY_getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentStatus called");
 
     # Mindestens Device muss existieren
     if (exists($data->{'Device'})) {
-        $room = STE_roomName($hash, $data);
-        $device = STE_getDeviceByName($hash, $room, $data->{'Device'});
-        $mapping = STE_getMapping($hash, $device, "Status", undef);
+        $room = RHASSPY_roomName($hash, $data);
+        $device = RHASSPY_getDeviceByName($hash, $room, $data->{'Device'});
+        $mapping = RHASSPY_getMapping($hash, $device, "Status", undef);
 
         if (defined($mapping->{'response'})) {
-            $response = STE_getValue($hash, $device, $mapping->{'response'},undef,  $room);
+            $response = RHASSPY_getValue($hash, $device, $mapping->{'response'},undef,  $room);
         }
     }
     # Antwort senden
-    STE_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
 }
 
 
 # Eingehende "MediaControls" Intents bearbeiten
-sub STE_handleIntentMediaControls($$) {
+sub RHASSPY_handleIntentMediaControls($$) {
     my ($hash, $data) = @_;
     my $command, my $device, my $room;
     my $mapping;
-    my $response = STE_getResponse($hash, "DefaultError");
+    my $response = RHASSPY_getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentMediaControls called");
 
     # Mindestens Kommando muss übergeben worden sein
     if (exists($data->{'Command'})) {
-        $room = STE_roomName($hash, $data);
+        $room = RHASSPY_roomName($hash, $data);
         $command = $data->{'Command'};
 
         # Passendes Gerät suchen
         if (exists($data->{'Device'})) {
-            $device = STE_getDeviceByName($hash, $room, $data->{'Device'});
+            $device = RHASSPY_getDeviceByName($hash, $room, $data->{'Device'});
         } else {
-            $device = STE_getActiveDeviceForIntentAndType($hash, $room, "MediaControls", undef);
-            $response = STE_getResponse($hash, "NoActiveMediaDevice") if (!defined($device));
+            $device = RHASSPY_getActiveDeviceForIntentAndType($hash, $room, "MediaControls", undef);
+            $response = RHASSPY_getResponse($hash, "NoActiveMediaDevice") if (!defined($device));
         }
 
-        $mapping = STE_getMapping($hash, $device, "MediaControls", undef);
+        $mapping = RHASSPY_getMapping($hash, $device, "MediaControls", undef);
 
         if (defined($device) && defined($mapping)) {
             my $cmd;
@@ -1374,25 +1374,25 @@ sub STE_handleIntentMediaControls($$) {
 
             if (defined($cmd)) {
                 # Cmd ausführen
-                STE_runCmd($hash, $device, $cmd);
+                RHASSPY_runCmd($hash, $device, $cmd);
                 
                 # Antwort festlegen
-                if (defined($mapping->{'response'})) { $response = STE_getValue($hash, $device, $mapping->{'response'}, $command, $room); }
-                else { $response = STE_getResponse($hash, "DefaultConfirmation"); }
+                if (defined($mapping->{'response'})) { $response = RHASSPY_getValue($hash, $device, $mapping->{'response'}, $command, $room); }
+                else { $response = RHASSPY_getResponse($hash, "DefaultConfirmation"); }
             }
         }
     }
     # Antwort senden
-    STE_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
 }
 
 
 # Eingehende "GetTime" Intents bearbeiten
-sub STE_handleIntentGetTime($$) {
+sub RHASSPY_handleIntentGetTime($$) {
     my ($hash, $data) = @_;
     my $channel, my $device, my $room;
     my $cmd;
-    my $response = STE_getResponse($hash, "DefaultError");
+    my $response = RHASSPY_getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentGetTime called");
 
@@ -1401,16 +1401,16 @@ sub STE_handleIntentGetTime($$) {
     Log3($hash->{NAME}, 5, "Response: $response");
 
     # Antwort senden
-    STE_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
 }
 
 
 # Eingehende "GetWeekday" Intents bearbeiten
-sub STE_handleIntentGetWeekday($$) {
+sub RHASSPY_handleIntentGetWeekday($$) {
     my ($hash, $data) = @_;
     my $channel, my $device, my $room;
     my $cmd;
-    my $response = STE_getResponse($hash, "DefaultError");
+    my $response = RHASSPY_getResponse($hash, "DefaultError");
     
     # Get configured language from attribut "language" of device "global"
     # to determine locale for DateTime
@@ -1423,77 +1423,77 @@ sub STE_handleIntentGetWeekday($$) {
     Log3($hash->{NAME}, 5, "Response: $response");
 
     # Antwort senden
-    STE_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
 }
 
 
 # Eingehende "MediaChannels" Intents bearbeiten
-sub STE_handleIntentMediaChannels($$) {
+sub RHASSPY_handleIntentMediaChannels($$) {
     my ($hash, $data) = @_;
     my $channel, my $device, my $room;
     my $cmd;
-    my $response = STE_getResponse($hash, "DefaultError");
+    my $response = RHASSPY_getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentMediaChannels called");
 
     # Mindestens Channel muss übergeben worden sein
     if (exists($data->{'Channel'})) {
-        $room = STE_roomName($hash, $data);
+        $room = RHASSPY_roomName($hash, $data);
         $channel = $data->{'Channel'};
 
         # Passendes Gerät suchen
         if (exists($data->{'Device'})) {
-            $device = STE_getDeviceByName($hash, $room, $data->{'Device'});
+            $device = RHASSPY_getDeviceByName($hash, $room, $data->{'Device'});
         } else {
-            $device = STE_getDeviceByMediaChannel($hash, $room, $channel);
+            $device = RHASSPY_getDeviceByMediaChannel($hash, $room, $channel);
         }
 
-        $cmd = STE_getCmd($hash, $device, "rhasspyChannels", $channel, undef);
+        $cmd = RHASSPY_getCmd($hash, $device, "rhasspyChannels", $channel, undef);
 
         if (defined($device) && defined($cmd)) {
-            $response = STE_getResponse($hash, "DefaultConfirmation");
+            $response = RHASSPY_getResponse($hash, "DefaultConfirmation");
             # Cmd ausführen
-            STE_runCmd($hash, $device, $cmd);
+            RHASSPY_runCmd($hash, $device, $cmd);
         }
     }
 
     # Antwort senden
-    STE_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
 }
 
 
 # Eingehende "SetColor" Intents bearbeiten
-sub STE_handleIntentSetColor($$) {
+sub RHASSPY_handleIntentSetColor($$) {
     my ($hash, $data) = @_;
     my $color, my $device, my $room;
     my $cmd;
-    my $response = STE_getResponse($hash, "DefaultError");
+    my $response = RHASSPY_getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentSetColor called");
 
     # Mindestens Device und Color muss übergeben worden sein
     if (exists($data->{'Color'}) && exists($data->{'Device'})) {
-        $room = STE_roomName($hash, $data);
+        $room = RHASSPY_roomName($hash, $data);
         $color = $data->{'Color'};
 
         # Passendes Gerät & Cmd suchen
-        $device = STE_getDeviceByName($hash, $room, $data->{'Device'});
-        $cmd = STE_getCmd($hash, $device, "rhasspyColors", $color, undef);
+        $device = RHASSPY_getDeviceByName($hash, $room, $data->{'Device'});
+        $cmd = RHASSPY_getCmd($hash, $device, "rhasspyColors", $color, undef);
 
         if (defined($device) && defined($cmd)) {
-            $response = STE_getResponse($hash, "DefaultConfirmation");
+            $response = RHASSPY_getResponse($hash, "DefaultConfirmation");
 
             # Cmd ausführen
-            STE_runCmd($hash, $device, $cmd);
+            RHASSPY_runCmd($hash, $device, $cmd);
         }
     }
     # Antwort senden
-    STE_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
 }
 
 
 # Abgespeckte Kopie von ReplaceSetMagic aus fhem.pl
-sub	STE_ReplaceReadingsVal($@) {
+sub	RHASSPY_ReplaceReadingsVal($@) {
     my $hash = shift;
     my $a = join(" ", @_);
 
@@ -1528,3 +1528,84 @@ sub	STE_ReplaceReadingsVal($@) {
     return $a;
 }
 1;
+
+=pod
+=item device
+=item summary Control FHEM with Rhasspy voice assistant
+=item summary_DE Steuerung von FHEM mittels Rhasspy Sprach-Assistent
+=begin html
+
+<a name="RHASSPY"></a>
+<h3>RHASSPY</h3>
+<ul>
+<p>This module receives, processes and executes voice commands coming from Rhasspy voice assistent.</p>
+<a name="RHASSPYdefine"></a>
+<p><b>Define</b></p>
+<p><code>define &lt;name&gt; RHASSPY &lt;MqttDevice&gt; &lt;DefaultRoom&gt;</code></p>
+<ul>
+  <li>MqttDevice: Name of the MQTT Device in FHEM which connects to Rhasspys MQTT server</li>
+  <li>DefaultRoom: Default room name. Used to speak commands without a room name (e.g. &quot;turn lights on&quot; to turn on the lights in the &quot;default room&quot;)</li>
+</ul>
+<p>Example for defining an MQTT device and the Rhasspy device in FHEM:</p>
+<p>
+  <code>define rhasspyMQTT MQTT &lt;ip-or-hostname-of-rhasspy-master&gt;:12101</code><br>
+  <code>define Rhasspy RHASSPY rhasspyMQTT Wohnzimmer</code>
+</p>
+<a name="RHASSPYset"></a>
+<p><b>Set</b></p>
+<ul>
+  <li>
+    <b>speak</b><br>
+    Voice output over TTS.<br>
+	Both arguments (siteId and text) are required!<br>
+    Example: <code>set &lt;rhasspyDevice&gt speak siteId="default" text="This is a test"</code>
+  </li>
+  <li>
+    <b>textCommand</b><br>
+    Send a text command to Rhasspy.<br>
+	Example: <code>set &lt;rhasspyDevice&gt textCommand turn the light on</code>
+  </li>
+  <li>
+    <b>trainRhasspy</b><br>
+	Sends a train-command to the HTTP-API of the Rhasspy master.<br>
+	The attribute <i>rhasspyMaster</i> has to be defined to work.<br>
+	Example: <code>set &lt;rhasspyDevice&gt; trainRhasspy</code>
+  <li>
+    <b>updateSlots</b><br>
+    Sends a command to the HTTP-API of the Rhasspy master to update all slots on Rhasspy with actual FHEM-devices, rooms, etc.<br>
+	The attribute <i>rhasspyMaster</i> has to be defined to work.<br>
+	Example: <code>set &lt;rhasspyDevice&gt; updateSlots</code><br>
+	Do not forget to train Rhasspy afterwards!
+  </li>
+</ul>
+<a name="RHASSPYattr"></a>
+<p><b>Attributes</b></p>
+<ul>
+  <li>
+    <b>rhasspyMaster</b><br>
+    Defines the URL to the Rhasspy Master for sending requests to the HTTP-API. Has to be in Format <code>protocol://fqdn:port</code> (e.g. <i>http://rhasspy.example.com:12101</i>).
+  </li>
+  <li>
+    <b>response</b><br>
+	Optionally define alternative default answers. Available keywords are <code>DefaultError</code>, <code>NoActiveMediaDevice</code> and <code>DefaultConfirmation</code>.<br>
+	Example:
+	<pre><code>DefaultError=
+DefaultConfirmation=Klaro, mach ich</code></pre>
+  </li>
+  <li>
+    <b>rhasspyIntents</b>
+	<!--Defines custom intents. See <a href="https://github.com/Thyraz/Snips-Fhem#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren" hreflang="de">Custom Intent erstellen</a>.<br>-->
+	Not implemented yet
+  </li>
+  <li>
+    <b>shortcuts</b>
+	Define custom sentences without editing Rhasspy sentences.ini<br>
+	The shortcuts are uploaded to Rhasspy when using the updateSlots set-command.<br>
+	Example:<pre><code>mute on={fhem ("set receiver mute on")}
+mute off={fhem ("set receiver mute off")}</code></pre>
+  </li>
+</ul>
+</ul>
+
+=end html
+=cut
