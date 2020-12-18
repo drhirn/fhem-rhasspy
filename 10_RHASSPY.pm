@@ -1397,7 +1397,7 @@ sub RHASSPY_handleIntentGetTime($$) {
     Log3($hash->{NAME}, 5, "handleIntentGetTime called");
 
     (my $sec,my $min,my $hour,my $mday,my $mon,my $year,my $wday,my $yday,my $isdst) = localtime();
-    $response = "Es ist $hour:$min";
+    $response = "Es ist $hour Uhr $min";
     Log3($hash->{NAME}, 5, "Response: $response");
 
     # Antwort senden
