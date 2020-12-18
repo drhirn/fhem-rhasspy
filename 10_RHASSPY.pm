@@ -694,8 +694,12 @@ sub RHASSPY_parseJSON($$) {
     }
 
     # Standard-Keys auslesen
-    ($data->{'intent'} = $decoded->{'intent'}{'intentName'}) =~ s/^.*.://;
+#    ($data->{'intent'} = $decoded->{'intent'}{'intentName'}) =~ s/^.*.://;
+if (exists($decoded->{'intent'})) {
+	($data->{'intent'} = $decoded->{'intent'}{'intentName'}) =~ s/^.*.://;
     $data->{'probability'} = $decoded->{'intent'}{'confidenceScore'};
+}
+#    $data->{'probability'} = $decoded->{'intent'}{'confidenceScore'};
     $data->{'sessionId'} = $decoded->{'sessionId'};
     $data->{'siteId'} = $decoded->{'siteId'};
     $data->{'input'} = $decoded->{'input'};
@@ -1397,7 +1401,7 @@ sub RHASSPY_handleIntentGetTime($$) {
     Log3($hash->{NAME}, 5, "handleIntentGetTime called");
 
     (my $sec,my $min,my $hour,my $mday,my $mon,my $year,my $wday,my $yday,my $isdst) = localtime();
-    $response = "Es ist $hour:$min";
+    $response = "Es ist $hour Uhr $min";
     Log3($hash->{NAME}, 5, "Response: $response");
 
     # Antwort senden
