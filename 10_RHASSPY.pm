@@ -694,16 +694,12 @@ sub RHASSPY_parseJSON($$) {
     }
 
     # Standard-Keys auslesen
-#    ($data->{'intent'} = $decoded->{'intent'}{'intentName'}) =~ s/^.*.://;
-if (exists($decoded->{'intent'})) {
-	($data->{'intent'} = $decoded->{'intent'}{'intentName'}) =~ s/^.*.://;
-    $data->{'probability'} = $decoded->{'intent'}{'confidenceScore'};
-}
-#    $data->{'probability'} = $decoded->{'intent'}{'confidenceScore'};
-    $data->{'sessionId'} = $decoded->{'sessionId'};
-    $data->{'siteId'} = $decoded->{'siteId'};
-    $data->{'input'} = $decoded->{'input'};
-    $data->{'rawInput'} = $decoded->{'rawInput'};
+    (($data->{'intent'} = $decoded->{'intent'}{'intentName'}) =~ s/^.*.://) unless (!exists($decoded->{'intent'}{'intentName'}));
+    $data->{'probability'} = $decoded->{'intent'}{'confidenceScore'}        unless (!exists($decoded->{'intent'}{'confidenceScore'}));
+    $data->{'sessionId'} = $decoded->{'sessionId'}                          unless (!exists($decoded->{'sessionId'}));
+    $data->{'siteId'} = $decoded->{'siteId'}                                unless (!exists($decoded->{'siteId'}));
+    $data->{'input'} = $decoded->{'input'}                                  unless (!exists($decoded->{'input'}));
+    $data->{'rawInput'} = $decoded->{'rawInput'}                            unless (!exists($decoded->{'rawInput'}));
 
 
     # Überprüfen ob Slot Array existiert
