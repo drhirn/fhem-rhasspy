@@ -7,6 +7,8 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 [About Rhasspy](#About-Rhasspy)\
 [About FHEM-Rhasspy](#About-FHEM-Rhasspy)\
 [Installation of Rhasspy-FHEM](#Installation-of-Rhasspy-FHEM)\
+&nbsp;&nbsp;[Definition (DEF)](#Definition-(DEF))
+&nbsp;&nbsp;[Set-Commands (SET)](#Set-Commands-(SET))
 [To-Do](#To-Do)
 
 ## About Rhasspy
@@ -20,29 +22,42 @@ Rhasspy-FHEM evaluates these JSON-messages and converts them to commands. And it
 Rhasspy-FHEM uses the 00_MQTT.pm module to receive and send these messages. Therefore it is necessary to define an MQTT device in FHEM before using Rhasspy-FHEM.
 
 ## Installation of Rhasspy-FHEM
-10_SNIPS.pm nach `opt/fhem/FHEM`kopieren.
-Danach FHEM neu starten.
-
-Die Syntax zur Definition des Moduls sieht so aus:
+- Download a RAW-Copy of 10_RHASSPY.pm and copy it to `opt/fhem/FHEM`
+- Don't forget to change the ownership of the file to `fhem.dialout` (or whatever user/group FHEM is using).
+- Restart FHEM
+- Define a MQTT device which connects to the MQTT-server Rhasspy is using. E.g.:
 ```
-define <name> SNIPS <MqttDevice> <DefaultRoom>
+define RhasspyMQTT MQTT <ip-or-hostname-of-mqtt-server>:12183 
 ```
 
-* *MqttDevice* Name des MQTT Devices in FHEM das zum MQTT Server von Snips verbindet.
+### Definition (DEF)
+You can define a new instance of this module with:
 
-* *DefaultRoom* weist die Snips Hauptinstanz einem Raum zu.\
-Im Gegensatz zu weiteren Snips Satellites in anderen Räumen,\
-kann die Hauptinstanz nicht umbenannt werden und heißt immer *default*.\
-Um den Raumnamen bei einigen Befehlen weglassen zu können, sofern sie den aktuellen Raum betreffen ,\
-muss Snips eben wissen in welchem Raum man sich befindet.\
-Dies ermöglicht dann z.B. ein "Deckenlampe einschalten"\
-auch wenn man mehrere Geräte mit dem Alias Deckenlampe in unterschiedlichen Räumen hat.
+```
+define <name> RHASSPY <MqttDevice> <DefaultRoom>
+```
 
-Beispiel für die Definition des MQTT Servers und Snips in FHEM:
-```
-define SnipsMQTT MQTT <ip-or-hostname-of-snips-machine>:1883
-define Snips SNIPS SnipsMQTT Wohnzimmer
-```
+* *MqttDevice* Name of the MQTT Device in FHEM which connects to the MQTT server Rhasspy uses.
+
+* *DefaultRoom* Name of the default room which should be used if no room-name is present in the command.
+
+### Set-Commands (SET)
+* **speak**\
+  Voice output over TTS.\
+  Both arguments (siteId and text) are required!\
+  Example: `set <rhasspyDevice> speak siteId="default" text="This is a test"`
+* **textCommand**\
+  Send a text command to Rhasspy.\
+  Example: `set <rhasspyDevice> textCommand turn the light on`
+* **trainRhasspy**\
+  Sends a train-command to the HTTP-API of the Rhasspy master.\
+  The attribute *rhasspyMaster* has to be defined to work.\
+  Example: `set <rhasspyDevice> trainRhasspy`
+* **updateSlots**\
+  Sends a command to the HTTP-API of the Rhasspy master to update all slots on Rhasspy with actual FHEM-devices, rooms, etc.\
+  The attribute *rhasspyMaster* has to be defined to work.\
+  Example: `set <rhasspyDevice> updateSlots`\
+  Do not forget to train Rhasspy afterwards!
 
 ## To-Do
 - [ ] Move ip of Rhasspy-Master to DEF instead of ATTR
