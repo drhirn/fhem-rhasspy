@@ -17,8 +17,8 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyRoom*](#attribute-rhasspyroom)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Assign intents with *rhasspyMapping*](#assign-intents-with-rhasspymapping)\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping)\
-[Intents](#intents)
-&nbsp;&nbsp;&nbsp;&nbsp;[SetOnOff](#setonoff)
+[Intents](#intents)\
+&nbsp;&nbsp;&nbsp;&nbsp;[SetOnOff](#setonoff)\
 [To-Do](#To-Do)
 
 ## About Rhasspy
@@ -184,16 +184,18 @@ Intents are used to tell FHEM what to do after receiving a voice-/text-command. 
 ### SetOnOff
 Intent to turn on/off, open/close, start/stop, ... devices.
 
-Example-Mapping: `SetOnOff:cmdOn=on,cmdOff=off`
+Example-Mapping:
+
+`SetOnOff:cmdOn=on,cmdOff=off`
 
 Options:
   * **cmdOn** Command to turn the device on. See [Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping).
   * **cmdOff** Command to turn the device off. See [Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping).
 
 Example-Sentences:
-  > turn the light on
-  > close the shutter in the bedroom
-  > start the coffee maker
+  > turn the light on\
+  > close the shutter in the bedroom\
+  > start the coffee maker\
  
 ## To-Do
 - [ ] Move ip of Rhasspy-Master to DEF instead of ATTR
