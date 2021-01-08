@@ -83,5 +83,16 @@ define <name> RHASSPY <MqttDevice> <DefaultRoom>
   mute on={fhem ("set receiver mute on")}
   mute off={fhem ("set receiver mute off")}
   ```
+
+### Readings / Events
+* **lastIntentPayload**\
+  Content of the last command which was received by FHEM
+* **listening_*roomname***\
+  Changes to 1 if a wakeword was recognized and back to 0 if the Rhasspy-session has ended.\
+  There is one reading for every single satellite/master.\
+  Can for example be used to mute speakers while Rhasspy is listening to commands.
+* **voiceResponse** and **textResponse**\
+  Response to the last voice- or text-command.
+
 ## To-Do
 - [ ] Move ip of Rhasspy-Master to DEF instead of ATTR
