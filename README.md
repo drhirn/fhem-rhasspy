@@ -37,7 +37,7 @@ You can define a new instance of this module with:
 define <name> RHASSPY <MqttDevice> <DefaultRoom>
 ```
 
-* *MqttDevice* Name of the MQTT Device in FHEM which connects to the MQTT server Rhasspy uses.
+* `MqttDevice`: Name of the MQTT Device in FHEM which connects to the MQTT server Rhasspy uses.
 
 * *DefaultRoom* Name of the default room which should be used if no room-name is present in the command.
 
