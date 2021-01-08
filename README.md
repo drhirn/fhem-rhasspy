@@ -7,9 +7,10 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 [About Rhasspy](#About-Rhasspy)\
 [About FHEM-Rhasspy](#About-FHEM-Rhasspy)\
 [Installation of Rhasspy-FHEM](#Installation-of-Rhasspy-FHEM)\
-&nbsp;&nbsp;[Definition (DEF)](#Definition-(DEF))\
+[Definition (DEF) in FHEM](#Definition-(DEF)-in-FHEM)\
 &nbsp;&nbsp;[Set-Commands (SET)](#Set-Commands-(SET))\
 &nbsp;&nbsp;[Attributes (ATTR)](#Attributes-(ATTR))\
+&nbsp;&nbsp;[Readings/Events](#Readings/Events)\
 [To-Do](#To-Do)
 
 ## About Rhasspy
@@ -31,7 +32,7 @@ Rhasspy-FHEM uses the 00_MQTT.pm module to receive and send these messages. Ther
 define RhasspyMQTT MQTT <ip-or-hostname-of-mqtt-server>:12183 
 ```
 
-### Definition (DEF)
+## Definition (DEF) in FHEM
 You can define a new instance of this module with:
 
 ```
