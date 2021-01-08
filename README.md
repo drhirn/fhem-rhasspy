@@ -39,7 +39,7 @@ define <name> RHASSPY <MqttDevice> <DefaultRoom>
 
 * `MqttDevice`: Name of the MQTT Device in FHEM which connects to the MQTT server Rhasspy uses.
 
-* *DefaultRoom* Name of the default room which should be used if no room-name is present in the command.
+* `DefaultRoom`: Name of the default room which should be used if no room-name is present in the command.
 
 ### Set-Commands (SET)
 * **speak**\
@@ -50,8 +50,8 @@ define <name> RHASSPY <MqttDevice> <DefaultRoom>
   Send a text command to Rhasspy.\
   Example: `set <rhasspyDevice> textCommand turn the light on`
 * **trainRhasspy**\
-  Sends a train-command to the HTTP-API of the Rhasspy master.\
-  The attribute *rhasspyMaster* has to be defined to work.\
+  Sends a train-command to the HTTP-API of the Rhasspy master.
+  The attribute `rhasspyMaster` has to be defined to work.\
   Example: `set <rhasspyDevice> trainRhasspy`
 * **updateSlots**\
   Sends a command to the HTTP-API of the Rhasspy master to update all slots on Rhasspy with actual FHEM-devices, rooms, etc.\
