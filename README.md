@@ -4,9 +4,9 @@
 Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://github.com/Thyraz/Snips-Fhem).
 
 ## Contents
-[About Rhasspy](#About-Rhasspy)
-[About FHEM-Rhasspy](#About-FHEM-Rhasspy)
-[Installation of Rhasspy-FHEM](#Installation-of-Rhasspy-FHEM)
+[About Rhasspy](#About-Rhasspy)\
+[About FHEM-Rhasspy](#About-FHEM-Rhasspy)\
+[Installation of Rhasspy-FHEM](#Installation-of-Rhasspy-FHEM)\
 &nbsp;&nbsp;[Definition (DEF)](#Definition-(DEF))\
 &nbsp;&nbsp;[Set-Commands (SET)](#Set-Commands-(SET))\
 &nbsp;&nbsp;[Attributes (ATTR)](#Attributes-(ATTR))\
@@ -39,7 +39,6 @@ define <name> RHASSPY <MqttDevice> <DefaultRoom>
 ```
 
 * `MqttDevice`: Name of the MQTT Device in FHEM which connects to the MQTT server Rhasspy uses.
-
 * `DefaultRoom`: Name of the default room which should be used if no room-name is present in the command.
 
 ### Set-Commands (SET)
@@ -61,20 +60,24 @@ define <name> RHASSPY <MqttDevice> <DefaultRoom>
   Do not forget to train Rhasspy afterwards!
 
 ### Attributes (ATTR)
-* **rhasspyMaster**
-  Defines the URL to the Rhasspy Master for sending requests to the HTTP-API. Has to be in Format `protocol://fqdn:port` (e.g. *http://rhasspy.example.com:12101*).
-* **response**
-  Optionally define alternative default answers. Available keywords are `DefaultError`, `NoActiveMediaDevice` and `DefaultConfirmation`.
+* **rhasspyMaster**\
+  Defines the URL to the Rhasspy Master for sending requests to the HTTP-API.\
+  Has to be in Format `protocol://fqdn:port`.\
+  Example:
+  `http://rhasspy.example.com:12101`
+* **response**\
+  Optionally define alternative default answers.\
+  Available keywords are `DefaultError`, `NoActiveMediaDevice` and `DefaultConfirmation`.\
   Example:
   ```
   DefaultError=
   DefaultConfirmation=Master, it is a pleasure doing as you wish
   ```
-* **rhasspyIntents**
+* **rhasspyIntents**\
   Not implemented yet
-* **shortcuts**
-  Define custom sentences without editing Rhasspy sentences.ini.
-  The shortcuts are uploaded to Rhasspy when using the `updateSlots` set-command.
+* **shortcuts**\
+  Define custom sentences without editing Rhasspy sentences.ini.\
+  The shortcuts are uploaded to Rhasspy when using the `updateSlots` set-command.\
   Example:
   ```
   mute on={fhem ("set receiver mute on")}
