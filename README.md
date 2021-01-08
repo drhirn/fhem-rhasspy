@@ -12,11 +12,11 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;[Attributes (ATTR)](#attributes-attr)\
 &nbsp;&nbsp;[Readings/Events](#readings--events)\
 [Configure FHEM-devices for use with Rhasspy](#configure-fhem-devices-for-use-with-rhasspy)\
-&nbsp;&nbsp;[Room *Rhasspy*](#room-rhasspy)
-&nbsp;&nbsp;[Attribute *rhasspyName*](#attribute-rhasspyname)
-&nbsp;&nbsp;[Attribute *rhasspyRoom*](#attribute-rhasspyroom)
-&nbsp;&nbsp;[Assign intents with *rhasspyMapping*](#assign-intents-with-rhasspymapping)
-&nbsp;&nbsp;&nbsp;&nbsp;[Formatting Commands and Readings inside a *rhasspyMapping*]()
+&nbsp;&nbsp;[Room *Rhasspy*](#room-rhasspy)\
+&nbsp;&nbsp;[Attribute *rhasspyName*](#attribute-rhasspyname)\
+&nbsp;&nbsp;[Attribute *rhasspyRoom*](#attribute-rhasspyroom)\
+&nbsp;&nbsp;[Assign intents with *rhasspyMapping*](#assign-intents-with-rhasspymapping)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping)\
 [To-Do](#To-Do)
 
 ## About Rhasspy
