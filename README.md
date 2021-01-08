@@ -212,7 +212,7 @@ Example-Mapping:
 `GetOnOff:currentVal=state,valueOff=closed`
 
 Options:\
-*Hint: only valueOn OR valueOff need to be set. All other values are assign to the other state.*
+*Hint: only valueOn OR valueOff need to be set. All other values are assigned the other state.*
   * **currentVal** Reading to read the current value from.
   * **valueOff** Value from *currentVal* which represents **off**.
   * **valueOn** Value from *currentVal* which represents **on**.
