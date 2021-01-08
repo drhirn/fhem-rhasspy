@@ -7,10 +7,10 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 [About Rhasspy](#About-Rhasspy)\
 [About FHEM-Rhasspy](#About-FHEM-Rhasspy)\
 [Installation of Rhasspy-FHEM](#Installation-of-Rhasspy-FHEM)\
-[Definition (DEF) in FHEM](#Definition-(DEF)-in-FHEM)\
-&nbsp;&nbsp;[Set-Commands (SET)](#Set-Commands-(SET))\
-&nbsp;&nbsp;[Attributes (ATTR)](#Attributes-(ATTR))\
-&nbsp;&nbsp;[Readings/Events](#Readings/Events)\
+[Definition (DEF) in FHEM](#definition-def-in-fhem)\
+&nbsp;&nbsp;[Set-Commands (SET)](#set-commands-set)\
+&nbsp;&nbsp;[Attributes (ATTR)](#attributes-attr)\
+&nbsp;&nbsp;[Readings/Events](#readings--events)\
 [To-Do](#To-Do)
 
 ## About Rhasspy
