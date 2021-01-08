@@ -58,7 +58,15 @@ define <name> RHASSPY <MqttDevice> <DefaultRoom>
   Sends a command to the HTTP-API of the Rhasspy master to update all slots on Rhasspy with actual FHEM-devices, rooms, etc.\
   The attribute *rhasspyMaster* has to be defined to work.\
   Example: `set <rhasspyDevice> updateSlots`\
-  Do not forget to train Rhasspy afterwards!
+  Updated/Created Slots are
+  - de.fhem.Device
+  - de.fhem.Room
+  - de.fhem.MediaChannels
+  - de.fhem.Color
+  - de.fhem.NumericType
+  
+  
+  **Do not forget to train Rhasspy after updating slots!**
 
 ### Attributes (ATTR)
 * **rhasspyMaster**\
@@ -119,21 +127,28 @@ attr <device> rhasspyName Bulb,Ceiling Light,Chandelier
 ```
 It's also possible to have the same name for different FHEM-devices. Just make sure they have different *rhasspyRoom* attributes.
 
-### Attribut *snipsRoom*
-Jedem Gerät in FHEM muss das Attribut **snipsRoom** hinzugefügt werden.\
-Beispiel: `attr <device> snipsRoom Wohnzimmer`
+### Attribute *rhasspyRoom*
+You can add an attribute `rhasspyRoom` to the device to tell Rhasspy in which physical room the device is. Otherwise it belongs to the "default room" you used when defining the Rhasspy-device.\
+This is useful to speak commands without a room. If there is a device *Bulb* and it's *rhasspyRoom*-attribute is equal to the siteId of your satellite, it's enough to say "Bulb on" and the Bulp in the room the command is spoken will be turned on.
+Example:
+```attr <device> rhasspyRoom Livingroom```
 
-### Intents über *snipsMapping* zuordnen
-Das Snips Modul hat bisher noch keine automatische Erkennung von Intents für bestimmte Gerätetypen.\
-Es müssen also noch bei jedem Device die unterstützten Intents über ein Mapping bekannt gemacht werden.\
-Einem Gerät können mehrere Intents zugewiesen werden, dazu einfach eine Zeile pro Mapping im Attribut einfügen.
+### Assign intents with *rhasspyMapping*
+There is no automatic detection of the right intent for a particual type of device. That's why it's necessary to create a mapping of intents a device supports.\
+It's possible to assign multiple intents to a single device. Just add one line per mapping.
 
-Das Mapping folgt dabei dem Schema:
+A mapping has to look like:
 ```
 IntentName:option1=value1,option2=value2,...
 ```
 
-#### Formatierung von CMDs und Readings innerhalb eines snipsMappings
+Example:
+```
+SetOnOff:cmdOn=on,cmdOff=off
+GetOnOff:currentVal=state,valueOff=off
+```
+
+#### Formatierung von CMDs und Readings innerhalb eines rhasspyMappings
 Einige Intents haben als Option auszuführende FHEM Kommandos oder Readings über die das Modul aktuelle Werte lesen kann.\
 Diese können in der Regel auf 3 Arten angegeben werden:
 * Set Kommando bzw. Reading des aktuellen Devices direkt angeben:\
