@@ -181,6 +181,7 @@ Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
 
 ## Intents
 Intents are used to tell FHEM what to do after receiving a voice-/text-command. This module has some build-in intents.
+
 ### SetOnOff
 Intent to turn on/off, open/close, start/stop, ... devices.
 
@@ -199,8 +200,33 @@ Example-Spoken-Sentences:
  
  Example-Rhasspy-Sentences:
  ```
+ [de.fhem:SetOnOff]
  (turn on|turn off|open|close|start|stop) $de.fhem.Device{Device} [$de.fhem.Room{Room}]
  ```
+ 
+#### GetOnOff
+Intent to request the current state of a device.
+
+Example-Mapping:
+
+`GetOnOff:currentVal=state,valueOff=closed`
+
+Options:\
+*Hint: only valueOn OR valueOff need to be set. All other values are assign to the other state.*
+  * **currentVal** Reading to read the current value from.
+  * **valueOff** Value from *currentVal* which represents **off**.
+  * **valueOn** Value from *currentVal* which represents **on**.
+
+Example-Sentences:
+  > is the light in the bathroom switched on?\
+  > is the window in the living room opened?\
+  > is the washer running?
+  
+Example-Rhasspy-Sentences:
+```
+[de.fhem:GetOnOff]
+$de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched on|switched off|running|stopped|opened|closed)
+```
  
 ## To-Do
 - [ ] Move ip of Rhasspy-Master to DEF instead of ATTR
