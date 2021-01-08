@@ -95,5 +95,65 @@ define <name> RHASSPY <MqttDevice> <DefaultRoom>
 * **voiceResponse** and **textResponse**\
   Response to the last voice- or text-command.
 
+## Configure FHEM-devices for use with Rhasspy
+To control a device with voice-commands, Rhasspy needs to now about the device. This works by adding the device to the FHEM-room *Rhasspy*. When using the set-command *updateSlots*, the module Rhasspy-FHEM then creates a list of all devices in this room and saves it to a Rhasspy-slot called *de.fhem.Device*. After training Rhasspy, the device is recognized and can be controlled.
+
+
+**Important**: Be sure to execute `updateSlots` and `trainRhasspy` after every change of the following attributes.
+
+
+To use a FHEM-device with Rhasspy, some settings are needed:
+
+### Room Rhasspy
+Rhasspy-FHEM only searches for devices in room **Rhasspy**. Be sure to add this attribute to every device you want to control with Rhasspy.\
+Example:
+```
+attr Bulb room Rhasspy
+```
+
+### Attribute *rhasspyName*
+Every controllable FHEM-device has to have an attribute **rhasspyName**. The content of this attribute is the name you want to call this device (e.g. *Bulb*). It's possible to use multiple names for the same device by separating them with comma.\
+Example:
+```
+attr <device> rhasspyName Bulb,Ceiling Light,Chandelier
+```
+It's also possible to have the same name for different FHEM-devices. Just make sure they have different *rhasspyRoom* attributes.
+
+### Attribut *snipsRoom*
+Jedem Gerät in FHEM muss das Attribut **snipsRoom** hinzugefügt werden.\
+Beispiel: `attr <device> snipsRoom Wohnzimmer`
+
+### Intents über *snipsMapping* zuordnen
+Das Snips Modul hat bisher noch keine automatische Erkennung von Intents für bestimmte Gerätetypen.\
+Es müssen also noch bei jedem Device die unterstützten Intents über ein Mapping bekannt gemacht werden.\
+Einem Gerät können mehrere Intents zugewiesen werden, dazu einfach eine Zeile pro Mapping im Attribut einfügen.
+
+Das Mapping folgt dabei dem Schema:
+```
+IntentName:option1=value1,option2=value2,...
+```
+
+#### Formatierung von CMDs und Readings innerhalb eines snipsMappings
+Einige Intents haben als Option auszuführende FHEM Kommandos oder Readings über die das Modul aktuelle Werte lesen kann.\
+Diese können in der Regel auf 3 Arten angegeben werden:
+* Set Kommando bzw. Reading des aktuellen Devices direkt angeben:\
+  `cmd=on` bzw. `currentReading=temperature`
+* Kommando oder Reading auf ein anderes Gerät umleiten:\
+  `cmd=Otherdecice:on` bzw. `currentReading=Otherdevice:temperature`
+* Perl-Code um ein Kommando auszuführen, oder einen Wert zu bestimmen.\
+  Dies ermöglicht komplexere Abfragen oder das freie Zusammensetzen von Befehle.\
+  Der Code muss in geschweiften Klammern angegeben werden: \
+  `{currentVal={ReadingsVal($DEVICE,"state",0)}`\
+  oder\
+  `cmd={fhem("set $DEVICE dim $VALUE")}`\
+  Innerhalb der geschweiften Klammern kann über $DEVICE auf das aktuelle Gerät zugegriffen werden.\
+  Bei der *cmd* Option von *SetNumeric* wird außerdem der zu setzende Wert über $VALUE bereit gestellt.
+
+Gibt man bei der Option `currentVal` das Reading im Format *reading* oder *Device:reading* an,\
+kann mit der Option `part` das Reading an Leerzeichen getrennt werden.\
+Über `part=1` bestimmt ihr, dass nur der erst Teil des Readings übernommen werden soll.\
+Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
+
 ## To-Do
 - [ ] Move ip of Rhasspy-Master to DEF instead of ATTR
+- [ ] Add Custom intents functionality
