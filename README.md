@@ -105,7 +105,7 @@ define <name> RHASSPY <MqttDevice> <DefaultRoom>
 * **lastIntentPayload**\
   Content of the last command which was received by FHEM
 * **listening_*roomname***\
-  Changes to 1 if a wakeword was recognized and back to 0 if the Rhasspy-session has ended.\
+  Changes to 1 if a wake-word was recognized and back to 0 if the Rhasspy-session has ended.\
   There is one reading for every single satellite/master.\
   Can for example be used to mute speakers while Rhasspy is listening to commands.
 * **voiceResponse** and **textResponse**\
@@ -137,13 +137,13 @@ It's also possible to have the same name for different FHEM-devices. Just make s
 
 ### Attribute *rhasspyRoom*
 You can add an attribute `rhasspyRoom` to the device to tell Rhasspy in which physical room the device is. Otherwise it belongs to the "default room" you used when defining the Rhasspy-device.\
-This is useful to speak commands without a room. If there is a device *Bulb* and it's *rhasspyRoom*-attribute is equal to the siteId of your satellite, it's enough to say "Bulb on" and the Bulp in the room the command is spoken will be turned on.
+This is useful to speak commands without a room. If there is a device *Bulb* and it's *rhasspyRoom*-attribute is equal to the siteId of your satellite, it's enough to say "Bulb on" and the Bulb in the room the command is spoken will be turned on.
 
 Example:
 ```attr <device> rhasspyRoom Livingroom```
 
 ### Assign intents with *rhasspyMapping*
-There is no automatic detection of the right intent for a particual type of device. That's why it's necessary to create a mapping of intents a device supports.\
+There is no automatic detection of the right intent for a particular type of device. That's why it's necessary to create a mapping of intents a device supports.\
 It's possible to assign multiple intents to a single device. Just add one line per mapping.
 
 A mapping has to look like:
@@ -163,8 +163,8 @@ There are three ways to write them:
 * Directly use Set-Command or Reading of the current devices:\
   `cmd=on` or `currentReading=temperature`
 * Redirect command or reading to another device:\
-  `cmd=Otherdecice:on` or `currentReading=Otherdevice:temperature`
-* Perl-Code to execute a command or assing a value:\
+  `cmd=Otherdevice:on` or `currentReading=Otherdevice:temperature`
+* Perl-Code to execute a command or assign a value:\
   This allows more complex requests.\
   The code has to be enclosed in curly brackets.\
   `{currentVal={ReadingsVal($DEVICE,"state",0)}`\
@@ -229,5 +229,5 @@ $de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched on|switched off|running|
 ```
  
 ## To-Do
-- [ ] Move ip of Rhasspy-Master to DEF instead of ATTR
+- [ ] Move IP of Rhasspy-Master to DEF instead of ATTR
 - [ ] Add Custom intents functionality
