@@ -192,10 +192,15 @@ Options:
   * **cmdOn** Command to turn the device on. See [Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping).
   * **cmdOff** Command to turn the device off. See [Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping).
 
-Example-Sentences:
-  > turn the light on\
+Example-Spoken-Sentences:
+  > turn on the light\
   > close the shutter in the bedroom\
-  > start the coffee maker\
+  > start the coffee maker
+ 
+ Example-Rhasspy-Sentences:
+ ```
+ (turn on|turn off|open|close|start|stop) $de.fhem.Device{Device} [$de.fhem.Room{Room}]
+ ```
  
 ## To-Do
 - [ ] Move ip of Rhasspy-Master to DEF instead of ATTR
