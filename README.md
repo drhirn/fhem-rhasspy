@@ -8,15 +8,17 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 [About FHEM-Rhasspy](#About-FHEM-Rhasspy)\
 [Installation of Rhasspy-FHEM](#Installation-of-Rhasspy-FHEM)\
 [Definition (DEF) in FHEM](#definition-def-in-fhem)\
-&nbsp;&nbsp;[Set-Commands (SET)](#set-commands-set)\
-&nbsp;&nbsp;[Attributes (ATTR)](#attributes-attr)\
-&nbsp;&nbsp;[Readings/Events](#readings--events)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Set-Commands (SET)](#set-commands-set)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Attributes (ATTR)](#attributes-attr)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Readings/Events](#readings--events)\
 [Configure FHEM-devices for use with Rhasspy](#configure-fhem-devices-for-use-with-rhasspy)\
-&nbsp;&nbsp;[Room *Rhasspy*](#room-rhasspy)\
-&nbsp;&nbsp;[Attribute *rhasspyName*](#attribute-rhasspyname)\
-&nbsp;&nbsp;[Attribute *rhasspyRoom*](#attribute-rhasspyroom)\
-&nbsp;&nbsp;[Assign intents with *rhasspyMapping*](#assign-intents-with-rhasspymapping)\
-&nbsp;&nbsp;&nbsp;&nbsp;[Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Room *Rhasspy*](#room-rhasspy)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyName*](#attribute-rhasspyname)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyRoom*](#attribute-rhasspyroom)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Assign intents with *rhasspyMapping*](#assign-intents-with-rhasspymapping)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping)\
+[Intents](#intents)
+&nbsp;&nbsp;&nbsp;&nbsp;[SetOnOff](#setonoff)
 [To-Do](#To-Do)
 
 ## About Rhasspy
@@ -177,6 +179,22 @@ kann mit der Option `part` das Reading an Leerzeichen getrennt werden.\
 Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
 -->
 
+## Intents
+Intents are used to tell FHEM what to do after receiving a voice-/text-command. This module has some build-in intents.
+### SetOnOff
+Intent to turn on/off, open/close, start/stop, ... devices.
+
+Example-Mapping: `SetOnOff:cmdOn=on,cmdOff=off`
+
+Options:
+  * **cmdOn** Command to turn the device on. See [Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping).
+  * **cmdOff** Command to turn the device off. See [Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping).
+
+Example-Sentences:
+  > turn the light on
+  > close the shutter in the bedroom
+  > start the coffee maker
+ 
 ## To-Do
 - [ ] Move ip of Rhasspy-Master to DEF instead of ATTR
 - [ ] Add Custom intents functionality
