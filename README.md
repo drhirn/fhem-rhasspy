@@ -11,6 +11,12 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;[Set-Commands (SET)](#set-commands-set)\
 &nbsp;&nbsp;[Attributes (ATTR)](#attributes-attr)\
 &nbsp;&nbsp;[Readings/Events](#readings--events)\
+[Configure FHEM-devices for use with Rhasspy](#configure-fhem-devices-for-use-with-rhasspy)\
+&nbsp;&nbsp;[Room *Rhasspy*](#room-rhasspy)
+&nbsp;&nbsp;[Attribute *rhasspyName*](#attribute-rhasspyname)
+&nbsp;&nbsp;[Attribute *rhasspyRoom*](#attribute-rhasspyroom)
+&nbsp;&nbsp;[Assign intents with *rhasspyMapping*](#assign-intents-with-rhasspymapping)
+&nbsp;&nbsp;&nbsp;&nbsp;[Formatting Commands and Readings inside a *rhasspyMapping*]()
 [To-Do](#To-Do)
 
 ## About Rhasspy
@@ -130,6 +136,7 @@ It's also possible to have the same name for different FHEM-devices. Just make s
 ### Attribute *rhasspyRoom*
 You can add an attribute `rhasspyRoom` to the device to tell Rhasspy in which physical room the device is. Otherwise it belongs to the "default room" you used when defining the Rhasspy-device.\
 This is useful to speak commands without a room. If there is a device *Bulb* and it's *rhasspyRoom*-attribute is equal to the siteId of your satellite, it's enough to say "Bulb on" and the Bulp in the room the command is spoken will be turned on.
+
 Example:
 ```attr <device> rhasspyRoom Livingroom```
 
@@ -148,26 +155,27 @@ SetOnOff:cmdOn=on,cmdOff=off
 GetOnOff:currentVal=state,valueOff=off
 ```
 
-#### Formatierung von CMDs und Readings innerhalb eines rhasspyMappings
-Einige Intents haben als Option auszuführende FHEM Kommandos oder Readings über die das Modul aktuelle Werte lesen kann.\
-Diese können in der Regel auf 3 Arten angegeben werden:
-* Set Kommando bzw. Reading des aktuellen Devices direkt angeben:\
-  `cmd=on` bzw. `currentReading=temperature`
-* Kommando oder Reading auf ein anderes Gerät umleiten:\
-  `cmd=Otherdecice:on` bzw. `currentReading=Otherdevice:temperature`
-* Perl-Code um ein Kommando auszuführen, oder einen Wert zu bestimmen.\
-  Dies ermöglicht komplexere Abfragen oder das freie Zusammensetzen von Befehle.\
-  Der Code muss in geschweiften Klammern angegeben werden: \
+#### Formatting Commands and Readings inside a *rhasspyMapping*
+Some intents can use FHEM-commands or -readings to get or set values.\
+There are three ways to write them:
+* Directly use Set-Command or Reading of the current devices:\
+  `cmd=on` or `currentReading=temperature`
+* Redirect command or reading to another device:\
+  `cmd=Otherdecice:on` or `currentReading=Otherdevice:temperature`
+* Perl-Code to execute a command or assing a value:\
+  This allows more complex requests.\
+  The code has to be enclosed in curly brackets.\
   `{currentVal={ReadingsVal($DEVICE,"state",0)}`\
-  oder\
+  or\
   `cmd={fhem("set $DEVICE dim $VALUE")}`\
-  Innerhalb der geschweiften Klammern kann über $DEVICE auf das aktuelle Gerät zugegriffen werden.\
-  Bei der *cmd* Option von *SetNumeric* wird außerdem der zu setzende Wert über $VALUE bereit gestellt.
+  `$DEVICE` is the current FHEM-device. The *SetNumeric* intent can use `$VALUE` for the value which has to be set.
 
+<!--
 Gibt man bei der Option `currentVal` das Reading im Format *reading* oder *Device:reading* an,\
 kann mit der Option `part` das Reading an Leerzeichen getrennt werden.\
 Über `part=1` bestimmt ihr, dass nur der erst Teil des Readings übernommen werden soll.\
 Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
+-->
 
 ## To-Do
 - [ ] Move ip of Rhasspy-Master to DEF instead of ATTR
