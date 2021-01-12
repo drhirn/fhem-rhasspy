@@ -19,6 +19,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping)\
 [Intents](#intents)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetOnOff](#setonoff)\
+&nbsp;&nbsp;&nbsp;&nbsp;[GetOnOff](#getonoff)\
 [To-Do](#To-Do)
 
 ## About Rhasspy
@@ -204,7 +205,7 @@ Example-Spoken-Sentences:
  (turn on|turn off|open|close|start|stop) $de.fhem.Device{Device} [$de.fhem.Room{Room}]
  ```
  
-#### GetOnOff
+### GetOnOff
 Intent to request the current state of a device.
 
 Example-Mapping:
