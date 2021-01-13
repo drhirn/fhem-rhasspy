@@ -396,18 +396,21 @@ Netflix=set tv launchApp Netflix
 Leselicht=set lightSceneWz scene Leselicht
 ```
 
-Hinweis zu Befehlen ohne Nennung des Gerätenamens:
-Um die Wiedergabe ohne Angabe eines Gerätes starten zu können,
-muss das Modul bestimmen welches Ausgabegerät verwendet werden soll.
-Hierzu sucht das Modul über das Attribut snipsChannels nach einem passenden Device. Treffer im aktuellen (bzw. angesprochenen) Raum werden bevorzugt.
+Notice on using the commands without a device name:\
+To start playback on a device without specifying the device name in the voice command, the module needs to know, which device should be used. Therefor it searches the attribute *rhasspyChannels* for suitable one. Devices in the actual or spoken room are preferred.
 
-Beispielsätze:
+Example-Sentences:
+```
+play CNN on the radio in my office
+switch to HBO
+change channel on radio to BBC news
+```
 
-    Spiele SWR3 auf dem Radio im Büro
-    Spiele SWR1
-    Schalte um auf BigFM
-    Sender vom Radio auf Das Ding wechseln
-
+Example-Rhasspy-Sentences:
+```
+[de.fhem:MediaChannels]
+\[(play|switch to|change to)] ($de.fhem.MediaChannels){Channel} [($de.fhem.Device){Device}] [($de.fhem.Room){Room}]
+```
 
 ## To-Do
 - [ ] Move IP of Rhasspy-Master to DEF instead of ATTR
