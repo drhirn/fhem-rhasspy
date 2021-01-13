@@ -23,6 +23,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[SetNumeric](#setnumeric)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetNumeric](#getnumeric)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Status](#status)\
+&nbsp;&nbsp;&nbsp;&nbsp;[MediaControls](#mediacontrols)\
 [To-Do](#To-Do)
 
 ## About Rhasspy
@@ -337,6 +338,35 @@ Example-Rhasspy-Sentences:
 ```
 [de.fhem:Status]
 \[how is the] (state) $de.fhem.Device{Device} [$de.fhem.Room{Room}]
+```
+
+### MediaControls
+
+Intent to control media devices
+
+Example-Mapping:
+```
+MediaControls:cmdPlay=play,cmdPause=pause,cmdStop=stop
+```
+
+Options:
+* **cmdPlay** Play command of the device. See chapter [Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping).
+* **cmdPause** Command to pause the device.
+* **cmdStop** Command to stop the device.
+* **cmdFwd** Command to skip to the next track/channel/etc.
+* **cmdBack** Command to skip to the previous track/channel/etc.
+
+Note on issuing a voice-command without a room-name:\
+As described in the *SetNumeric*-Intent, it is recommended to define a *GetOnOff*-Mapping to use the *MediaControls*-Intent without a room name.
+
+Example-Sentences:
+```
+skip to next track on the radio
+pause
+skip video on the dvd player
+stop playback
+next
+previous
 ```
 
 ## To-Do
