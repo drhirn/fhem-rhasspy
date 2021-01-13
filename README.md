@@ -24,6 +24,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[GetNumeric](#getnumeric)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Status](#status)\
 &nbsp;&nbsp;&nbsp;&nbsp;[MediaControls](#mediacontrols)\
+&nbsp;&nbsp;&nbsp;&nbsp;[MediaChannels](#mediachannels)\
 [To-Do](#To-Do)
 
 ## About Rhasspy
@@ -369,7 +370,47 @@ next
 previous
 ```
 
+### MediaChannels
+
+Intent to change radio-/tv channels, favorites, playlists, lightscenes, ...
+
+Instead of using the attribute *rhasspyMapping*, this intent is configured with an own attribute **rhasspyChannels** in the respective device. Reason is the multiple-line-configuration.
+
+To add this new attribute, it's necessary to create/edit the attribute *userattr* and add:
+```
+attr <deviceName> userattr rhasspyChannels:textField-long
+```
+
+Afterwards write down the desired channels in the format `channelname=command`.
+
+Values:
+* **Channelname** The name you want to use in the voice-command.
+* **cmd** The FHEM-command to switch to the channel.
+
+Example-Mappings:
+```
+SWR3=favorite s_w_r_3
+SWR1=favorite s_w_r_1
+ARD=set tv channel 204
+Netflix=set tv launchApp Netflix
+Leselicht=set lightSceneWz scene Leselicht
+```
+
+Hinweis zu Befehlen ohne Nennung des Gerätenamens:
+Um die Wiedergabe ohne Angabe eines Gerätes starten zu können,
+muss das Modul bestimmen welches Ausgabegerät verwendet werden soll.
+Hierzu sucht das Modul über das Attribut snipsChannels nach einem passenden Device. Treffer im aktuellen (bzw. angesprochenen) Raum werden bevorzugt.
+
+Beispielsätze:
+
+    Spiele SWR3 auf dem Radio im Büro
+    Spiele SWR1
+    Schalte um auf BigFM
+    Sender vom Radio auf Das Ding wechseln
+
+
 ## To-Do
 - [ ] Move IP of Rhasspy-Master to DEF instead of ATTR
 - [ ] Add Custom intents functionality
 - [ ] Set-/GetNumeric-Intents multilingual
+- [ ] Check MediaControls-Intent. Doesn't look functional. And is german-only too.
