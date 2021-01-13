@@ -233,12 +233,12 @@ $de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched on|switched off|running|
 
 Intent to dim, change volume, set temperature, ...
 
-Example:
+Example-Mapping:
 ```
 SetNumeric:currentVal=pct,cmd=dim,minVal=0,maxVal=99,step=25
 ```
 
-Options:\
+Options:
   * **currentVal** Reading which contains the acual value.
   * **part** Used to split *currentVal* into separate values. Separator is a blank. E.g. if *currentVal* is *23 C*, part=1 results in *23*
   * **cmd** Set-command of the device that should be called after analysing the voice-command.
@@ -250,21 +250,24 @@ Options:\
 
 Explanation for `map=percent`:\
 If this option is set, all numeric control values are taken as percentage between *minVal* and *maxVal*.\
-If there is a light-device with the setting *minVal=0* and *maxVal=255*, then "turn the light to 50" means the same as "turn the light to 50 percent".
+If there is a light-device with the setting *minVal=0* and *maxVal=255*, then "turn the light to 50" means the same as "turn the light to 50 percent". The light is then set to 127 instead of 50.
 
-Besonderheit bei type=Lautstärke:
-Um die Befehle leiserund lauter ohne Angabe eines Gerätes verwenden zu können,
-muss das Modul bestimmen welches Ausgabegerät gerade verwendet wird.
-Hierfür wird mithilfe des GetOnOff Mappings geprüft welches Gerät mit type=Lautstärke eingeschaltet ist.
-Dabei wird zuerst im aktuellen snipsRoom gesucht, dananch im Rest falls kein Treffer erfolgt ist.
-Es empfiehlt sich daher bei Verwendung von type=Lautstärke auch immer ein GetOnOff Mapping einzutragen.
-Ein Gerätename lauter bzw. Gerätename leiser ist unabhängig dieser Sonderbehandlung natürlich immer möglich.
+Specifics with `type=Lautstärke`:\
+To use the commands *lauter* or *leiser* without the need to speak a device-name, the module has to now which device is currently playing. Thus it uses the *GetOnOff-Mappings* to search a turned on device with `type=Lautstärke`. First it searches in the actual *rhasspyRoom* (the *siteId* or - if missing - the default rhasspyRoom), next in all other *rhasspyRoom*s.\
+That's why it's advisable to also set a *GetOnOff*-Mapping if using a *SetNumeric*-Mapping.
 
-Beispielsätze:
+Example-sentences:
+```
+Stelle die Deckenlampe auf 30 Prozent
+Mach das Radio leiser
+Stelle die Heizung im Büro um 2 Grad wärmer Lauter
+```
 
-    Stelle die Deckenlampe auf 30 Prozent
-    Mach das Radio leiser
-    Stelle die Heizung im Büro um 2 Grad wärmer Lauter
+Example-Rhasspy-Sentences:
+```
+[de.fhem:SetNumeric]
+\[stelle|mache|schalte] $de.fhem.Device{Device} [$de.fhem.Device{Room}] [auf|um] [(0..100){Value}] [(prozent|grad|dezibel){Unit}] [(heller|dunkler|leiser|lauter|wärmer|kälter){Change}]
+```
 
 ## To-Do
 - [ ] Move IP of Rhasspy-Master to DEF instead of ATTR
