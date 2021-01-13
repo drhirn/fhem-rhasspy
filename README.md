@@ -228,7 +228,44 @@ Example-Rhasspy-Sentences:
 [de.fhem:GetOnOff]
 $de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched on|switched off|running|stopped|opened|closed)
 ```
- 
+
+### SetNumeric
+
+Intent to dim, change volume, set temperature, ...
+
+Example:
+```
+SetNumeric:currentVal=pct,cmd=dim,minVal=0,maxVal=99,step=25
+```
+
+Options:\
+  * **currentVal** Reading which contains the acual value.
+  * **part** Used to split *currentVal* into separate values. Separator is a blank. E.g. if *currentVal* is *23 C*, part=1 results in *23*
+  * **cmd** Set-command of the device that should be called after analysing the voice-command.
+  * **minVal** Lowest possible value
+  * **maxVal** Highest possible value
+  * **step** Step-size for changes (e.g. *turn the volume up*)
+  * **map** Currently only one possible value: percent. See below.
+  * **type** To differentiate between multiple possible SetNumeric-Intents for the same device. Currently supports only the german hard-coded values **Helligkeit**, **Temperatur**, **Sollwert**, **Lautstärke**, **Luftfeuchtigkeit**, **Batterie**, **Wasserstand**
+
+Explanation for `map=percent`:\
+If this option is set, all numeric control values are taken as percentage between *minVal* and *maxVal*.\
+If there is a light-device with the setting *minVal=0* and *maxVal=255*, then "turn the light to 50" means the same as "turn the light to 50 percent".
+
+Besonderheit bei type=Lautstärke:
+Um die Befehle leiserund lauter ohne Angabe eines Gerätes verwenden zu können,
+muss das Modul bestimmen welches Ausgabegerät gerade verwendet wird.
+Hierfür wird mithilfe des GetOnOff Mappings geprüft welches Gerät mit type=Lautstärke eingeschaltet ist.
+Dabei wird zuerst im aktuellen snipsRoom gesucht, dananch im Rest falls kein Treffer erfolgt ist.
+Es empfiehlt sich daher bei Verwendung von type=Lautstärke auch immer ein GetOnOff Mapping einzutragen.
+Ein Gerätename lauter bzw. Gerätename leiser ist unabhängig dieser Sonderbehandlung natürlich immer möglich.
+
+Beispielsätze:
+
+    Stelle die Deckenlampe auf 30 Prozent
+    Mach das Radio leiser
+    Stelle die Heizung im Büro um 2 Grad wärmer Lauter
+
 ## To-Do
 - [ ] Move IP of Rhasspy-Master to DEF instead of ATTR
 - [ ] Add Custom intents functionality
