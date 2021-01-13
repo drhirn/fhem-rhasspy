@@ -275,3 +275,4 @@ Example-Rhasspy-Sentences:
 ## To-Do
 - [ ] Move IP of Rhasspy-Master to DEF instead of ATTR
 - [ ] Add Custom intents functionality
+- [ ] Set-/GetNumeric-Intents multilingual
