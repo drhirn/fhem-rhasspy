@@ -20,6 +20,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 [Intents](#intents)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetOnOff](#setonoff)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetOnOff](#getonoff)\
+&nbsp;&nbsp;&nbsp;&nbsp;[SetNumeric](#setnumeric)\
 [To-Do](#To-Do)
 
 ## About Rhasspy
@@ -233,9 +234,11 @@ $de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched on|switched off|running|
 
 Intent to dim, change volume, set temperature, ...
 
-Example-Mapping:
+Example-Mappings:
 ```
 SetNumeric:currentVal=pct,cmd=dim,minVal=0,maxVal=99,step=25
+SetNumeric:currentVal=brightness,minVal=0,maxVal=255,map=percent,cmd=brightness,step=1,type=Helligkeit
+SetNumeric:currentVal=volume,cmd=volume,minVal=0,maxVal=99,step=10,type=Lautstärke
 ```
 
 Options:
