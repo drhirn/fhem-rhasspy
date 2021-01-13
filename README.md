@@ -320,11 +320,11 @@ Status:response={my $value=ReadingsVal("$DEVICE","brightness",""); return "Brigh
 ```
 
 Options:
-* **response** Text for the response Rhassyp will give.
+* **response** Text for the response Rhassyp will give.\
 To use values from FHEM use format [Device:Reading].\
-  A comma within the response has to be escaped (\\, instead of ,).
-  Or you can use Perl-code enclosed in curley brackets to define the response.
-  Mixing text and Perl-code is not supported.
+A comma within the response has to be escaped (\\, instead of ,).\
+Or you can use Perl-code enclosed in curley brackets to define the response.\
+Mixing text and Perl-code is not supported.
 
 Example-Sentences:
 ```
