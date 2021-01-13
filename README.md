@@ -21,6 +21,8 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[SetOnOff](#setonoff)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetOnOff](#getonoff)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetNumeric](#setnumeric)\
+&nbsp;&nbsp;&nbsp;&nbsp;[GetNumeric](#getnumeric)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Status](#status)\
 [To-Do](#To-Do)
 
 ## About Rhasspy
@@ -270,6 +272,71 @@ Example-Rhasspy-Sentences:
 ```
 [de.fhem:SetNumeric]
 \[stelle|mache|schalte] $de.fhem.Device{Device} [$de.fhem.Device{Room}] [auf|um] [(0..100){Value}] [(prozent|grad|dezibel){Unit}] [(heller|dunkler|leiser|lauter|wärmer|kälter){Change}]
+```
+
+### GetNumeric
+
+Intent to question values like actual temperature, brightness, volume, ...
+
+Example-Mappings:
+```
+GetNumeric:currentVal=temperature,part=1
+GetNumeric:currentVal=brightness,type=Helligkeit
+```
+
+Optionen:
+* **currentVal** Reading which contains the value.
+* **part** Used to split *currentVal* into separate values. Separator is a blank. E.g. if *currentVal* is *23 C*, part=1 results in *23*
+* **map** See Explanation in [SetNumeric Intent](#setnumeric). Converts the given value back to a percent-value.
+* **minVal** Lowest possible value. Only needed if *map* is used.
+* **maxVal** Highest possible value. Only needed if *map* is used.
+* **type** To differentiate between multiple possible SetNumeric-Intents for the same device. Currently supports only the german hard-coded values **Helligkeit**, **Temperatur**, **Sollwert**, **Lautstärke**, **Luftfeuchtigkeit**, **Batterie**, **Wasserstand**
+
+Example-Sentences:
+```
+Wie ist die Temperatur vom Thermometer im Büro?
+Auf was ist das Thermostat im Bad gestellt?
+Wie hell ist die Deckenlampe?
+Wie laut ist das Radio im Wohnzimmer?
+```
+
+Example-Rhasspy-Sentences:
+```
+[de.fhem:GetNumeric]
+(wie laut|wie ist die lautstärke){Type:Lautstärke} $de.fhem.Device{Device} [$de.fhem.Room{Room}]
+(wie ist die|wie warm ist es){Type:Temperatur} [temperatur] [$de.fhem.Device{Device} ] [$de.fhem.Room{Room}]
+\[(wie|wie ist die)] (hell|helligkeit){Type:Helligkeit} $de.fhem.Device{Device} [$de.fhem.Room{Room}]
+```
+
+### Status
+
+Intent to get specific information of a device. The respone can be defined.
+
+Example-Mappings:
+```
+Status:response="Temperature is [Thermo:temp] degree ati [Thermo:hum] percent humidity"
+Status:response={my $value=ReadingsVal("device","reading",""); return "The value is $value";}
+Status:response={my $value=ReadingsVal("$DEVICE","brightness",""); return "Brightness is $value";}
+```
+
+Options:
+* **response** Text for the response Rhassyp will give.
+To use values from FHEM use format [Device:Reading].
+  A comma within the response has to be escaped (\, instead of ,).
+  Or you can use Perl-code enclosed in curley brackets to define the response.
+  Mixing text and Perl-code is not supported.
+
+Example-Sentences:
+```
+How is the state of the thermostat in the kitchen
+state light in livingroom
+state washer
+```
+
+Example-Rhasspy-Sentences:
+```
+[de.fhem:Status]
+\[how is the] (state) $de.fhem.Device{Device} [$de.fhem.Room{Room}]
 ```
 
 ## To-Do
