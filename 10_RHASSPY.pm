@@ -856,7 +856,7 @@ sub RHASSPY_getResponse($$) {
     my %messages = (
         DefaultError => "Da ist leider etwas schief gegangen.",
         NoActiveMediaDevice => "Tut mir leid, es ist kein Wiedergabegerät aktiv.",
-        DefaultConfirmation => "Mache ich doch sehr gerne"
+        DefaultConfirmation => "OK"
     );
 
     $response = RHASSPY_getCmd($hash, $hash->{NAME}, "response", $identifier);
