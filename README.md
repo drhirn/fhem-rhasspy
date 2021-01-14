@@ -26,6 +26,8 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[MediaControls](#mediacontrols)\
 &nbsp;&nbsp;&nbsp;&nbsp;[MediaChannels](#mediachannels)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetColor](#setcolor)\
+&nbsp;&nbsp;&nbsp;&nbsp;[GetTime](#gettime)\
+&nbsp;&nbsp;&nbsp;&nbsp;[GetWeekDay](#getweekday)\
 [To-Do](#To-Do)
 
 ## About Rhasspy
@@ -449,6 +451,49 @@ Example-Rhasspy-Sentences:
 ```
 [de.fhem:SetColor]
 \[change|color] $de.fhem.Device{Device} [$de.fhem.Room{Room}] $de.fhem.Color{Color}
+```
+
+### GetTime
+
+Intent to let Rhasspy speak the actual time.
+
+German only. No FHEM-settings needed.
+
+Example-Sentences:
+```
+wie spät ist es
+sag mir die uhrzeit
+```
+
+Example-Rhasspy-Sentences:
+```
+[de.fhem:GetTime]
+wie spät ist es
+sag mir die uhrzeit
+```
+
+### GetWeekDay
+
+Intent to let Rhasspy speak the actual day
+
+German only. No FHEM-settings needed.
+
+Example-Sentences:
+```
+welcher wochentag ist heute
+weißt du welcher tag heute ist
+kannst du mir bitte den wochentag sagen
+```
+
+Example-Rhasspy-Sentences:
+```
+[de.fhem:GetWeekday]
+\[bitte] weißt du [bitte] welcher Tag heute ist [bitte]
+\[bitte] kannst du mir [bitte] sagen welcher Tag heute ist [bitte]
+\[bitte] könntest du mir [bitte] sagen welcher Tag heute ist [bitte]
+\[bitte] kannst du mir [bitte] den [heutigen] Tag sagen [bitte]
+welcher [wochentag|tag] ist heute [bitte]
+welchen [wochentag|tag] haben wir heute [bitte]
 ```
 
 ## To-Do
