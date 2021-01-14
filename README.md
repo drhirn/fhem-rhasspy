@@ -25,6 +25,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[Status](#status)\
 &nbsp;&nbsp;&nbsp;&nbsp;[MediaControls](#mediacontrols)\
 &nbsp;&nbsp;&nbsp;&nbsp;[MediaChannels](#mediachannels)\
+&nbsp;&nbsp;&nbsp;&nbsp;[SetColor](#setcolor)\
 [To-Do](#To-Do)
 
 ## About Rhasspy
@@ -410,6 +411,44 @@ Example-Rhasspy-Sentences:
 ```
 [de.fhem:MediaChannels]
 \[(play|switch to|change to)] ($de.fhem.MediaChannels){Channel} [($de.fhem.Device){Device}] [($de.fhem.Room){Room}]
+```
+
+### SetColor
+
+Intent to change light colors
+
+Because of the multi-line settings, instead of configuring this intent with the attribute *rhasspyMapping*, a separate attribute *rhasspyColors* is used.
+
+To add this new attribute to the device, create/edit the attribute *userattr*:\
+`attr <deviceName> userattr rhasspyColors:textField-long`
+
+Afterwards it's possible to add entries the *rhasspyColors* using following format:\
+`Colorname=cmd`
+
+Settings:
+* **Colorname** The name of the color you want to use in a voice-command
+* **cmd** The FHEM-command
+
+Example-Mappings:
+```
+red=rgb FF0000
+green=rgb 00FF00
+blue=rgb 0000FF
+white=ct 3000
+warm white=ct 2700
+```
+
+Example-Sentences:
+```
+change light to green
+lightstrip blue
+color the light in the sleeping room white
+```
+
+Example-Rhasspy-Sentences:
+```
+[de.fhem:SetColor]
+\[change|color] $de.fhem.Device{Device} [$de.fhem.Room{Room}] $de.fhem.Color{Color}
 ```
 
 ## To-Do
