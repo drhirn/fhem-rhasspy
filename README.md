@@ -28,6 +28,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[SetColor](#setcolor)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetTime](#gettime)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetWeekDay](#getweekday)\
+[Tips & Tricks](#tips_&_tricks)
 [To-Do](#To-Do)
 
 ## About Rhasspy
@@ -495,6 +496,7 @@ Example-Rhasspy-Sentences:
 welcher [wochentag|tag] ist heute [bitte]
 welchen [wochentag|tag] haben wir heute [bitte]
 ```
+## Tips & Tricks
 
 ## To-Do
 - [ ] Move IP of Rhasspy-Master to DEF instead of ATTR
