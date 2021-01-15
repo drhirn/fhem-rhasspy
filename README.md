@@ -29,6 +29,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[GetTime](#gettime)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetWeekDay](#getweekday)\
 [Tips & Tricks](#tips--tricks)\
+    [Rhasspy speaks actual state of device after switching it](#rhasspy-speaks-actual-state-of-device-after-switching-it)\
 [To-Do](#To-Do)
 
 ## About Rhasspy
