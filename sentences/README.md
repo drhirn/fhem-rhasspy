@@ -1,1 +1,1 @@
-Some sample sentences in german for rhasspy-fhem
+Some sample sentences-files in german for rhasspy-fhem
