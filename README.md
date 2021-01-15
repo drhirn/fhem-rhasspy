@@ -28,7 +28,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[SetColor](#setcolor)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetTime](#gettime)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetWeekDay](#getweekday)\
-[Tips & Tricks](##tips--tricks)\
+[Tips & Tricks](#tips--tricks)\
 [To-Do](#To-Do)
 
 ## About Rhasspy
