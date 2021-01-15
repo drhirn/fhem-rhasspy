@@ -28,7 +28,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[SetColor](#setcolor)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetTime](#gettime)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetWeekDay](#getweekday)\
-[Tips & Tricks](#tips_&_tricks)
+[Tips & Tricks](##tips--tricks)\
 [To-Do](#To-Do)
 
 ## About Rhasspy
@@ -497,6 +497,31 @@ welcher [wochentag|tag] ist heute [bitte]
 welchen [wochentag|tag] haben wir heute [bitte]
 ```
 ## Tips & Tricks
+
+### Rhasspy speaks actual state of device after switching it
+
+JensS wrote a short script to let Rhasspy speak the actual state of a FHEM-device after switching it with a voice-command.\
+Add the following to your 99_myUtils.pm
+
+```
+sub ResponseOnOff($){
+  my ($dev) = @_;
+  my $room;
+  my $state = lc(ReadingsVal($dev,"state","in unknown state"));
+  my $name = (split(/,/,AttrVal($dev,"rhasspyName","error")))[0];
+  if (AttrVal($dev,"rhasspyRoom","")){$room = " in ".(split(/,/,AttrVal($dev,"rhasspyRoom","")))[0]};
+  $state=~s/.*on/turned on/;
+  $state=~s/.*off/turned off/;
+  return "Ok - ".$name.$room." is now ".$state
+}
+```
+
+and add a *response* to the *SetOnOff*-Mapping of a device
+
+```
+SetOnOff:cmdOn=on,cmdOff=off,response={ResponseOnOff($DEVICE)}
+```
+
 
 ## To-Do
 - [ ] Move IP of Rhasspy-Master to DEF instead of ATTR
