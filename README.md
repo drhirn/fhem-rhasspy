@@ -297,7 +297,7 @@ Optionen:
 * **map** See Explanation in [SetNumeric Intent](#setnumeric). Converts the given value back to a percent-value.
 * **minVal** Lowest possible value. Only needed if *map* is used.
 * **maxVal** Highest possible value. Only needed if *map* is used.
-* **type** To differentiate between multiple possible SetNumeric-Intents for the same device. Currently supports only the german hard-coded values **Helligkeit**, **Temperatur**, **Sollwert**, **Lautstärke**, **Luftfeuchtigkeit**, **Batterie**, **Wasserstand**
+* **type** To differentiate between multiple possible SetNumeric-Intents for the same device. Currently supports only the german hard-coded values **Helligkeit**, **Temperatur**, **Sollwert**, **Lautstärke**, **Luftfeuchtigkeit**, **Batterie**, **Wasserstand**, **Bodenfeuchte**
 
 Example-Sentences:
 ```
