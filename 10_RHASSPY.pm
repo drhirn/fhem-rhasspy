@@ -9,6 +9,8 @@ use Net::MQTT::Constants;
 use Encode;
 use HttpUtils;
 use DateTime;
+use Time::Seconds;
+use Time::Piece;
 use Data::Dumper;
 
 my %gets = (
@@ -810,6 +812,8 @@ sub RHASSPY_onmessage($$$) {
             RHASSPY_handleIntentGetTime($hash, $data);
         } elsif ($intent eq 'GetWeekday') {
             RHASSPY_handleIntentGetWeekday($hash, $data);
+		} elsif ($intent eq 'SetTimer') {
+			RHASSPY_handleIntentSetTimer($hash, $data);
         } else {
             RHASSPY_handleCustomIntent($hash, $intent, $data);
         }
@@ -1490,6 +1494,45 @@ sub RHASSPY_handleIntentSetColor($$) {
         }
     }
     # Antwort senden
+    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+}
+
+
+# Handle incoming SetTimer intents
+sub RHASSPY_handleIntentSetTimer($$) {
+    my ($hash, $data) = @_;
+    my $value, my $unit, my $room, my $siteId, my $time;
+    my $name = $hash->{'NAME'};
+    my $cmd;
+    my $validData = 0;
+    my @unitHours = ("stunde","stunden","hour","hours","heure","heures");
+    my @unitMinutes = ("minute","minuten","minute","minutes");
+	my $response = RHASSPY_getResponse($hash, "DefaultError");
+
+    Log3($hash->{NAME}, 5, "handleIntentSetTimer called");
+	
+	$room = ($data->{'Room'}) if (exists($data->{'Room'}));
+    $value = ($data->{'Value'}) if (exists($data->{'Value'}));
+    $unit = ($data->{'Unit'}) if (exists($data->{'Unit'}));
+    $siteId = ($data->{'siteId'}) if (exists($data->{'siteId'}));
+
+    if($value && $unit && ($room||$siteId)) {$validData = 1};
+    if (!$room){$room = $siteId};
+    
+    if ($validData = 1) {
+        $time = $value;
+        if ($unit ~~ @unitHours) {$time = $value*3600};
+        if ($unit ~~ @unitMinutes) {$time = $value*60};
+        
+        $time = strftime('%T', gmtime($time));
+        $cmd = "defmod timer_$room at +$time set $name speak siteId=\"$room\" text=\"taimer abgelaufen\";;setreading $name timer_".lc($room)." 0";
+        
+        RHASSPY_runCmd($hash,"",$cmd);
+        readingsSingleUpdate($hash, "timer_" . lc($room), 1, 0);
+        
+        $response = "Taimer in $room gesetzt auf $value $unit";
+    }
+
     RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
 }
 
