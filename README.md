@@ -529,3 +529,5 @@ SetOnOff:cmdOn=on,cmdOff=off,response={ResponseOnOff($DEVICE)}
 - [ ] Add Custom intents functionality
 - [ ] Set-/GetNumeric-Intents multilingual
 - [ ] Check MediaControls-Intent. Doesn't look functional. And is german-only too.
+- [ ] Add play and volume SET-functions
+- [ ] Add timer intent
