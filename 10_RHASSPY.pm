@@ -918,7 +918,9 @@ sub RHASSPY_speak($$) {
 # Send all devices, rooms, etc. to Rhasspy HTTP-API to update the slots
 sub RHASSPY_updateSlots($) {
     my ($hash) = @_;
-    
+    my $method = "POST";
+    my $contenttype = "application/json";
+
     # Collect everything and store it in arrays
     my @devices = RHASSPY_allRhasspyNames();
     my @rooms = RHASSPY_allRhasspyRooms();
@@ -928,10 +930,9 @@ sub RHASSPY_updateSlots($) {
     my @shortcuts = RHASSPY_allRhasspyShortcuts($hash);
 
     if (@shortcuts > 0) {
-        my $json;
+#        my $json;
         my $deviceData;
         my $url = "/api/sentences";
-        my $method = "POST";
         
         $deviceData='{"intents/de.fhem.Shortcuts.ini":"[de.fhem:Shortcuts]\n';
         foreach (@shortcuts)
@@ -942,7 +943,7 @@ sub RHASSPY_updateSlots($) {
         
         Log3($hash->{NAME}, 5, "Updating Rhasspy Sentences with data: $deviceData");
           
-        RHASSPY_sendToApi($hash, $url, $method, $deviceData);
+        RHASSPY_sendToApi($hash, $url, $method, $contenttype, $deviceData);
     }
 
     # If there are any devices, rooms, etc. found, create JSON structure and send it the the API
@@ -950,7 +951,6 @@ sub RHASSPY_updateSlots($) {
       my $json;
       my $deviceData;
       my $url = "/api/slots";
-      my $method = "POST";
 
       $deviceData->{'de.fhem.Device'} = \@devices if @devices > 0;
       $deviceData->{'de.fhem.Room'} = \@rooms if @rooms > 0;
@@ -962,22 +962,23 @@ sub RHASSPY_updateSlots($) {
 
       Log3($hash->{NAME}, 5, "Updating Rhasspy Slots with data: $json");
       
-      RHASSPY_sendToApi($hash, $url, $method, $json);
+      RHASSPY_sendToApi($hash, $url, $method, $contenttype, $json);
     }
 }
 
 # Use the HTTP-API to instruct Rhasspy to re-train it's data
-sub RHASSPY_trainRhasspy($) {
+sub RHASSPY_trainRhasspy ($) {
     my ($hash) = @_;
     my $url = "/api/train";
     my $method = "POST";
+    my $contenttype = "application/json";
     
-    RHASSPY_sendToApi($hash, $url, $method, undef);
+    RHASSPY_sendToApi($hash, $url, $method, $contenttype, undef);
 }
 
 # Send request to HTTP-API of Rhasspy
-sub RHASSPY_sendToApi($$$$) {
-    my ($hash,$url,$method,$data) = @_;
+sub RHASSPY_sendToApi($$$$$) {
+    my ($hash,$url,$method,$contenttype,$data) = @_;
     
     #Retrieve URL of Rhasspy-Master from attribute
     $url = AttrVal($hash->{NAME}, "rhasspyMaster", undef).$url;
@@ -987,7 +988,7 @@ sub RHASSPY_sendToApi($$$$) {
         hash       => $hash,
         timeout    => 120,
         method     => $method,
-        header     => "Content-Type: application/json",
+        header     => "Content-Type: $contenttype",
         data       => $data,
         callback   => \&RHASSPY_ParseHttpResponse
     };
@@ -1522,10 +1523,10 @@ sub RHASSPY_handleIntentSetTimer($$) {
     if($value && $unit && ($room||$siteId)) {$validData = 1};
     if (!$room){$room = $siteId};
     
-    if ($validData = 1) {
+    if ($validData == 1) {
         $time = $value;
-        if ($unit ~~ @unitHours) {$time = $value*3600};
-        if ($unit ~~ @unitMinutes) {$time = $value*60};
+        if ($unit =~ @unitHours) {$time = $value*3600};
+        if ($unit =~ @unitMinutes) {$time = $value*60};
         
         $time = strftime('%T', gmtime($time));
         $cmd = "defmod timer_$room at +$time set $name speak siteId=\"$room\" text=\"taimer abgelaufen\";;setreading $name timer_".lc($room)." 0";
@@ -1543,6 +1544,9 @@ sub RHASSPY_playWav($$) {
     my ($hash, $params) = @_;
     my $siteId = "default";
     my $json;
+    my $url = "/api/play-wav";
+    my $method = "POST";
+    my $contenttype = "audio/wav";
     my($unnamedParams, $namedParams) = parseParams($params);
     
 #    my $siteId = ($data->{'siteId'}) if (exists($data->{'siteId'}));
@@ -1563,7 +1567,7 @@ sub RHASSPY_playWav($$) {
 my $i = '';
             while (read($handle,my $file_contents,1024) ) { 
 #                print $file_contents;
-                $i += $file_contents;
+                $i .= $file_contents;
             }
             close($handle);
                             my $sendData =  {
