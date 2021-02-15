@@ -18,7 +18,7 @@ my %gets = (
 
 my %sets = (
     "speak" => "",
-    "play" => "",
+#    "play" => "",
     "updateSlots" => "",
     "textCommand" => "",
     "trainRhasspy" => ""
@@ -117,10 +117,10 @@ sub RHASSPY_Set($$$@) {
         RHASSPY_trainRhasspy($hash);
     }
     # playWav Cmd
-    if ($command eq "play") {
-        my $params = join (" ", @values);
-        RHASSPY_playWav($hash, $params);
-    }
+#    if ($command eq "play") {
+#        my $params = join (" ", @values);
+#        RHASSPY_playWav($hash, $params);
+#    }
 }
 
 # Attribute setzen / löschen
@@ -943,7 +943,8 @@ sub RHASSPY_updateSlots($) {
         
         Log3($hash->{NAME}, 5, "Updating Rhasspy Sentences with data: $deviceData");
           
-        RHASSPY_sendToApi($hash, $url, $method, $contenttype, $deviceData);
+#        RHASSPY_sendToApi($hash, $url, $method, $contenttype, $deviceData);
+        RHASSPY_sendToApi($hash, $url, $method, $deviceData);
     }
 
     # If there are any devices, rooms, etc. found, create JSON structure and send it the the API
@@ -962,7 +963,8 @@ sub RHASSPY_updateSlots($) {
 
       Log3($hash->{NAME}, 5, "Updating Rhasspy Slots with data: $json");
       
-      RHASSPY_sendToApi($hash, $url, $method, $contenttype, $json);
+#      RHASSPY_sendToApi($hash, $url, $method, $contenttype, $json);
+      RHASSPY_sendToApi($hash, $url, $method, $json);
     }
 }
 
@@ -973,7 +975,8 @@ sub RHASSPY_trainRhasspy ($) {
     my $method = "POST";
     my $contenttype = "application/json";
     
-    RHASSPY_sendToApi($hash, $url, $method, $contenttype, undef);
+#    RHASSPY_sendToApi($hash, $url, $method, $contenttype, undef);
+    RHASSPY_sendToApi($hash, $url, $method, undef);
 }
 
 # Send request to HTTP-API of Rhasspy
@@ -988,7 +991,7 @@ sub RHASSPY_sendToApi($$$$$) {
         hash       => $hash,
         timeout    => 120,
         method     => $method,
-        header     => "Content-Type: $contenttype",
+#        header     => "Content-Type: $contenttype",
         data       => $data,
         callback   => \&RHASSPY_ParseHttpResponse
     };
