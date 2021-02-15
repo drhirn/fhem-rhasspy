@@ -516,8 +516,9 @@ Set countdown in the kitchen to two hours
 Example-Rhasspy-Sentence:
 ````
 [de.fhem:SetTimer]
-\[set] (timer|countdown) [in] [$de.fhem.Room{Room}] to (1..60){Value} (minute|minutes|hour|hours|second|seconds){Unit}
+\[set] (timer|countdown) [in] [$de.fhem.Room{Room}] to (1..60){Value} [(minute|minutes|hour|hours|second|seconds){Unit}]
 ````
+Be sure to make the unit optional! Else there is always a random "unit" added to the sentence.
 
 
 ## Tips & Tricks
