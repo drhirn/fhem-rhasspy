@@ -28,6 +28,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[SetColor](#setcolor)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetTime](#gettime)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetWeekDay](#getweekday)\
+&nbsp;&nbsp;&nbsp;&nbsp;[SetTimer](#settimer)\
 [Tips & Tricks](#tips--tricks)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Rhasspy speaks actual state of device after switching it](#rhasspy-speaks-actual-state-of-device-after-switching-it)\
 [To-Do](#To-Do)
@@ -497,6 +498,28 @@ Example-Rhasspy-Sentences:
 welcher [wochentag|tag] ist heute [bitte]
 welchen [wochentag|tag] haben wir heute [bitte]
 ```
+
+### SetTimer
+
+Intent to create a timer/countdown
+
+This intent creates an AT-command in FHEM with the given time and - currently - speaks the sentences "Timer abgelaufen" when it has expired.
+
+No FHEM-settings needed
+
+Example-Sentences:
+````
+Set timer in bedroom to five minutes
+Set countdown in the kitchen to two hours
+````
+
+Example-Rhasspy-Sentence:
+````
+[de.fhem:SetTimer]
+\[set] (timer|countdown) [in] [$de.fhem.Room{Room}] to (1..60){Value} (minute|minutes|hour|hours|second|seconds){Unit}
+````
+
+
 ## Tips & Tricks
 
 ### Rhasspy speaks actual state of device after switching it
@@ -530,4 +553,5 @@ SetOnOff:cmdOn=on,cmdOff=off,response={ResponseOnOff($DEVICE)}
 - [ ] Set-/GetNumeric-Intents multilingual
 - [ ] Check MediaControls-Intent. Doesn't look functional. And is german-only too.
 - [ ] Add play and volume SET-functions
-- [ ] Add timer intent
+- [x] Add timer intent
+- [ ] Upgrade timer intent to play WAV file, stop existing timer, use times like "one hour and 15 minutes"
