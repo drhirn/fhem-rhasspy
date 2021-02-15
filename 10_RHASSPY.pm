@@ -943,7 +943,6 @@ sub RHASSPY_updateSlots($) {
         
         Log3($hash->{NAME}, 5, "Updating Rhasspy Sentences with data: $deviceData");
           
-#        RHASSPY_sendToApi($hash, $url, $method, $contenttype, $deviceData);
         RHASSPY_sendToApi($hash, $url, $method, $deviceData);
     }
 
@@ -963,7 +962,6 @@ sub RHASSPY_updateSlots($) {
 
       Log3($hash->{NAME}, 5, "Updating Rhasspy Slots with data: $json");
       
-#      RHASSPY_sendToApi($hash, $url, $method, $contenttype, $json);
       RHASSPY_sendToApi($hash, $url, $method, $json);
     }
 }
@@ -975,13 +973,12 @@ sub RHASSPY_trainRhasspy ($) {
     my $method = "POST";
     my $contenttype = "application/json";
     
-#    RHASSPY_sendToApi($hash, $url, $method, $contenttype, undef);
     RHASSPY_sendToApi($hash, $url, $method, undef);
 }
 
 # Send request to HTTP-API of Rhasspy
-sub RHASSPY_sendToApi($$$$$) {
-    my ($hash,$url,$method,$contenttype,$data) = @_;
+sub RHASSPY_sendToApi($$$$) {
+    my ($hash,$url,$method,$data) = @_;
     
     #Retrieve URL of Rhasspy-Master from attribute
     $url = AttrVal($hash->{NAME}, "rhasspyMaster", undef).$url;
@@ -991,7 +988,6 @@ sub RHASSPY_sendToApi($$$$$) {
         hash       => $hash,
         timeout    => 120,
         method     => $method,
-#        header     => "Content-Type: $contenttype",
         data       => $data,
         callback   => \&RHASSPY_ParseHttpResponse
     };
@@ -1523,19 +1519,29 @@ sub RHASSPY_handleIntentSetTimer($$) {
     $unit = ($data->{'Unit'}) if (exists($data->{'Unit'}));
     $siteId = ($data->{'siteId'}) if (exists($data->{'siteId'}));
 
+Log3($hash->{NAME}, 5, "Unit: $unit\n");
+Log3($hash->{NAME}, 5, "Value: $value\n");
+
     if($value && $unit && ($room||$siteId)) {$validData = 1};
     if (!$room){$room = $siteId};
     
     if ($validData == 1) {
         $time = $value;
-        if ($unit =~ @unitHours) {$time = $value*3600};
-        if ($unit =~ @unitMinutes) {$time = $value*60};
+        #if ($unit ~~ @unitHours) {$time = $value*3600};
+        #if ($unit ~~ @unitMinutes) {$time = $value*60};
+        if ( grep $_ eq $unit, @unitMinutes ) {$time = $value*60};
+        if ( grep $_ eq $unit, @unitHours ) {$time = $value*3600};
         
         $time = strftime('%T', gmtime($time));
+
+Log3($hash->{NAME}, 5, "Time: $time\n");
+
         $cmd = "defmod timer_$room at +$time set $name speak siteId=\"$room\" text=\"taimer abgelaufen\";;setreading $name timer_".lc($room)." 0";
         
         RHASSPY_runCmd($hash,"",$cmd);
         readingsSingleUpdate($hash, "timer_" . lc($room), 1, 0);
+        
+        Log3($hash->{NAME}, 5, "Created timer: $cmd");
         
         $response = "Taimer in $room gesetzt auf $value $unit";
     }
@@ -1580,7 +1586,7 @@ my $i = '';
                 };
                 $json = toJSON($sendData);
                 #print Dumper $sendData;
-                MQTT::send_publish($hash->{IODev}, topic => 'hermes/audioServer/wohnzimmer/playBytes/0', message => $json, qos => 0, retain => "0");
+#                MQTT::send_publish($hash->{IODev}, topic => 'hermes/audioServer/wohnzimmer/playBytes/0', message => $json, qos => 0, retain => "0");
         }
     }
 }
