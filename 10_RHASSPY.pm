@@ -18,7 +18,7 @@ my %gets = (
 
 my %sets = (
     "speak" => "",
-#    "play" => "",
+    "play" => "",
     "updateSlots" => "",
     "textCommand" => "",
     "trainRhasspy" => ""
@@ -117,10 +117,10 @@ sub RHASSPY_Set($$$@) {
         RHASSPY_trainRhasspy($hash);
     }
     # playWav Cmd
-#    if ($command eq "play") {
-#        my $params = join (" ", @values);
-#        RHASSPY_playWav($hash, $params);
-#    }
+    if ($command eq "play") {
+        my $params = join (" ", @values);
+        RHASSPY_playWav($hash, $params);
+    }
 }
 
 # Attribute setzen / löschen
@@ -1557,9 +1557,7 @@ sub RHASSPY_playWav($$) {
     my $method = "POST";
     my $contenttype = "audio/wav";
     my($unnamedParams, $namedParams) = parseParams($params);
-    
-#    my $siteId = ($data->{'siteId'}) if (exists($data->{'siteId'}));
-    
+
     Log3($hash->{NAME}, 5, "action playWav called");
     
     if (defined($namedParams->{'siteId'}) && defined($namedParams->{'path'})) {
@@ -1567,26 +1565,19 @@ sub RHASSPY_playWav($$) {
         my $filename = $namedParams->{'path'};
         my $encoding = ":raw :bytes";
         my $handle   = undef;
+        my $topic = "hermes/audioServer/$siteId/playBytes/999";
 
-        Log3($hash->{NAME}, 3, "siteId: $siteId, path: $filename");
-        
+        Log3($hash->{NAME}, 3, "Playing file $filename on $siteId");
+
         if (-e $filename) {
             open($handle, "< $encoding", $filename)
                 || warn "$0: can't open $filename for reading: $!";
-my $i = '';
-            while (read($handle,my $file_contents,1024) ) { 
-#                print $file_contents;
-                $i .= $file_contents;
+
+            while (read($handle,my $file_contents,1000000) ) { 
+                MQTT::send_publish($hash->{IODev}, topic => $topic, message => $file_contents, qos => 0, retain => "0");
             }
+
             close($handle);
-                            my $sendData =  {
-                    wav_bytes => $i,
-                    requestId => 0,
-                    siteId => $siteId
-                };
-                $json = toJSON($sendData);
-                #print Dumper $sendData;
-#                MQTT::send_publish($hash->{IODev}, topic => 'hermes/audioServer/wohnzimmer/playBytes/0', message => $json, qos => 0, retain => "0");
         }
     }
 }
