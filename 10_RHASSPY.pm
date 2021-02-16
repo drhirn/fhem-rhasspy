@@ -1055,7 +1055,7 @@ sub RHASSPY_handleCustomIntent($$$) {
                 Log3($hash->{NAME}, 5, "Calling sub: $subName");
 
                 no strict 'refs';
-                $response = $subName->(@params);
+                $response = $subName->(@params, $hash);
             };
 
             if ($@) {
