@@ -789,7 +789,7 @@ sub RHASSPY_onmessage($$$) {
       RHASSPY_respond($hash, $type, $sessionId, $siteId, $response);
     }
 
-    elsif ($topic =~ qr/^hermes\/intent\/.*:/) {
+    elsif ($topic =~ qr/^hermes\/intent\/.*:/ and $Mute_Wert ne 1) {
         my $info, my $sendData;
         my $device, my $room, my $channel, my $color;
         my $json, my $infoJson;
