@@ -1002,6 +1002,7 @@ sub RHASSPY_sendToApi($$$$) {
         timeout    => 120,
         method     => $method,
         data       => $data,
+        header     => "Content-Type: application/json",
         callback   => \&RHASSPY_ParseHttpResponse
     };
 
