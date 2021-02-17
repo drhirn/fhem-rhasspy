@@ -740,15 +740,7 @@ sub RHASSPY_onmessage($$$) {
     $type = $data->{'type'} if defined($data->{'type'});
     my $sessionId = $data->{'sessionId'} if defined($data->{'sessionId'});
     my $siteId = $data->{'siteId'} if defined($data->{'siteId'});
-    my $Satellite = $data->{'siteId'};
-    my %umlaute = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss" );
-    my $keye = join ("|", keys(%umlaute));
-    $Satellite =~ s/($keye)/$umlaute{$1}/g;
-    $Satellite = lc($Satellite);
-    my $Satellite_mute = "mute_$Satellite";
-    my $RhasspyDevice = $hash->{NAME};
-    my $Mute_Wert = ReadingsVal($RhasspyDevice,$Satellite_mute,0);
-    
+
     # Hotword Erkennung
     if ($topic =~ m/^hermes\/dialogueManager/) {
 #        my $data = RHASSPY_parseJSON($hash, $message);
@@ -768,12 +760,8 @@ sub RHASSPY_onmessage($$$) {
         }
     }
 
-   elsif ($topic =~ qr/^hermes\/intent\/.*:/ && $data->{'intent'} eq 'mute') {readingsSingleUpdate($hash, "mute_" . lc($Satellite), 1, 1);
-	    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, "Ok - ich mach dann mal Pause");}
-   elsif ($topic =~ qr/^hermes\/intent\/.*:/ && $data->{'intent'} eq 'unmute') {readingsSingleUpdate($hash, "mute_" . lc($Satellite), 0, 1);
-	    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, "Hallo - da bin ich wieder");}
     # Shortcut empfangen -> Code direkt ausführen
-   elsif ($topic =~ qr/^hermes\/intent\/.*:/ && defined($input) && grep( /^$input$/i, RHASSPY_allRhasspyShortcuts($hash)) and $Mute_Wert ne 1) {
+    elsif ($topic =~ qr/^hermes\/intent\/.*:/ && defined($input) && grep( /^$input$/i, RHASSPY_allRhasspyShortcuts($hash))) {
       my $error;
       my $response = RHASSPY_getResponse($hash, "DefaultError");
       my $cmd = RHASSPY_getCmd($hash, $hash->{NAME}, "shortcuts", $input);
@@ -789,7 +777,7 @@ sub RHASSPY_onmessage($$$) {
       RHASSPY_respond($hash, $type, $sessionId, $siteId, $response);
     }
 
-    elsif ($topic =~ qr/^hermes\/intent\/.*:/ and $Mute_Wert ne 1) {
+    elsif ($topic =~ qr/^hermes\/intent\/.*:/) {
         my $info, my $sendData;
         my $device, my $room, my $channel, my $color;
         my $json, my $infoJson;
@@ -833,7 +821,6 @@ sub RHASSPY_onmessage($$$) {
             RHASSPY_handleCustomIntent($hash, $intent, $data);
         }
     }
-    else {RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, " ");}
 }
     
 # Antwort ausgeben
