@@ -731,6 +731,17 @@ sub RHASSPY_parseJSON($$) {
     return $data;
 }
 
+#Replace german umlauts for showing text in FHEMWEB
+sub RHASSPY_umlauts($$) {
+    my ($hash,$word) = @_;
+    my %umlauts = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss" );
+    my $keys = join ("|", keys(%umlauts));
+
+    $word =~ s/($keys)/$umlauts{$1}/g;
+
+    return $word;
+}
+
 # Daten vom MQTT Modul empfangen -> Device und Room ersetzen, dann erneut an NLU übergeben
 sub RHASSPY_onmessage($$$) {
     my ($hash, $topic, $message) = @_;
@@ -740,25 +751,19 @@ sub RHASSPY_onmessage($$$) {
     $type = $data->{'type'} if defined($data->{'type'});
     my $sessionId = $data->{'sessionId'} if defined($data->{'sessionId'});
     my $siteId = $data->{'siteId'} if defined($data->{'siteId'});
-    my $Satellite = $data->{'siteId'};
-    my %umlaute = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss" );
-    my $keye = join ("|", keys(%umlaute));
-    $Satellite =~ s/($keye)/$umlaute{$1}/g;
-    $Satellite = lc($Satellite);
-    my $Satellite_mute = "mute_$Satellite";
-    my $RhasspyDevice = $hash->{NAME};
-    my $Mute_Wert = ReadingsVal($RhasspyDevice,$Satellite_mute,0);
+    
+    my $mute = ReadingsNum($hash->{NAME},"mute_$siteId",3) if defined($data->{'siteId'});
     
     # Hotword Erkennung
     if ($topic =~ m/^hermes\/dialogueManager/) {
-#        my $data = RHASSPY_parseJSON($hash, $message);
         my $room = RHASSPY_roomName($hash, $data);
 
         if (defined($room)) {
-            my %umlauts = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss" );
-            my $keys = join ("|", keys(%umlauts));
+#            my %umlauts = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss" );
+#            my $keys = join ("|", keys(%umlauts));
 
-            $room =~ s/($keys)/$umlauts{$1}/g;
+            #$room =~ s/($keys)/$umlauts{$1}/g;
+            $room = RHASSPY_umlauts($hash,$room);
 
             if ($topic =~ m/sessionStarted/) {
                 readingsSingleUpdate($hash, "listening_" . lc($room), 1, 1);
@@ -768,12 +773,22 @@ sub RHASSPY_onmessage($$$) {
         }
     }
 
-   elsif ($topic =~ qr/^hermes\/intent\/.*:/ && $data->{'intent'} eq 'mute') {readingsSingleUpdate($hash, "mute_" . lc($Satellite), 1, 1);
-	    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, "Ok - ich mach dann mal Pause");}
-   elsif ($topic =~ qr/^hermes\/intent\/.*:/ && $data->{'intent'} eq 'unmute') {readingsSingleUpdate($hash, "mute_" . lc($Satellite), 0, 1);
-	    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, "Hallo - da bin ich wieder");}
+    elsif ($topic =~ qr/^hermes\/intent\/de.fhem:SetMute/ && defined($siteId)) {
+        $type = ($message =~ m/fhem.textCommand/) ? "text" : "voice";
+        $data->{'requestType'} = $type;
+        
+        # Readings updaten
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, "lastIntentTopic", $topic);
+        readingsBulkUpdate($hash, "lastIntentPayload", toJSON($data));
+        readingsEndUpdate($hash, 1);
+        
+        RHASSPY_handleIntentSetMute($hash, $data);
+    }
+
+
     # Shortcut empfangen -> Code direkt ausführen
-   elsif ($topic =~ qr/^hermes\/intent\/.*:/ && defined($input) && grep( /^$input$/i, RHASSPY_allRhasspyShortcuts($hash)) and $Mute_Wert ne 1) {
+   elsif ($topic =~ qr/^hermes\/intent\/.*:/ && defined($input) && grep( /^$input$/i, RHASSPY_allRhasspyShortcuts($hash)) && $mute != 1) {
       my $error;
       my $response = RHASSPY_getResponse($hash, "DefaultError");
       my $cmd = RHASSPY_getCmd($hash, $hash->{NAME}, "shortcuts", $input);
@@ -789,7 +804,7 @@ sub RHASSPY_onmessage($$$) {
       RHASSPY_respond($hash, $type, $sessionId, $siteId, $response);
     }
 
-    elsif ($topic =~ qr/^hermes\/intent\/.*:/ and $Mute_Wert ne 1) {
+    elsif ($topic =~ qr/^hermes\/intent\/.*:/ && $mute != 1 && $topic !~ qr/^hermes\/intent\/de.fhem:SetMute/) {
         my $info, my $sendData;
         my $device, my $room, my $channel, my $color;
         my $json, my $infoJson;
@@ -832,6 +847,7 @@ sub RHASSPY_onmessage($$$) {
         } else {
             RHASSPY_handleCustomIntent($hash, $intent, $data);
         }
+        
     }
     else {RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, " ");}
 }
@@ -1081,6 +1097,28 @@ sub RHASSPY_handleCustomIntent($$$) {
         # Antwort senden
         RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
     }
+}
+
+# Handle incoming "SetMute" intents
+sub RHASSPY_handleIntentSetMute($$) {
+    my ($hash, $data) = @_;
+    my $value, my $siteId, my $state = 0;
+    my $response = RHASSPY_getResponse($hash, "DefaultError");
+    
+    Log3($hash->{NAME}, 5, "handleIntentSetMute called");
+    
+    if (exists($data->{'Value'}) && exists($data->{'siteId'})) {
+        $siteId = $data->{'siteId'};
+        $value = $data->{'Value'};
+        
+#        Log3($hash->{NAME}, 5, "siteId: $siteId, value: $value");
+        
+        if ($value eq "on") {$state = 1};
+
+        readingsSingleUpdate($hash, "mute_$siteId", $state, 1);
+        $response = RHASSPY_getResponse($hash, "DefaultConfirmation");
+    }
+    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);    
 }
 
 # Eingehende "SetOnOff" Intents bearbeiten
