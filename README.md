@@ -520,6 +520,31 @@ Example-Rhasspy-Sentence:
 ````
 Be sure to make the unit optional! Else there is always a random "unit" added to the sentence.
 
+### SetMute
+
+Intent to disable/enable the processing of intents on a specific siteId. Rhasspy will still listen to the wakeword but will not process any intents.
+
+This intents creates a Reading __mute_siteId__ vor every siteId it get's a voice-command from.
+
+No FHEM-settings needed
+
+Example-Sentences:
+````
+good night
+be quiet
+good morning
+make noise
+start listening
+stop listening
+````
+
+Example-Rhasspy-Sentences:
+````
+(good night|be quiet){Value:on}
+(good morning|make noise){Value:off}
+````
+Attention! The `{Value:on}` or `{Value:off}` is mandatory and case sensitive!
+
 
 ## Tips & Tricks
 
