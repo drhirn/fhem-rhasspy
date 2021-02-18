@@ -29,6 +29,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[GetTime](#gettime)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetWeekDay](#getweekday)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetTimer](#settimer)\
+&nbsp;&nbsp;&nbsp;&nbsp;[SetMute](#setmute)\
 [Tips & Tricks](#tips--tricks)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Rhasspy speaks actual state of device after switching it](#rhasspy-speaks-actual-state-of-device-after-switching-it)\
 [To-Do](#To-Do)
@@ -543,7 +544,7 @@ Example-Rhasspy-Sentences:
 (good night|be quiet){Value:on}
 (good morning|make noise){Value:off}
 ````
-Attention! The `{Value:on}` or `{Value:off}` is mandatory and case sensitive!
+Attention! The `{Value:on}` or `{Value:off}` is mandatory, case sensitive and has to be english!
 
 
 ## Tips & Tricks
