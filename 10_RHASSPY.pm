@@ -334,7 +334,7 @@ sub RHASSPY_roomName ($$) {
 
     my $room;
     my $defaultRoom = $hash->{helper}{defaultRoom};
-
+    
     # Slot "Room" im JSON vorhanden? Sonst Raum des angesprochenen Satelites verwenden
     if (exists($data->{'Room'})) {
         $room = $data->{'Room'};
@@ -731,17 +731,6 @@ sub RHASSPY_parseJSON($$) {
     return $data;
 }
 
-#Replace german umlauts for showing text in FHEMWEB
-sub RHASSPY_umlauts($$) {
-    my ($hash,$word) = @_;
-    my %umlauts = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss" );
-    my $keys = join ("|", keys(%umlauts));
-
-    $word =~ s/($keys)/$umlauts{$1}/g;
-
-    return $word;
-}
-
 # Daten vom MQTT Modul empfangen -> Device und Room ersetzen, dann erneut an NLU übergeben
 sub RHASSPY_onmessage($$$) {
     my ($hash, $topic, $message) = @_;
@@ -751,24 +740,22 @@ sub RHASSPY_onmessage($$$) {
     $type = $data->{'type'} if defined($data->{'type'});
     my $sessionId = $data->{'sessionId'} if defined($data->{'sessionId'});
     my $siteId = $data->{'siteId'} if defined($data->{'siteId'});
+    my $mute = 0;
     
-    my $mute = ReadingsNum($hash->{NAME},"mute_$siteId",3) if defined($data->{'siteId'});
+    if (defined $siteId) {
+        my $reading = makeReadingName($siteId);
+        $mute = ReadingsNum($hash->{NAME},"mute_$reading",0);
+    }
     
     # Hotword Erkennung
     if ($topic =~ m/^hermes\/dialogueManager/) {
         my $room = RHASSPY_roomName($hash, $data);
 
         if (defined($room)) {
-#            my %umlauts = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss" );
-#            my $keys = join ("|", keys(%umlauts));
-
-            #$room =~ s/($keys)/$umlauts{$1}/g;
-            $room = RHASSPY_umlauts($hash,$room);
-
             if ($topic =~ m/sessionStarted/) {
-                readingsSingleUpdate($hash, "listening_" . lc($room), 1, 1);
+                readingsSingleUpdate($hash, "listening_" . makeReadingName($room), 1, 1);
             } elsif ($topic =~ m/sessionEnded/) {
-                readingsSingleUpdate($hash, "listening_" . lc($room), 0, 1);
+                readingsSingleUpdate($hash, "listening_" . makeReadingName($room), 0, 1);
             }
         }
     }
@@ -1108,7 +1095,7 @@ sub RHASSPY_handleIntentSetMute($$) {
     Log3($hash->{NAME}, 5, "handleIntentSetMute called");
     
     if (exists($data->{'Value'}) && exists($data->{'siteId'})) {
-        $siteId = $data->{'siteId'};
+        $siteId = makeReadingName($data->{'siteId'});
         $value = $data->{'Value'};
         
 #        Log3($hash->{NAME}, 5, "siteId: $siteId, value: $value");
