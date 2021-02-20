@@ -222,7 +222,7 @@ sub RHASSPY_execute($$$$$) {
     my $ROOM = (defined($siteId) && $siteId eq "default") ? $hash->{helper}{defaultRoom} : $siteId;
 
     # CMD ausführen
-    $returnVal = eval {$cmd};
+    $returnVal = eval $cmd; ##no critic #Can't put between curly braces because then shortcuts (with curly braces) don't work
     Log3($hash->{NAME}, 1, $@) if ($@);
 
     return $returnVal;
@@ -875,6 +875,20 @@ sub RHASSPY_Parse {
     return @ret;
 }
 
+sub RHASSPY_updateLastIntentReadings {
+    my $hash, my $topic, my $data;
+    $hash = shift;
+    $topic = shift;
+    $data = shift // return;
+    
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, "lastIntentTopic", $topic);
+    readingsBulkUpdate($hash, "lastIntentPayload", toJSON($data));
+    readingsEndUpdate($hash, 1);
+
+    return;
+}
+
 # Daten vom MQTT Modul empfangen -> Device und Room ersetzen, dann erneut an NLU übergeben
 sub RHASSPY_onmessage($$$) {
     my ($hash, $topic, $message) = @_;
@@ -917,10 +931,12 @@ sub RHASSPY_onmessage($$$) {
         $data->{'requestType'} = $type;
 
         # Readings updaten
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash, "lastIntentTopic", $topic);
-        readingsBulkUpdate($hash, "lastIntentPayload", toJSON($data));
-        readingsEndUpdate($hash, 1);
+#        readingsBeginUpdate($hash);
+#        readingsBulkUpdate($hash, "lastIntentTopic", $topic);
+#        readingsBulkUpdate($hash, "lastIntentPayload", toJSON($data));
+#        readingsEndUpdate($hash, 1);
+
+        RHASSPY_updateLastIntentReadings($hash, $topic,$data);
 
         RHASSPY_handleIntentSetMute($hash, $data);
     }
@@ -939,6 +955,13 @@ sub RHASSPY_onmessage($$$) {
           $response = $returnVal // RHASSPY_getResponse($hash, 'DefaultConfirmation');
       }
 
+        # Readings updaten
+#        readingsBeginUpdate($hash);
+#        readingsBulkUpdate($hash, "lastIntentTopic", $topic);
+#        readingsBulkUpdate($hash, "lastIntentPayload", toJSON($data));
+#        readingsEndUpdate($hash, 1);
+        RHASSPY_updateLastIntentReadings($hash, $topic,$data);
+
       # Antwort senden
       RHASSPY_respond($hash, $type, $sessionId, $siteId, $response);
     }
@@ -955,10 +978,11 @@ sub RHASSPY_onmessage($$$) {
         $intent = $data->{'intent'};
 
         # Readings updaten
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash, "lastIntentTopic", $topic);
-        readingsBulkUpdate($hash, "lastIntentPayload", toJSON($data));
-        readingsEndUpdate($hash, 1);
+#        readingsBeginUpdate($hash);
+#        readingsBulkUpdate($hash, "lastIntentTopic", $topic);
+#        readingsBulkUpdate($hash, "lastIntentPayload", toJSON($data));
+#        readingsEndUpdate($hash, 1);
+        RHASSPY_updateLastIntentReadings($hash, $topic,$data);
 
         # Passenden Intent-Handler aufrufen
         if ($intent eq 'SetOnOff') { #Beta-User: hier sollte eigentlich eher eine Hash-Dispatch-Funktion stehen, siehe 00_MYSENSORS.pm ca. ab Zeile 606
@@ -988,7 +1012,10 @@ sub RHASSPY_onmessage($$$) {
         }
     }
     else {RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, " ");}
+
     #Beta-User: return value is absolutely miraculous...?
+    
+    return;
 }
     
 
