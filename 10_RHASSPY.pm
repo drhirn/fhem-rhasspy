@@ -166,6 +166,7 @@ sub RHASSPY_Undefine {
 # Set Befehl aufgerufen
 sub RHASSPY_Set($$$@) {
     my ($hash, $name, $command, @values) = @_;
+    
     return "Unknown argument $command, choose one of " . join(" ", sort keys %sets) if(!defined($sets{$command}));
 
     Log3($hash->{NAME}, 5, "set " . $command . " - value: " . join (" ", @values));
@@ -195,8 +196,11 @@ sub RHASSPY_Set($$$@) {
 }
 
 # Attribute setzen / löschen
-sub RHASSPY_Attr($$$$) {
-    my ($command, $name, $attribute, $value) = @_;
+sub RHASSPY_Attr {
+    my $command = shift;
+    my $name = shift;
+    my $attribute = shift;
+    my $value = shift // return;
     my $hash = $defs{$name};
 
     # IODev Attribut gesetzt
@@ -218,7 +222,7 @@ sub RHASSPY_execute($$$$$) {
     my $ROOM = (defined($siteId) && $siteId eq "default") ? $hash->{helper}{defaultRoom} : $siteId;
 
     # CMD ausführen
-    $returnVal = eval $cmd;
+    $returnVal = eval {$cmd};
     Log3($hash->{NAME}, 1, $@) if ($@);
 
     return $returnVal;
@@ -244,8 +248,9 @@ sub RHASSPY_subscribeTopics {
 }
 
 # Topics abbestellen
-sub RHASSPY_unsubscribeTopics($) {
-    my ($hash) = @_;
+#sub RHASSPY_unsubscribeTopics($) {
+sub RHASSPY_unsubscribeTopics {
+    my ($hash) = shift // return;
 
     foreach (@topics) {
         my ($mqos, $mretain, $mtopic, $mvalue, $mcmd) = MQTT::parsePublishCmdStr($_);
@@ -389,10 +394,14 @@ sub RHASSPY_allRhasspyColors() {
 
 # Alle Shortcuts sammeln
 sub RHASSPY_allRhasspyShortcuts($) {
+#sub RHASSPY_allRhasspyShortcuts {
     my ($hash) = @_;
-    my @shortcuts, my @sorted;
+#    my $hash = shift // return;
+    my @shortcuts, my @sorted, my @rows;
 
-    my @rows = split(/\n/, AttrVal($hash->{NAME},"shortcuts",undef));
+    if (defined($hash)){
+        @rows = split(/\n/, AttrVal($hash->{NAME},"shortcuts",undef));
+    };
     foreach (@rows) {
         my @tokens = split('=', $_);
         my $shortcut = shift(@tokens);
@@ -441,8 +450,9 @@ sub RHASSPY_getDeviceByName($$$) {
         my @rooms = split(',', AttrVal($_,"rhasspyRoom",undef));
 
         # Case Insensitive schauen ob der gesuchte Name (oder besser Name und Raum) in den Arrays vorhanden ist
-        if (grep( /^$name$/i, @names)) {
-            if (!defined($device) || grep( /^$room$/i, @rooms)) {
+#        if (grep( /^$name$/i, @names)) {
+        if (grep( { /^$name$/i } @names)) {
+            if (!defined($device) || grep( { /^$room$/i} @rooms)) {
                 $device = $_;
             }
         }
@@ -475,7 +485,7 @@ sub RHASSPY_getDevicesByIntentAndType($$$$) {
 
         # Geräte sammeln
         if (!defined($type)) {
-            grep (/^$room$/i, @rooms) 
+            grep ( {/^$room$/i} @rooms) 
                 ? push @matchesInRoom, $_ 
                 : push @matchesOutsideRoom, $_;
         }
@@ -483,7 +493,7 @@ sub RHASSPY_getDevicesByIntentAndType($$$$) {
 #            push @matchesInRoom, $_;
 #        }
         elsif (defined($type) && $mappingType && $type =~ m/^$mappingType$/i) {
-            grep(/^$room$/i, @rooms) 
+            grep( {/^$room$/i} @rooms) 
             ? push @matchesInRoom, $_
             : push @matchesOutsideRoom, $_;
         }
@@ -569,7 +579,7 @@ sub RHASSPY_getDeviceByMediaChannel($$$) {
         next unless defined($cmd);
 
         # Erster Treffer wälen, überschreiben falls besserer Treffer (Raum matched auch) kommt
-        if (!defined($device) || grep(/^$room$/i, @rooms)) {
+        if (!defined($device) || grep( {/^$room$/i} @rooms)) {
             $device = $_;
         }
     }
@@ -581,8 +591,10 @@ sub RHASSPY_getDeviceByMediaChannel($$$) {
 
 
 # Mappings in Key/Value Paare aufteilen
-sub RHASSPY_splitMappingString($) {
-    my ($mapping) = @_;
+sub RHASSPY_splitMappingString {
+#sub RHASSPY_splitMappingString($) {
+    my ($mapping) = shift // return;
+#    my ($mapping) = @_;
     my @tokens, my $token = '';
     #my $char, 
     my $lastChar = '';
@@ -770,8 +782,11 @@ sub RHASSPY_getOnOffState ($$$) {
 
 
 # JSON parsen
-sub RHASSPY_parseJSON($$) {
-    my ($hash, $json) = @_;
+#sub RHASSPY_parseJSON($$) {
+sub RHASSPY_parseJSON {
+    #my ($hash, $json) = @_;
+    my $hash = shift;
+    my $json = shift // return;
     my $data;
 
     # JSON Decode und Fehlerüberprüfung
@@ -830,7 +845,7 @@ sub RHASSPY_Parse {
     
     Log3($iodev->{NAME}, 4, "RHASSPY_Parse called, short Topic is $shorttopic");
     
-    return q{[NEXT]} if !grep( m{\A$shorttopic}x, @topics);
+    return q{[NEXT]} if !grep( {m{\A$shorttopic}x} @topics);
     Log3($iodev->{NAME}, 4, "grep found $shorttopic");
     
     my @instances = devspec2array('TYPE=RHASSPY');
@@ -864,11 +879,14 @@ sub RHASSPY_Parse {
 sub RHASSPY_onmessage($$$) {
     my ($hash, $topic, $message) = @_;
     my $data  = RHASSPY_parseJSON($hash, $message);
-    my $input = $data->{'input'} if defined($data->{'input'});
+    my $input; my $siteId; my $sessionId;
+    if (defined $data->{'input'}) {$input = $data->{'input'}};
+#    my $input = $data->{'input'} if defined($data->{'input'});
     my $type  = $data->{'type'} // q{text};
     #$type = $data->{'type'} if defined($data->{'type'});
-    my $sessionId = $data->{'sessionId'} if defined($data->{'sessionId'});
-    my $siteId = $data->{'siteId'} if defined($data->{'siteId'});
+    if (defined($data->{'sessionId'})){$sessionId = $data->{'sessionId'}};
+#    my $sessionId = $data->{'sessionId'} if defined($data->{'sessionId'});
+    if (defined($data->{'siteId'})) {$siteId = $data->{'siteId'}};
     my $mute = 0;
 
     if (defined $siteId) {
@@ -908,7 +926,7 @@ sub RHASSPY_onmessage($$$) {
     }
 
     # Shortcut empfangen -> Code direkt ausführen
-   elsif ($topic =~ qr/^hermes\/intent\/.*[:_]/ && defined($input) && grep( /^$input$/i, RHASSPY_allRhasspyShortcuts($hash)) and $mute != 1) {
+   elsif ($topic =~ qr/^hermes\/intent\/.*[:_]/ && defined($input) && grep( {/^$input$/i} RHASSPY_allRhasspyShortcuts($hash)) && $mute != 1) {
       my $error;
       my $response = RHASSPY_getResponse($hash, "DefaultError");
       my $cmd = RHASSPY_getCmd($hash, $hash->{NAME}, "shortcuts", $input);
@@ -1129,6 +1147,7 @@ sub RHASSPY_updateSlots($) {
       
       RHASSPY_sendToApi($hash, $url, $method, $json);
     }
+    return;
 }
 
 # Use the HTTP-API to instruct Rhasspy to re-train it's data
@@ -1139,6 +1158,8 @@ sub RHASSPY_trainRhasspy ($) {
     my $contenttype = "application/json";
     
     RHASSPY_sendToApi($hash, $url, $method, undef);
+    
+    return;
 }
 
 # Send request to HTTP-API of Rhasspy
@@ -1211,8 +1232,9 @@ sub RHASSPY_handleCustomIntent($$$) {
     return if $intent !~ qr/^$intentName=.*\(.*\)/;
     #if ($intent =~ qr/^$intentName=.*\(.*\)/) {
         my @tokens = split(/=|\(|\)/, $intent);
-        my $subName =  $tokens[1] if (@tokens > 0);
-        my @paramNames = split(/,/, $tokens[2]) if (@tokens > 1);
+        my $subName; my @paramNames;
+        if (@tokens > 0){$subName = $tokens[1]} ;
+        if (@tokens > 1){@paramNames = split(/,/, $tokens[2])};
 
         if (defined($subName)) {
             my @params = map { $data->{$_} } @paramNames;
@@ -1257,7 +1279,9 @@ sub RHASSPY_handleIntentSetMute($$) {
         readingsSingleUpdate($hash, "mute_$siteId", $state, 1);
         $response = RHASSPY_getResponse($hash, "DefaultConfirmation");
     }
-    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);    
+    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+    
+    return;
 }
 
 # Eingehende "SetOnOff" Intents bearbeiten
