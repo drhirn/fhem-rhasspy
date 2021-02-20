@@ -1218,6 +1218,7 @@ sub RHASSPY_handleCustomIntent($$$) {
             my @params = map { $data->{$_} } @paramNames;
 
             # Sub aus dem Custom Intent aufrufen
+            $subName = "main::$subName";
             eval {
                 Log3($hash->{NAME}, 5, "Calling sub: $subName");
 
