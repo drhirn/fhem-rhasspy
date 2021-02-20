@@ -30,7 +30,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[GetWeekDay](#getweekday)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetTimer](#settimer)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetMute](#setmute)\
-[Custom Intents](#custom_intents)\
+[Custom Intents](#custom-intents)\
 [Tips & Tricks](#tips--tricks)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Rhasspy speaks actual state of device after switching it](#rhasspy-speaks-actual-state-of-device-after-switching-it)\
 [To-Do](#To-Do)
