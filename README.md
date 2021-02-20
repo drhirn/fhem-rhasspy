@@ -30,6 +30,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[GetWeekDay](#getweekday)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetTimer](#settimer)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetMute](#setmute)\
+[Custom Intents](#custom_intents)\
 [Tips & Tricks](#tips--tricks)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Rhasspy speaks actual state of device after switching it](#rhasspy-speaks-actual-state-of-device-after-switching-it)\
 [To-Do](#To-Do)
@@ -42,16 +43,20 @@ Rhasspy consist of multiple modules (Hot-Word Detection, Text to Speech, Speech 
 
 Rhasspy-FHEM evaluates these JSON-messages and converts them to commands. And it sends messages to Rhasspy to e.g. provide responses on commands to TextToSpeech.
 
-Rhasspy-FHEM uses the 00_MQTT.pm module to receive and send these messages. Therefore it is necessary to define an MQTT device in FHEM before using Rhasspy-FHEM.
+Rhasspy-FHEM uses the 00_MQTT2_CLIENT.pm module to receive and send these messages. Therefore it is necessary to define an MQTT2_CLIENT device in FHEM before using Rhasspy-FHEM.
 
 ## Installation of Rhasspy-FHEM
 - Download a RAW-Copy of 10_RHASSPY.pm and copy it to `opt/fhem/FHEM`
 - Don't forget to change the ownership of the file to `fhem.dialout` (or whatever user/group FHEM is using).
 - Restart FHEM
-- Define a MQTT device which connects to the MQTT-server Rhasspy is using. E.g.:
+- Define a MQTT2_CLIENT device which connects to the MQTT-server Rhasspy is using. E.g.:
 ```
 define RhasspyMQTT MQTT <ip-or-hostname-of-mqtt-server>:12183 
 ```
+- Change the `clientOrder` to set the right notification order:
+````
+attr <DeviceName> clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE
+````
 
 ## Definition (DEF) in FHEM
 You can define a new instance of this module with:
@@ -60,7 +65,7 @@ You can define a new instance of this module with:
 define <name> RHASSPY <MqttDevice> <DefaultRoom>
 ```
 
-* `MqttDevice`: Name of the MQTT Device in FHEM which connects to the MQTT server Rhasspy uses.
+* `MqttDevice`: Name of the MQTT2_CLIENT Device in FHEM which connects to the MQTT server Rhasspy uses.
 * `DefaultRoom`: Name of the default room which should be used if no room-name is present in the command.
 
 ### Set-Commands (SET)
@@ -99,20 +104,25 @@ define <name> RHASSPY <MqttDevice> <DefaultRoom>
   Optionally define alternative default answers.\
   Available keywords are `DefaultError`, `NoActiveMediaDevice` and `DefaultConfirmation`.\
   Example:
-  ```
+  ````
   DefaultError=
   DefaultConfirmation=Master, it is a pleasure doing as you wish
-  ```
+  ````
 * **rhasspyIntents**\
-  Not implemented yet
+  Define custom intents created in 99_myUtils.pm.\
+  Example:
+  ````
+  Wikipedia=Wikipedia(term)
+  Respeak=Respeak()
+  ````
 * **shortcuts**\
   Define custom sentences without editing Rhasspy sentences.ini.\
   The shortcuts are uploaded to Rhasspy when using the `updateSlots` set-command.\
   Example:
-  ```
+  ````
   mute on={fhem ("set receiver mute on")}
   mute off={fhem ("set receiver mute off")}
-  ```
+  ````
 
 ### Readings / Events
 * **lastIntentPayload**\
@@ -546,6 +556,32 @@ Example-Rhasspy-Sentences:
 ````
 Attention! The `{Value:on}` or `{Value:off}` is mandatory, case sensitive and has to be english!
 
+##Custom Intents
+
+It's possible to create custom intents in FHEM's 99_myUtils.pm.
+
+As example an intent that repeats the last voice response Rhasspy has spoken.
+
+Add the following `sub` to your 99_myUtils.pm:
+````
+sub Respeak(){
+    #Credits to JensS
+    my $name = "Rhasspy"; #Replace "Rhasspy" with the name of your RHASSPY-Device
+    my $response = ReadingsVal($name,"voiceResponse","Sorry, I can not remember my last sentence");
+    return $response;
+}
+````
+
+Then create or edit the attribut `rhasspyIntents` and add the following text. One Intent per line.
+````
+Respeak=Respeak()
+````
+
+Last add a new sentence to sentence.ini of your Rhasspy base:
+````
+[de.fhem:Respeak]
+what did you say
+````
 
 ## Tips & Tricks
 
