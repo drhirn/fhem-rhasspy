@@ -30,6 +30,7 @@ my %sets = (
 BEGIN {
 
   GP_Import(qw(
+    fhem
     addToAttrList
     readingsSingleUpdate
     readingsBeginUpdate
@@ -56,6 +57,8 @@ BEGIN {
     HttpUtils_NonblockingGet
     round
     strftime
+    makeReadingName
+    ReadingsNum
   ))
 
 };
@@ -861,11 +864,11 @@ sub RHASSPY_Parse {
 sub RHASSPY_onmessage($$$) {
     my ($hash, $topic, $message) = @_;
     my $data  = RHASSPY_parseJSON($hash, $message);
-    my $input = $data->{'input'}; if defined($data->{'input'});
+    my $input = $data->{'input'} if defined($data->{'input'});
     my $type  = $data->{'type'} // q{text};
     #$type = $data->{'type'} if defined($data->{'type'});
-    my $sessionId = $data->{'sessionId'}; if defined($data->{'sessionId'});
-    my $siteId = $data->{'siteId'}; if defined($data->{'siteId'});
+    my $sessionId = $data->{'sessionId'} if defined($data->{'sessionId'});
+    my $siteId = $data->{'siteId'} if defined($data->{'siteId'});
     my $mute = 0;
 
     if (defined $siteId) {
@@ -891,7 +894,7 @@ sub RHASSPY_onmessage($$$) {
         }
     }
 
-    elsif ($topic =~ qr/^hermes\/intent\/de.fhem:SetMute/ && defined($siteId)) {
+    elsif ($topic =~ qr/^hermes\/intent\/de.fhem[:_]SetMute/ && defined($siteId)) {
         $type = ($message =~ m/fhem.textCommand/) ? "text" : "voice";
         $data->{'requestType'} = $type;
 
