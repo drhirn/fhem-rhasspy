@@ -556,7 +556,7 @@ Example-Rhasspy-Sentences:
 ````
 Attention! The `{Value:on}` or `{Value:off}` is mandatory, case sensitive and has to be english!
 
-##Custom Intents
+## Custom Intents
 
 It's possible to create custom intents in FHEM's 99_myUtils.pm.
 
