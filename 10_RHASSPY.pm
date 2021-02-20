@@ -8,7 +8,7 @@ use JSON;
 #use Net::MQTT::Constants;
 use Encode;
 use HttpUtils;
-use DateTime;
+#use DateTime;
 use Data::Dumper;
 
 sub ::RHASSPY_Initialize { goto &RHASSPY_Initialize }
@@ -875,6 +875,8 @@ sub RHASSPY_Parse {
     return @ret;
 }
 
+# Update the readings lastIntentPayload and lastIntentTopic
+# after and intent is received
 sub RHASSPY_updateLastIntentReadings {
     my $hash, my $topic, my $data;
     $hash = shift;
@@ -1641,9 +1643,8 @@ sub RHASSPY_handleIntentMediaControls($$) {
 # Eingehende "GetTime" Intents bearbeiten
 sub RHASSPY_handleIntentGetTime($$) {
     my ($hash, $data) = @_;
-    my $channel, my $device, my $room;
+    my $channel, my $device, my $room, my $response;
     my $cmd;
-    my $response = RHASSPY_getResponse($hash, "DefaultError"); #Beta-User: Unklar, ob man das braucht; $response wird danach "hart" überschrieben...
 
     Log3($hash->{NAME}, 5, "handleIntentGetTime called");
 
@@ -1659,18 +1660,20 @@ sub RHASSPY_handleIntentGetTime($$) {
 # Eingehende "GetWeekday" Intents bearbeiten
 sub RHASSPY_handleIntentGetWeekday($$) {
     my ($hash, $data) = @_;
-    my $channel, my $device, my $room;
+    my $channel, my $device, my $room, my $response, my $weekDay;
     my $cmd;
-    my $response = RHASSPY_getResponse($hash, "DefaultError");
     
     # Get configured language from attribut "language" of device "global"
     # to determine locale for DateTime
-    my $language = lc AttrVal("global", "language", "de");
+#    my $language = lc AttrVal("global", "language", "de");
 
-    $language = lc $data->{'lang'} if (exists($data->{'lang'}));
+#    $language = lc $data->{'lang'} if (exists($data->{'lang'}));
     Log3($hash->{NAME}, 5, "handleIntentGetWeekday called");
 
-    $response = "Heute ist " . DateTime->now(locale => $language)->day_name;
+    $weekDay = strftime "%A", localtime;
+
+#    $response = "Heute ist " . DateTime->now(locale => $language)->day_name;
+    $response = "Heute ist $weekDay";
     Log3($hash->{NAME}, 5, "Response: $response");
 
     # Antwort senden
