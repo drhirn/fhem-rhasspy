@@ -51,7 +51,7 @@ Rhasspy-FHEM uses the 00_MQTT2_CLIENT.pm module to receive and send these messag
 - Restart FHEM
 - Define a MQTT2_CLIENT device which connects to the MQTT-server Rhasspy is using. E.g.:
 ```
-define RhasspyMQTT MQTT <ip-or-hostname-of-mqtt-server>:12183 
+define RhasspyMQTT2 MQTT2_CLIENT <ip-or-hostname-of-mqtt-server>:12183 
 ```
 - Change the `clientOrder` to set the right notification order:
 ````
