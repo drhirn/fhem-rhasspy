@@ -1675,6 +1675,7 @@ sub	RHASSPY_ReplaceReadingsVal($@) {
 	Sends a train-command to the HTTP-API of the Rhasspy master.<br>
 	The attribute <i>rhasspyMaster</i> has to be defined to work.<br>
 	Example: <code>set &lt;rhasspyDevice&gt; trainRhasspy</code>
+  </li>
   <li>
     <b>updateSlots</b><br>
     Sends a command to the HTTP-API of the Rhasspy master to update all slots on Rhasspy with actual FHEM-devices, rooms, etc.<br>
