@@ -932,12 +932,7 @@ sub RHASSPY_onmessage($$$) {
         $type = ($message =~ m/fhem.textCommand/) ? "text" : "voice";
         $data->{'requestType'} = $type;
 
-        # Readings updaten
-#        readingsBeginUpdate($hash);
-#        readingsBulkUpdate($hash, "lastIntentTopic", $topic);
-#        readingsBulkUpdate($hash, "lastIntentPayload", toJSON($data));
-#        readingsEndUpdate($hash, 1);
-
+        # update Readings
         RHASSPY_updateLastIntentReadings($hash, $topic,$data);
 
         RHASSPY_handleIntentSetMute($hash, $data);
@@ -957,11 +952,7 @@ sub RHASSPY_onmessage($$$) {
           $response = $returnVal // RHASSPY_getResponse($hash, 'DefaultConfirmation');
       }
 
-        # Readings updaten
-#        readingsBeginUpdate($hash);
-#        readingsBulkUpdate($hash, "lastIntentTopic", $topic);
-#        readingsBulkUpdate($hash, "lastIntentPayload", toJSON($data));
-#        readingsEndUpdate($hash, 1);
+        # update Readings
         RHASSPY_updateLastIntentReadings($hash, $topic,$data);
 
       # Antwort senden
@@ -979,11 +970,7 @@ sub RHASSPY_onmessage($$$) {
         $data->{'requestType'} = $type;
         $intent = $data->{'intent'};
 
-        # Readings updaten
-#        readingsBeginUpdate($hash);
-#        readingsBulkUpdate($hash, "lastIntentTopic", $topic);
-#        readingsBulkUpdate($hash, "lastIntentPayload", toJSON($data));
-#        readingsEndUpdate($hash, 1);
+        # update Readings
         RHASSPY_updateLastIntentReadings($hash, $topic,$data);
 
         # Passenden Intent-Handler aufrufen
@@ -1778,8 +1765,6 @@ sub RHASSPY_handleIntentSetTimer($$) {
         if ( grep $_ eq $unit, @unitHours ) {$time = $value*3600};
         
         $time = strftime('%T', gmtime($time));
-
-Log3($hash->{NAME}, 5, "Time: $time\n");
 
         $cmd = "defmod timer_$room at +$time set $name speak siteId=\"$room\" text=\"taimer abgelaufen\";;setreading $name timer_".lc($room)." 0";
         
