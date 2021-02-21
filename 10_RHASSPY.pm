@@ -1,3 +1,33 @@
+###########################################################################
+#
+# FHEM RHASSPY modul  (https://github.com/rhasspy)
+#
+# Originally written 2018 by Tobias Wiedenmann (Thyraz)
+# as FHEM Snips.ai module (thanks to Matthias Kleine)
+#
+# Adapted for RHASSPY 2020 by drhirn
+#
+# Thanks to BetaUser, rudolfkoenig, JensS, cb2sela and all the others
+# who did a great job getting this to work!
+#
+# This file is part of fhem.
+#
+# Fhem is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+# 
+# Fhem is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+
 package MQTT::RHASSPY; ##no critic qw(Package)
 use strict;
 use warnings;
@@ -1938,7 +1968,7 @@ __END__
 </ul>
 <p>Example for defining an MQTT device and the Rhasspy device in FHEM:</p>
 <p>
-  <code>define rhasspyMQTT MQTT &lt;ip-or-hostname-of-rhasspy-master&gt;:12101</code><br>
+  <code>define rhasspyMQTT MQTT2_CLIENT &lt;ip-or-hostname-of-rhasspy-master&gt;:12183</code><br>
   <code>define Rhasspy RHASSPY rhasspyMQTT Wohnzimmer</code>
 </p>
 <a name="RHASSPYset"></a>
@@ -1960,6 +1990,7 @@ __END__
 	Sends a train-command to the HTTP-API of the Rhasspy master.<br>
 	The attribute <i>rhasspyMaster</i> has to be defined to work.<br>
 	Example: <code>set &lt;rhasspyDevice&gt; trainRhasspy</code>
+  </li>
   <li>
     <b>updateSlots</b><br>
     Sends a command to the HTTP-API of the Rhasspy master to update all slots on Rhasspy with actual FHEM-devices, rooms, etc.<br>
