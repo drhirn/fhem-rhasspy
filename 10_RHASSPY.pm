@@ -59,6 +59,8 @@ BEGIN {
     strftime
     makeReadingName
     ReadingsNum
+    AnalyzePerlCommand
+    EvalSpecials
   ))
 
 };
@@ -208,20 +210,27 @@ sub RHASSPY_Attr($$$$) {
     return;
 }
 
-sub RHASSPY_execute($$$$$) {
-    my ($hash, $device, $cmd, $value, $siteId) = @_;
-    my $returnVal;
+sub RHASSPY_execute {
+    my $hash   = shift // return;
+    my $device = shift // carp q[No target device provided!] && return;
+    my $cmd    = shift // carp q[No command provided!]       && return;
+    my $value  = shift // carp q[No value provided!]         && return;
+    my $siteId = shift // $hash->{helper}{defaultRoom};
+    $siteId = $hash->{helper}{defaultRoom} if $siteId eq "default";
+
 
     # Nutervariablen setzen
-    my $DEVICE = $device;
-    my $VALUE = $value;
-    my $ROOM = (defined($siteId) && $siteId eq "default") ? $hash->{helper}{defaultRoom} : $siteId;
-
+    my %specials = (
+         '%DEVICE' => $device,
+         '%VALUE'  => $value,
+         '%ROOM'   => $siteId
+    );
+   
+    $cmd  = EvalSpecials($cmd, %specials);
+ 
     # CMD ausführen
-    $returnVal = eval $cmd;
-    Log3($hash->{NAME}, 1, $@) if ($@);
-
-    return $returnVal;
+    #my $returnVal = eval $cmd;
+    return AnalyzePerlCommand( $hash, $cmd );
 }
 
 # Topics abonnieren
