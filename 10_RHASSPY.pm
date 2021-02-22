@@ -89,6 +89,8 @@ BEGIN {
     strftime
     makeReadingName
     ReadingsNum
+    AnalyzePerlCommand
+    EvalSpecials
   ))
 
 };
@@ -242,7 +244,7 @@ sub RHASSPY_Attr {
     return;
 }
 
-sub RHASSPY_execute($$$$$) {
+sub RHASSPY_execute_old($$$$$) {
     my ($hash, $device, $cmd, $value, $siteId) = @_;
     my $returnVal;
 
@@ -256,6 +258,29 @@ sub RHASSPY_execute($$$$$) {
     Log3($hash->{NAME}, 1, $@) if ($@);
 
     return $returnVal;
+}
+
+sub RHASSPY_execute {
+    my $hash   = shift // return;
+    my $device = shift // carp q[No target device provided!] && return;
+    my $cmd    = shift // carp q[No command provided!]       && return;
+    my $value  = shift // carp q[No value provided!]         && return;
+    my $siteId = shift // $hash->{helper}{defaultRoom};
+    $siteId = $hash->{helper}{defaultRoom} if $siteId eq "default";
+
+
+    # Nutervariablen setzen
+    my %specials = (
+         '%DEVICE' => $device,
+         '%VALUE'  => $value,
+         '%ROOM'   => $siteId
+    );
+   
+    $cmd  = EvalSpecials($cmd, %specials);
+ 
+    # CMD ausführen
+    #my $returnVal = eval $cmd;
+    return AnalyzePerlCommand( $hash, $cmd );
 }
 
 # Topics abonnieren
@@ -692,8 +717,8 @@ sub RHASSPY_getMapping($$$$;$) {
 sub RHASSPY_getCmd($$$$;$) {
     my ($hash, $device, $reading, $key, $disableLog) = @_;
 
-    my @rows, my $cmd;
-    my $attrString = AttrVal($device, $reading, undef);
+    my @rows, my $cmd, my $attrString;
+    $attrString = AttrVal($device, $reading, undef);
 
     # String in einzelne Mappings teilen
     @rows = split(/\n/, $attrString);
@@ -1078,6 +1103,8 @@ sub RHASSPY_getResponse {
     my $hash = shift;
     my $identifier = shift // return 'Programmfehler, es wurde kein Identifier übergeben' ;
     #my $response;
+
+print "\n$identifier\n";
 
     my %messages = (
         DefaultError => "Da ist leider etwas schief gegangen.",
