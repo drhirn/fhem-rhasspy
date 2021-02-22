@@ -1194,7 +1194,7 @@ sub RHASSPY_updateSlots($) {
         my $deviceData;
         my $url = "/api/sentences";
         
-        $deviceData='{"intents/$language.fhem.Shortcuts.ini":"[$language.fhem:Shortcuts]\n';
+        $deviceData='{"intents/'.$language.'.fhem.Shortcuts.ini":"['.$language.'.fhem:Shortcuts]\n';
                   
         foreach (@shortcuts)
         {
