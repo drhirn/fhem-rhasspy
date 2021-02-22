@@ -162,7 +162,6 @@ sub firstInit {
     $language = AttrVal($hash->{NAME},'language',lc(AttrVal('global','language',$language)));
     $hash->{LANGUAGE} = $language;
     
-    print qq(\n$language\n);
 
     return;
 }
@@ -1122,7 +1121,6 @@ sub RHASSPY_updateSlots($) {
         my $deviceData;
         my $url = "/api/sentences";
         
-#        $deviceData='{"intents/'.$language.'.fhem.Shortcuts.ini":"['.$language.'.fhem:Shortcuts]\n';
         $deviceData =qq({"intents/${language}.fhem.Shortcuts.ini":"[${language}.fhem:Shortcuts]\\n);
         for (@shortcuts)
         {
