@@ -239,9 +239,9 @@ sub RHASSPY_Attr {
 
 sub RHASSPY_execute {
     my $hash   = shift // return;
-    my $device = shift // carp q[No target device provided!] && return;
-    my $cmd    = shift // carp q[No command provided!]       && return;
-    my $value  = shift // carp q[No value provided!]         && return;
+    my $device = shift;# // carp q[No target device provided!] && return;
+    my $cmd    = shift;# // carp q[No command provided!]       && return;
+    my $value  = shift;# // carp q[No value provided!]         && return;
     my $siteId = shift // $hash->{helper}{defaultRoom};
     $siteId = $hash->{helper}{defaultRoom} if $siteId eq "default";
 
@@ -674,10 +674,7 @@ sub RHASSPY_getCmd($$$$;$) {
     my @rows, my $cmd;
     #my $attrString = AttrVal($device, $reading, undef);
 
-                                       
-
     # String in einzelne Mappings teilen
-                                            
     @rows = split(/\n/, AttrVal($device, $reading, q{}));
 
     for (@rows) {
@@ -693,24 +690,24 @@ sub RHASSPY_getCmd($$$$;$) {
     return $cmd;
 }
 
-
 # Cmd String im Format 'cmd', 'device:cmd', 'fhemcmd1; fhemcmd2' oder '{<perlcode}' ausführen
 sub RHASSPY_runCmd {
     my $hash   = shift // return;
-    my $device = shift // carp q[No target device provided!] && return;
-    my $cmd    = shift // carp q[No command provided!]       && return;
+    my $device = shift;# // carp q[No target device provided!];# && return;
+    my $cmd    = shift;# // carp q[No command provided!];#       && return;
     my $val    = shift; 
     my $siteId = shift // $hash->{helper}{defaultRoom};
+    my $error;
+    my $returnVal;
     $siteId = $hash->{helper}{defaultRoom} if $siteId eq "default";
+
+    Log3($hash->{NAME}, 5, "runCmd called with command: $cmd");
 
     # Perl Command
     if ($cmd =~ m{\A\s*\{.*\}\s*\z}x) { #escaping closing bracket for editor only
         # CMD ausführen
         return RHASSPY_execute($hash, $device, $cmd, $val,$siteId);
     }
-
-    my $error;
-    my $returnVal;
 
     # String in Anführungszeichen (mit ReplaceSetMagic)
     if ($cmd =~ m/^\s*".*"\s*$/) {
@@ -950,7 +947,7 @@ sub RHASSPY_onmessage {
         return \@updatedList;
     }
 
-    if ($topic =~ qr/^hermes\/intent\/${language}.fhem[:_]SetMute/ && defined($siteId)) {
+    if ($topic =~ qr/^hermes\/intent\/.*[:_]SetMute/ && defined($siteId)) {
         $type = ($message =~ m/fhem.textCommand/) ? "text" : "voice";
         $data->{'requestType'} = $type;
 
@@ -962,10 +959,12 @@ sub RHASSPY_onmessage {
 
     # Shortcut empfangen -> Code direkt ausführen
    elsif ($topic =~ qr/^hermes\/intent\/.*[:_]/ && defined($input) && grep( {/^$input$/i} RHASSPY_allRhasspyShortcuts($hash)) && !$mute) {
-      my $response = RHASSPY_getResponse($hash, "DefaultError");
-      my $cmd = RHASSPY_getCmd($hash, $hash->{NAME}, "shortcuts", $input);
+      my $response = RHASSPY_getResponse($hash, 'DefaultError');
+      my $cmd = RHASSPY_getCmd($hash, $hash->{NAME}, 'shortcuts', $input);
 
       if (defined($cmd)) {
+
+            Log3($hash->{NAME}, 5, "Shortcut received: $cmd");
           # Cmd ausführen
           my $returnVal = RHASSPY_runCmd($hash, undef, $cmd, undef, $data->{'siteId'});
 
