@@ -962,7 +962,7 @@ sub RHASSPY_onmessage {
 
     # Shortcut empfangen -> Code direkt ausführen
    elsif ($topic =~ qr/^hermes\/intent\/.*[:_]/ && defined($input) && grep( {/^$input$/i} RHASSPY_allRhasspyShortcuts($hash)) && !$mute) {
-         my $response = RHASSPY_getResponse($hash, "DefaultError");
+      my $response = RHASSPY_getResponse($hash, "DefaultError");
       my $cmd = RHASSPY_getCmd($hash, $hash->{NAME}, "shortcuts", $input);
 
       if (defined($cmd)) {
@@ -1851,12 +1851,18 @@ sub RHASSPY_playWav($$) {
 
 
 # Abgespeckte Kopie von ReplaceSetMagic aus fhem.pl
-sub	RHASSPY_ReplaceReadingsVal($@) {
+#sub	RHASSPY_ReplaceReadingsVal($@) {
+sub RHASSPY_ReplaceReadingsVal {
     my $hash = shift;
-    my $a = join(" ", @_);
+    my @arr  = shift // return;
+    my $to_analyze = join q{ }, @arr;
+#    my $a = join(" ", @_);
 
-    sub readingsVal($$$$$) { #Nested named subroutine. Declaring a named sub inside another named sub does not prevent the inner sub from being global. Umbauen wie "my $activeDevice = sub ($$) {"...?
-        my ($all, $t, $d, $n, $s, $val) = @_;
+    my $readingsVal = sub ($$$$$) {
+#    sub readingsVal($$$$$) { #Nested named subroutine. Declaring a named sub inside another named sub does not prevent the inner sub from being global. Umbauen wie "my $activeDevice = sub ($$) {"...?
+        #my ($all, $t, $d, $n, $s, $val) = @_;
+        my ($all, $t, $d, $n, $s) = @_;
+        my $val;
         my $hash = $defs{$d};
         return $all if(!$hash);
 
@@ -1870,8 +1876,10 @@ sub	RHASSPY_ReplaceReadingsVal($@) {
             }
             $val = $r->{$n}{VAL} if($r && $r->{$n});
         }
-        $val = $hash->{$n}   if(!defined($val) && (!$t || $t eq "i:"));
-        $val = $attr{$d}{$n} if(!defined($val) && (!$t || $t eq "a:") && $attr{$d});
+#        $val = $hash->{$n}   if(!defined($val) && (!$t || $t eq "i:"));
+#        $val = $attr{$d}{$n} if(!defined($val) && (!$t || $t eq "a:") && $attr{$d});
+        $val = $hash->{$n}   if(!defined($val) && (!$t || $t eq 'i:'));
+        $val = $attr{$d}{$n} if(!defined($val) && (!$t || $t eq 'a:') && $attr{$d});
         return $all if(!defined($val));
 
         if($s && $s =~ /:d|:r|:i/ && $val =~ /(-?\d+(\.\d+)?)/) {
@@ -1880,10 +1888,12 @@ sub	RHASSPY_ReplaceReadingsVal($@) {
             $val = round($val, defined($1) ? $1 : 1) if($s =~ /^:r(\d)?/);
         }
         return $val;
-    }
+    };
 
-    $a =~s/(\[([ari]:)?([a-zA-Z\d._]+):([a-zA-Z\d._\/-]+)(:(t|sec|i|d|r|r\d))?\])/readingsVal($1,$2,$3,$4,$5)/eg;
-    return $a;
+#    $a =~s/(\[([ari]:)?([a-zA-Z\d._]+):([a-zA-Z\d._\/-]+)(:(t|sec|i|d|r|r\d))?\])/readingsVal($1,$2,$3,$4,$5)/eg;
+#    return $a;
+    $to_analyze =~s/(\[([ari]:)?([a-zA-Z\d._]+):([a-zA-Z\d._\/-]+)(:(t|sec|i|d|r|r\d))?\])/$readingsVal->($1,$2,$3,$4,$5)/eg;
+    return $to_analyze;
 }
 
 1;
