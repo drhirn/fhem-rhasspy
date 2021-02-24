@@ -248,7 +248,7 @@ Example-Sentences:
 Example-Rhasspy-Sentences:
 ```
 [de.fhem:GetOnOff]
-$de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched on|switched off|running|stopped|opened|closed)
+(is) $de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched on|switched off|running|stopped|opened|closed){Status}
 ```
 
 ### SetNumeric
