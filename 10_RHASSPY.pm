@@ -977,6 +977,8 @@ sub RHASSPY_onmessage {
 
       # Antwort senden
       RHASSPY_respond($hash, $type, $sessionId, $siteId, $response);
+      push @updatedList, $hash->{NAME};
+      return \@updatedList;
     }
 
     elsif ($topic =~ qr/^hermes\/intent\/.*[:_]/ && !$mute && $topic !~ qr/^hermes\/intent\/${language}.fhem[:_]SetMute/) {
@@ -1023,6 +1025,7 @@ sub RHASSPY_onmessage {
     else {RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, " ");}
     #Beta-User: return value should be reviewed. If there's an option to return the name of the devices triggered by Rhasspy, then this could be a better option than just RHASSPY's own name.
     
+    $device = $device // $hash->{NAME};                                  
     push @updatedList, $device;
     return \@updatedList;
 }
