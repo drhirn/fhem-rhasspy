@@ -693,8 +693,8 @@ sub RHASSPY_getCmd($$$$;$) {
 # Cmd String im Format 'cmd', 'device:cmd', 'fhemcmd1; fhemcmd2' oder '{<perlcode}' ausführen
 sub RHASSPY_runCmd {
     my $hash   = shift // return;
-    my $device = shift;# // carp q[No target device provided!];# && return;
-    my $cmd    = shift;# // carp q[No command provided!];#       && return;
+    my $device = shift;
+    my $cmd    = shift;
     my $val    = shift; 
     my $siteId = shift // $hash->{helper}{defaultRoom};
     my $error;
@@ -706,6 +706,7 @@ sub RHASSPY_runCmd {
     # Perl Command
     if ($cmd =~ m{\A\s*\{.*\}\s*\z}x) { #escaping closing bracket for editor only
         # CMD ausführen
+        Log3($hash->{NAME}, 5, "$cmd is a perl command");
         return RHASSPY_execute($hash, $device, $cmd, $val,$siteId);
     }
 
@@ -714,6 +715,8 @@ sub RHASSPY_runCmd {
         my $DEVICE = $device;
         my $ROOM = $siteId;
         my $VALUE = $val;
+
+        Log3($hash->{NAME}, 5, "$cmd has quotes...");
 
         # Anführungszeichen entfernen
         $cmd =~ s/^\s*"//;
@@ -726,21 +729,28 @@ sub RHASSPY_runCmd {
         $returnVal = RHASSPY_ReplaceReadingsVal($hash, $cmd);
         # Escapte Kommas wieder durch normale ersetzen
         $returnVal =~ s/\\,/,/;
+        Log3($hash->{NAME}, 5, "...and is now: $cmd ($returnVal)");
     }
     # FHEM Command oder CommandChain
     elsif (defined($main::cmds{ (split " ", $cmd)[0] })) {
+        my @test = split (" ",$cmd);
+print Dumper("device"=>$device,"test"=>@test[1]);
+        Log3($hash->{NAME}, 5, "$cmd is a FHEM command");
         $error = AnalyzeCommandChain($hash, $cmd);
+        $returnVal = @test[1];
     }
     # Soll Command auf anderes Device umgelenkt werden?
     elsif ($cmd =~ m/:/) {
         $cmd   =~ s/:/ /;
         $cmd   = qq($cmd $val) if defined($val);
+        Log3($hash->{NAME}, 5, "$cmd redirects to another device");
         $error = AnalyzeCommand($hash, "set $cmd");
     }
     # Nur normales Cmd angegeben
     else {
         $cmd   = qq($device $cmd);
         $cmd   = qq($cmd $val) if defined($val);
+        Log3($hash->{NAME}, 5, "$cmd is a normal command");
         $error = AnalyzeCommand($hash, "set $cmd");
     }
     Log3($hash->{NAME}, 1, $_) if (defined($error));
@@ -904,20 +914,15 @@ sub RHASSPY_onmessage {
     my $topic   = shift // carp q[No topic provided!]   && return;
     my $message = shift // carp q[No message provided!] && return;;
     my $data  = RHASSPY_parseJSON($hash, $message);
-    #my $input, my $siteId, my $sessionId, my $type;
-    #if (defined $data->{'input'}) {$input = $data->{'input'}};
 
     my $input = $data->{'input'};
     
     my $device;
     my @updatedList;
 
-    my $type  = $data->{'type'} // q{text};
-    #$type = $data->{'type'} if defined($data->{'type'});
+    my $type = $data->{'type'} // q{text};
     my $sessionId = $data->{'sessionId'};
     my $siteId = $data->{'siteId'};
-    #if (defined($data->{'sessionId'})){$sessionId = $data->{'sessionId'}};
-    #if (defined($data->{'siteId'})) {$siteId = $data->{'siteId'}};
     my $mute = 0;
 
     if (defined $siteId) {
@@ -957,37 +962,8 @@ sub RHASSPY_onmessage {
         RHASSPY_handleIntentSetMute($hash, $data);
     }
 
-    # Shortcut empfangen -> Code direkt ausführen
-   elsif ($topic =~ qr/^hermes\/intent\/.*[:_]/ && defined($input) && grep( {/^$input$/i} RHASSPY_allRhasspyShortcuts($hash)) && !$mute) {
-      my $response = RHASSPY_getResponse($hash, 'DefaultError');
-      my $cmd = RHASSPY_getCmd($hash, $hash->{NAME}, 'shortcuts', $input);
-
-      if (defined($cmd)) {
-
-            Log3($hash->{NAME}, 5, "Shortcut received: $cmd");
-          # Cmd ausführen
-          my $returnVal = RHASSPY_runCmd($hash, undef, $cmd, undef, $data->{'siteId'});
-
-          #$response = (defined($returnVal)) ? $returnVal : RHASSPY_getResponse($hash, "DefaultConfirmation");
-          $response = $returnVal // RHASSPY_getResponse($hash, 'DefaultConfirmation');
-      }
-
-      # update Readings
-      RHASSPY_updateLastIntentReadings($hash, $topic,$data);
-
-      # Antwort senden
-      RHASSPY_respond($hash, $type, $sessionId, $siteId, $response);
-      push @updatedList, $hash->{NAME};
-      return \@updatedList;
-    }
-
     elsif ($topic =~ qr/^hermes\/intent\/.*[:_]/ && !$mute && $topic !~ qr/^hermes\/intent\/${language}.fhem[:_]SetMute/) {
-#        my $info, my $sendData;
-#        my $device, my $room, my $channel, my $color;
-#        my $json, my $infoJson;
         my $command = $data->{'input'};
-#        my $intent;
-#        my $type = ($message =~ m/fhem.textCommand/) ? "text" : "voice";
         $type = ($message =~ m/fhem.textCommand/) ? "text" : "voice";
         $data->{'requestType'} = $type;
         my $intent = $data->{'intent'};
@@ -1018,6 +994,8 @@ sub RHASSPY_onmessage {
             RHASSPY_handleIntentGetWeekday($hash, $data);
         } elsif ($intent eq 'SetTimer') {
             RHASSPY_handleIntentSetTimer($hash, $data);
+        } elsif ($intent eq 'Shortcuts') {
+            $device = RHASSPY_handleIntentShortcuts($hash, $data);
         } else {
             RHASSPY_handleCustomIntent($hash, $intent, $data);
         }
@@ -1258,6 +1236,24 @@ sub RHASSPY_ParseHttpResponse {
     return;
 }
 
+sub RHASSPY_handleIntentShortcuts {
+    my $hash = shift // return;
+    my $data = shift;
+    my $input = $data->{input};
+
+    my $response = RHASSPY_getResponse($hash, 'DefaultError');
+    my $cmd = RHASSPY_getCmd($hash, $hash->{NAME}, 'shortcuts', $input);
+
+    print Dumper($data,$input,$cmd);
+
+    if (defined($cmd)) {
+        # Cmd ausführen
+        my $returnVal = RHASSPY_runCmd($hash, undef, $cmd, undef, $data->{'siteId'});
+        $response = $returnVal // RHASSPY_getResponse($hash, 'DefaultConfirmation');
+        print Dumper($data,$input,$cmd,$returnVal,$response);
+    }
+    return;# RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+}
 
 # Eingehender Custom-Intent
 sub RHASSPY_handleCustomIntent($$$) {
