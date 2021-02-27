@@ -63,6 +63,7 @@ BEGIN {
 
   GP_Import(qw(
     addToAttrList
+    delFromDevAttrList
     readingsSingleUpdate
     readingsBeginUpdate
     readingsBulkUpdate
@@ -107,22 +108,18 @@ my @topics = qw(
 );
 
 my $language = 'en';
+my $prefix   = q{rhasspy};
 
 sub RHASSPY_Initialize {
     my $hash = shift // return;
 
-    # Attribute rhasspyName und rhasspyRoom für andere Devices zur Verfügung abbestellen
-    addToAttrList('rhasspyName');
-    addToAttrList('rhasspyRoom');
-    addToAttrList('rhasspyMapping:textField-long');
-    
     # Consumer
     $hash->{DefFn}       = \&RHASSPY_Define;
     $hash->{UndefFn}     = \&RHASSPY_Undefine;
+    $hash->{DeleteFn}    = \&RHASSPY_Delete;
     $hash->{SetFn}       = \&RHASSPY_Set;
     $hash->{AttrFn}      = \&RHASSPY_Attr;
     $hash->{AttrList}    = "IODev defaultRoom rhasspyIntents:textField-long shortcuts:textField-long rhasspyMaster response:textField-long language:multiple,en,de forceNEXT:0,1 disable:0,1 disabledForIntervals " . $readingFnAttributes;
-    #$hash->{OnMessageFn} = \&RHASSPY_onmessage;
     $hash->{Match}       = ".*";
     $hash->{ParseFn}     = \&RHASSPY_Parse;
 
@@ -164,6 +161,10 @@ sub firstInit {
     
     $language = AttrVal($hash->{NAME},'language',lc(AttrVal('global','language',$language)));
     $hash->{LANGUAGE} = $language;
+    # Attribute rhasspyName und rhasspyRoom für andere Devices zur Verfügung abbestellen
+    addToAttrList("${prefix}Name");  #rhasspyName
+    addToAttrList("${prefix}Room");  #rhasspyRoom
+    addToAttrList("${prefix}Mapping:textField-long"); #rhasspyMapping
 
     return;
 }
@@ -171,10 +172,32 @@ sub firstInit {
 # Device löschen
 sub RHASSPY_Undefine {
     my $hash = shift // return;
-    #Beta-User: $name not needed; was ist mit den globalen Attributen? Bleiben die...?
 
     RemoveInternalTimer($hash);
-  
+
+    return;
+}
+
+sub RHASSPY_Delete {
+    my $hash = shift // return;
+
+# DELETE POD AFTER TESTS ARE COMPLETED    
+=begin comment
+    
+    #Beta-User: globale Attribute löschen
+    for (devspec2array("${prefix}Mapping=.+")) {
+        delFromDevAttrList($_,"${prefix}NameMapping:textField-long");
+    }
+    for (devspec2array("${prefix}Name=.+")) {
+        delFromDevAttrList($_,"${prefix}Name");
+    }
+    for (devspec2array("${prefix}Room=.+")) {
+        delFromDevAttrList($_,"${prefix}Room");
+    }
+
+=end comment
+
+=cut
     return;
 }
 
@@ -304,6 +327,7 @@ sub RHASSPY_execute {
     #my $returnVal = eval $cmd;
     return AnalyzePerlCommand( $hash, $cmd );
 }
+
 #from https://stackoverflow.com/a/43873983, modified...
 sub get_unique {
     my @arr    = shift;
@@ -323,7 +347,9 @@ sub RHASSPY_EvalSpecialsDefaults {
     my $hash2 = shift;
     my $self = $hash2->{'$SELF'} // $hash->{NAME};
     my $name = $hash2->{'$NAME'} // $hash->{NAME};
-    
+    my $parent = ( caller(1) )[3];
+    Log3($hash->{NAME}, 5, "RHASSPY_EvalSp... from $parent starting with: $cmd");
+
     my %specials = (
         '$SELF' => $self,
         '$NAME' => $name
@@ -336,26 +362,22 @@ sub RHASSPY_EvalSpecialsDefaults {
         $key =~ s{\$}{\\\$}gxms;
         $cmd =~ s{$key}{$val}gxms
     }
-    
+    Log3($hash->{NAME}, 5, "RHASSPY_EvalSp... from $parent returns: $cmd");
     return $cmd;
 }
 
 # Alle Gerätenamen sammeln
 sub RHASSPY_allRhasspyNames {
-    #my @devices;#, my @sorted;
-    #my %devicesHash;
     my $devspec = 'room=Rhasspy';
     my @devs = devspec2array($devspec);
     my @devices;
 
     # Alle RhasspyNames sammeln
     for (@devs) {
-        push @devices, split(',', AttrVal($_,'rhasspyName',undef));
+        push @devices, split(',', AttrVal($_,"${prefix}Name",undef));
     }
 
     # Doubletten rausfiltern
-    #%devicesHash = map { if (defined($_)) { $_, 1 } else { () } } @devices;
-    #@devices = keys %devicesHash;
     #from https://stackoverflow.com/a/43873983
     #my @unique = get_unique(@devices, 1 );
     # Längere Werte zuerst, damit bei Ersetzungen z.B. nicht 'lampe' gefunden wird bevor der eigentliche Treffer 'deckenlampe' versucht wurde
@@ -370,12 +392,12 @@ sub RHASSPY_allRhasspyNames {
 sub RHASSPY_allRhasspyRooms {
     my @rooms, my @sorted;
     my %roomsHash;
-    my $devspec = "room=Rhasspy";
+    my $devspec = q{room=Rhasspy};
     my @devs = devspec2array($devspec);
 
     # Alle RhasspyNames sammeln
     foreach (@devs) {
-        push @rooms, split(',', AttrVal($_,"rhasspyRoom",undef));
+        push @rooms, split(',', AttrVal($_,"${prefix}Room",undef));
     }
 
     # Doubletten rausfiltern
@@ -394,13 +416,12 @@ sub RHASSPY_allRhasspyRooms {
 sub RHASSPY_allRhasspyChannels {
     my @channels, my @sorted;
     my %channelsHash;
-    my $devspec = "room=Rhasspy";
-    my @devs = devspec2array($devspec);
+    my $devspec = q{room=Rhasspy};
 
     # Alle RhasspyNames sammeln
-    foreach (@devs) {
-        my @rows = split(/\n/, AttrVal($_,"rhasspyChannels",undef));
-        foreach (@rows) {
+    for (devspec2array($devspec)) {
+        my @rows = split(/\n/, AttrVal($_,"${prefix}Channels",undef));
+        for (@rows) {
             my @tokens = split('=', $_);
             my $channel = shift(@tokens);
             push @channels, $channel;
@@ -422,19 +443,19 @@ sub RHASSPY_allRhasspyChannels {
 sub RHASSPY_allRhasspyTypes {
     my @types, my @sorted;
     my %typesHash;
-    my $devspec = "room=Rhasspy";
+    my $devspec = q{room=Rhasspy};
     my @devs = devspec2array($devspec);
 
     # Alle RhasspyNames sammeln
     for (@devs) {
-        my @mappings = split(/\n/, AttrVal($_,"rhasspyMapping",undef));
+        my @mappings = split(/\n/, AttrVal($_,"${prefix}Mapping",undef));
         for (@mappings) {
             # Nur GetNumeric und SetNumeric verwenden
             next if $_ !~ m/^(SetNumeric|GetNumeric)/;
             $_ =~ s/(SetNumeric|GetNumeric)://;
             my %mapping = RHASSPY_splitMappingString($_);
 
-            push @types, $mapping{'type'} if (defined($mapping{'type'}));
+            push @types, $mapping{type} if (defined($mapping{type}));
         }
     }
 
@@ -460,7 +481,7 @@ sub RHASSPY_allRhasspyColors() {
     for(@devs) {
         #my @rows = split(/\n/, AttrVal($_,"rhasspyColors",undef));
         #foreach (@rows) {
-        for (split(/\n/, AttrVal($_,"rhasspyColors",undef))) {
+        for (split(/\n/, AttrVal($_,"${prefix}Colors",undef))) {
             my @tokens = split('=', $_);
             my $color = shift(@tokens);
             push @colors, $color;
@@ -532,8 +553,8 @@ sub RHASSPY_getDeviceByName($$$) {
 
     for (@devices) {
         # 2 Arrays bilden mit Namen und Räumen des Devices
-        my @names = split(',', AttrVal($_,'rhasspyName',q{}));
-        my @rooms = split(',', AttrVal($_,'rhasspyRoom',q{}));
+        my @names = split(',', AttrVal($_,"${prefix}Name",q{}));
+        my @rooms = split(',', AttrVal($_,"${prefix}Room",q{}));
 
         # Case Insensitive schauen ob der gesuchte Name (oder besser Name und Raum) in den Arrays vorhanden ist
 #        if (grep( /^$name$/i, @names)) {
@@ -562,7 +583,7 @@ sub RHASSPY_getDevicesByIntentAndType($$$$) {
 
     for(@devices) {
         # Array bilden mit Räumen des Devices
-        my @rooms = split(',', AttrVal($_,"rhasspyRoom",undef));
+        my @rooms = split(',', AttrVal($_,"${prefix}Room",undef));
         # Mapping mit passendem Intent vorhanden?
         my $mapping = RHASSPY_getMapping($hash, $_, $intent, $type, 1) // next;
         #next unless defined($mapping);
@@ -617,14 +638,15 @@ sub RHASSPY_getActiveDeviceForIntentAndType($$$$) {
 
     # Anonyme Funktion zum finden des aktiven Geräts
     my $activeDevice = sub ($$) {
-        my ($hash, $devices) = @_;
+        my $subhash = shift;
+        my $devices = shift // return;
         my $match;
 
         for (@{$devices}) {
-            my $mapping = RHASSPY_getMapping($hash, $_, 'GetOnOff', undef, 1);
+            my $mapping = RHASSPY_getMapping($subhash, $_, 'GetOnOff', undef, 1);
             if (defined($mapping)) {
                 # Gerät ein- oder ausgeschaltet?
-                my $value = RHASSPY_getOnOffState($hash, $_, $mapping);
+                my $value = RHASSPY_getOnOffState($subhash, $_, $mapping);
                 if ($value == 1) {
                     $match = $_;
                     last;
@@ -656,12 +678,12 @@ sub RHASSPY_getDeviceByMediaChannel($$$) {
 
     for (@devices) {
         # Array bilden mit Räumen des Devices
-        my @rooms = AttrVal($_,"rhasspyRoom",undef);
+        my @rooms = AttrVal($_,"${prefix}Room",undef);
         if (index(@rooms, ",") != -1) {
-            my @rooms = split(',', AttrVal($_,"rhasspyRoom",undef));
+            my @rooms = split(',', AttrVal($_,"${prefix}Room",undef));
         }
         # Cmd mit passendem Intent vorhanden?
-        my $cmd = RHASSPY_getCmd($hash, $_, "rhasspyChannels", $channel, 1) // next;
+        my $cmd = RHASSPY_getCmd($hash, $_, "${prefix}Channels", $channel, 1) // next;
         #next if !defined($cmd);
 
         # Erster Treffer wälen, überschreiben falls besserer Treffer (Raum matched auch) kommt
@@ -718,7 +740,7 @@ sub RHASSPY_splitMappingString {
 sub RHASSPY_getMapping($$$$;$) {
     my ($hash, $device, $intent, $type, $disableLog) = @_;
     my @mappings, my $matchedMapping;
-    my $mappingsString = AttrVal($device, "rhasspyMapping", undef);
+    my $mappingsString = AttrVal($device, "${prefix}Mapping", undef);
 
     if (defined($mappingsString)) {
         # String in einzelne Mappings teilen
@@ -734,7 +756,7 @@ sub RHASSPY_getMapping($$$$;$) {
             if (!defined($matchedMapping) || (defined($type) && lc($matchedMapping->{'type'}) ne lc($type) && lc($currentMapping{'type'}) eq lc($type))) {
                 $matchedMapping = \%currentMapping;
 
-                Log3($hash->{NAME}, 5, "rhasspyMapping selected: $_") if (!defined($disableLog) || (defined($disableLog) && $disableLog != 1));
+                Log3($hash->{NAME}, 5, "${prefix}Mapping selected: $_") if (!defined($disableLog) || (defined($disableLog) && $disableLog != 1));
             }
         }
     }
@@ -808,7 +830,6 @@ sub RHASSPY_runCmd {
     # FHEM Command oder CommandChain
     elsif (defined($main::cmds{ (split " ", $cmd)[0] })) {
         my @test = split q{ }, $cmd;
-        print Dumper("device"=>$device,"test"=>@test[1]);
         Log3($hash->{NAME}, 5, "$cmd is a FHEM command");
         $error = AnalyzeCommandChain($hash, $cmd);
         $returnVal = @test[1];
@@ -1073,7 +1094,15 @@ sub RHASSPY_onmessage {
     #Beta-User: return value should be reviewed. If there's an option to return the name of the devices triggered by Rhasspy, then this could be a better option than just RHASSPY's own name.
     
     $device = $device // $hash->{NAME};
-    push @updatedList, $device;
+    #several devices?
+    if ($device =~ m{,}x) {
+        my @candidates = split m{,}x, $device;
+        for (@candidates) {
+            push @updatedList if $defs{$_}; 
+        }    
+    } else { 
+        push @updatedList, $device if $defs{$device};
+    }
     return \@updatedList;
 }
     
@@ -1209,7 +1238,7 @@ sub RHASSPY_updateSlots {
 
       $json = eval { toJSON($deviceData) };
 
-      Log3($hash->{NAME}, 5, "Updating Rhasspy Slots with data: $json");
+      Log3($hash->{NAME}, 5, "Updating Rhasspy Slots with data ($language): $json");
       
       RHASSPY_sendToApi($hash, $url, $method, $json);
     }
@@ -1284,8 +1313,8 @@ sub RHASSPY_ParseHttpResponse {
         readingsBulkUpdate($hash, 'updateSlots', $data);
     }
     elsif (grep({/api\/profile/i} $url)) {
-        my $ref = JSON->new->decode($data);
-        my $siteIds = encode('cp-1252',$ref->{'dialogue'}{'satellite_site_ids'});
+        my $ref = decode_json($data);
+        my $siteIds = encode('cp-1252',$ref->{dialogue}{satellite_site_ids});
         readingsBulkUpdate($hash, 'siteIds', $siteIds);
     }
     else {
@@ -1387,10 +1416,11 @@ sub RHASSPY_handleIntentShortcuts {
     
     my $response = $shortcut->{response} // RHASSPY_getResponse($hash, 'DefaultError');
     my $ret;
-    my $device;
-    my $cmd = $shortcut->{perl};
-    my $name = $shortcut->{NAME};
-    my $self = $hash->{NAME};
+    my $device = $shortcut->{NAME};;
+    my $cmd    = $shortcut->{perl};
+                                 
+    my $self   = $hash->{NAME};
+    my $name   = $shortcut->{NAME} // $self;
     my %specials = (
          '$DEVICE' => $name,
          '$SELF'   => $self,
@@ -1398,34 +1428,29 @@ sub RHASSPY_handleIntentShortcuts {
         );
 
     if (defined($cmd)) {
-        Log3($hash->{NAME}, 4, "Perl shortcut identified: $cmd, shortc name is $shortcut->{NAME}");
-        #partly replace variables:
-        #$cmd = EvalSpecials($cmd, %specials);
-        for my $key (keys %specials) {
-            my $val = $specials{$key};
-            $key =~ s{\$}{\\\$}gxms;
-            $cmd =~ s{$key}{$val}gxms
-        }
-        #$cmd  = RHASSPY_EvalSpecialsDefaults($hash, $cmd, \$specials);
+        Log3($hash->{NAME}, 5, "Perl shortcut identified: $cmd, shortc name is $shortcut->{NAME}");
+
+        $cmd  = RHASSPY_EvalSpecialsDefaults($hash, $cmd, \%specials);
         #execute Perl command
-        Log3($hash->{NAME}, 4, "Perl shortcut modified: $cmd");
-        $ret = RHASSPY_runCmd($hash, undef, $cmd, undef, $data->{'siteId'});
-        $device = $ret;
-        #$response = $ret // EvalSpecials($response, %specials);
+                                                               
+        $ret = RHASSPY_runCmd($hash, undef, $cmd, undef, $data->{siteId});
+        $device = $ret if $ret !~ m{Please.define.*first}x;
+                                                                
         $response = $ret // RHASSPY_EvalSpecialsDefaults($hash, $response, \%specials);
     } else {
         $cmd = $shortcut->{fhem} // return;
-        #$cmd = EvalSpecials($cmd, $specials);
-        #$cmd  = RHASSPY_EvalSpecialsDefaults($hash, $cmd, %specials);
-        $device = split m{,}x, $shortcut->{NAME};
-        #$response = EvalSpecials($response, %specials);
-        #$response = RHASSPY_EvalSpecialsDefaults($hash, $response, %specials);
+        Log3($hash->{NAME}, 5, "FHEM shortcut identified: $cmd, shortc name is $shortcut->{NAME}");
+        $cmd  = RHASSPY_EvalSpecialsDefaults($hash, $cmd, \%specials);
+                                                 
+                                                        
+        $response = RHASSPY_EvalSpecialsDefaults($hash, $response, \%specials);
         AnalyzeCommand($hash, $cmd);
     }
     
     RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
     # update Readings
     #RHASSPY_updateLastIntentReadings($hash, $topic,$data);
+                                                        
     return $device;
 }
 
@@ -1867,44 +1892,56 @@ sub RHASSPY_handleIntentSetColor($$) {
 sub RHASSPY_handleIntentSetTimer {
     my $hash = shift;
     my $data = shift // return;
-    my $value, my $unit, my $room, my $siteId, my $time;
-    my $name = $hash->{'NAME'};
-    my $cmd;
-    my $validData = 0;
-    my @unitHours = ("stunde","stunden","hour","hours","heure","heures");
-    my @unitMinutes = ("minute","minuten","minute","minutes");
-    my $response = RHASSPY_getResponse($hash, "DefaultError");
 
-    Log3($hash->{NAME}, 5, "handleIntentSetTimer called");
+    my $name = $hash->{NAME};
+    my $unit, my $room, my $value;
+                                  
+    my @unitHours = ('stunde','stunden','hour','hours','heure','heures');
+    my @unitMinutes = ('minute','minuten','minute','minutes');
+    my $response = RHASSPY_getResponse($hash, 'DefaultError');
 
-    if ($data->{'Room'}) {$room = makeReadingName($data->{'Room'})};
-    if ($data->{'Value'}) {$value = $data->{'Value'}} else {$response = "Tut mir leid ich habe die Dauer nicht verstanden"};
-    if ($data->{'Unit'}) {$unit = $data->{'Unit'}} else {$response = "Tut mir leid ich habe die Dauer nicht verstanden"};
-    if ($data->{'siteId'}) {$siteId = $data->{'siteId'}};
+    Log3($name, 5, 'handleIntentSetTimer called');
 
-    if($value && $unit && ($room||$siteId)) {$validData = 1};
-    if (!$room){$room = $siteId};
+                                                                         
+                                                              
+                                                              
+    if ($data->{Room}) {$room = makeReadingName($data->{Room})};
+    if ($data->{Value}) {$value = $data->{Value}} else {$response = 'Tut mir leid ich habe die Dauer nicht verstanden'};
+
+               
+                                   
+    if ($data->{Unit}) {$unit = $data->{Unit}} else {$response = 'Tut mir leid ich habe die Dauer nicht verstanden'};
     
-    if ($validData == 1) {
-        $time = $value;
+    my $siteId = $data->{siteId};
 
-        if ( grep $_ eq $unit, @unitMinutes ) {$time = $value*60};
-        if ( grep $_ eq $unit, @unitHours ) {$time = $value*3600};
+    $room = $room // $siteId;
+            
+                                                                      
+      
+
+    if( $value && $unit && $room ) {
+        my $time = $value;
+        my $roomReading = makeReadingName($room);
+        
+        if    ( grep $_ eq $unit, @unitMinutes ) {$time = $value*60}
+        elsif ( grep $_ eq $unit, @unitHours ) {$time = $value*3600};
         
         $time = strftime('%T', gmtime($time));
 
-        $cmd = "defmod timer_$room at +$time set $name speak siteId=\"$room\" text=\"taimer abgelaufen\";;setreading $name timer_".$room." 0";
+        #my $cmd = "defmod timer_$room at +$time set $name speak siteId=\"$siteId\" text=\"taimer abgelaufen\";;setreading $name timer_".$room." 0";
+        my $cmd = qq(defmod timer_$room at +$time set $name speak siteId=\"$room\" text=\"taimer abgelaufen\";;setreading $name timer_$roomReading 0);
         
         RHASSPY_runCmd($hash,"",$cmd);
 
-        readingsSingleUpdate($hash, "timer_" . makeReadingName($room), 1, 1);
+        readingsSingleUpdate($hash, "timer_" . $roomReading, 1, 1);
         
-        Log3($hash->{NAME}, 5, "Created timer: $cmd");
+        Log3($name, 5, "Created timer: $cmd");
         
         $response = "Taimer in $room gesetzt auf $value $unit";
     }
 
-    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+    RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
+    return $name;
 }
 
 sub RHASSPY_playWav($$) {
@@ -2005,15 +2042,17 @@ __END__
 <p>This module receives, processes and executes voice commands coming from Rhasspy voice assistent.</p>
 <a name="RHASSPYdefine"></a>
 <p><b>Define</b></p>
-<p><code>define &lt;name&gt; RHASSPY &lt;MqttDevice&gt; &lt;DefaultRoom&gt;</code></p>
+<p><code>define &lt;name&gt; RHASSPY &lt;DefaultRoom&gt;</code></p>
 <ul>
-  <li>MqttDevice: Name of the MQTT Device in FHEM which connects to Rhasspys MQTT server</li>
   <li>DefaultRoom: Default room name. Used to speak commands without a room name (e.g. &quot;turn lights on&quot; to turn on the lights in the &quot;default room&quot;)</li>
 </ul>
-<p>Example for defining an MQTT device and the Rhasspy device in FHEM:</p>
+<p>Before defining RHASSPY an MQTT2_CLIENT device has to be created which connects to the same MQTT-Server the voice assistant connects to.</p>
+<p>Example for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</p>
 <p>
-  <code>define rhasspyMQTT MQTT &lt;ip-or-hostname-of-rhasspy-master&gt;:12101</code><br>
-  <code>define Rhasspy RHASSPY rhasspyMQTT Wohnzimmer</code>
+  <code><pre>defmod rhasspyMQTT2 MQTT2_CLIENT rhasspy:12183
+attr rhasspyMQTT2 clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE
+attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded</pre></code><br>
+  <code>define Rhasspy RHASSPY Wohnzimmer</code>
 </p>
 <a name="RHASSPYset"></a>
 <p><b>Set</b></p>
@@ -2066,8 +2105,8 @@ DefaultConfirmation=Klaro, mach ich</code></pre>
     <b>shortcuts</b><br>
 	Define custom sentences without editing Rhasspy sentences.ini<br>
 	The shortcuts are uploaded to Rhasspy when using the updateSlots set-command.<br>
-	Example:<pre><code>mute on={fhem ("set receiver mute on")}
-mute off={fhem ("set receiver mute off")}</code></pre>
+	Example:<pre><code>mute on=set receiver mute on
+mute off=set receiver mute off</code></pre>
   </li>
   <li>
     <b>forceNEXT</b><br>
