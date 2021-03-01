@@ -387,6 +387,16 @@ next
 previous
 ```
 
+Example-Rhasspy-Sentences:
+````
+[de.fhem:MediaControls]
+(start){Command:play} the playback [$de.fhem.Device{Device}]
+(stop){Command:stop} the playback [$de.fhem.Device{Device}]
+(pause){Command:pause} the playback [$de.fhem.Device{Device}]
+(next){Command:vor} (song|title) [$de.fhem.Device{Device}]
+(previous){Command:zurück} (song|title) [$de.fhem.Device{Device}] [$de.fhem.Room{Room}]
+````
+
 ### MediaChannels
 
 Intent to change radio-/tv channels, favorites, playlists, lightscenes, ...
