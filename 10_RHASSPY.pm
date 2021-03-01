@@ -829,10 +829,10 @@ sub RHASSPY_runCmd {
     }
     # FHEM Command oder CommandChain
     elsif (defined($main::cmds{ (split " ", $cmd)[0] })) {
-        my @test = split q{ }, $cmd;
+#        my @test = split q{ }, $cmd;
         Log3($hash->{NAME}, 5, "$cmd is a FHEM command");
         $error = AnalyzeCommandChain($hash, $cmd);
-        $returnVal = @test[1];
+#        $returnVal = @test[1];
     }
     # Soll Command auf anderes Device umgelenkt werden?
     elsif ($cmd =~ m/:/) {
@@ -1205,7 +1205,9 @@ sub RHASSPY_updateSlots {
     my @colors = RHASSPY_allRhasspyColors();
     my @types = RHASSPY_allRhasspyTypes();
     #my @shortcuts = RHASSPY_allRhasspyShortcuts($hash);
-    my @shortcuts = keys %{$hash->{helper}{Shortcuts}};
+    my @shortcuts = keys %{$hash->{helper}{shortcuts}};
+
+#print Dumper($hash->{helper}{Shortcuts});
 
     if (@shortcuts > 0) {
 #        my $json;
@@ -1428,7 +1430,7 @@ sub RHASSPY_handleIntentShortcuts {
         );
 
     if (defined($cmd)) {
-        Log3($hash->{NAME}, 5, "Perl shortcut identified: $cmd, shortc name is $shortcut->{NAME}");
+        Log3($hash->{NAME}, 5, "Perl shortcut identified: $cmd, device name is $shortcut->{NAME}");
 
         $cmd  = RHASSPY_EvalSpecialsDefaults($hash, $cmd, \%specials);
         #execute Perl command
@@ -1439,7 +1441,7 @@ sub RHASSPY_handleIntentShortcuts {
         $response = $ret // RHASSPY_EvalSpecialsDefaults($hash, $response, \%specials);
     } else {
         $cmd = $shortcut->{fhem} // return;
-        Log3($hash->{NAME}, 5, "FHEM shortcut identified: $cmd, shortc name is $shortcut->{NAME}");
+        Log3($hash->{NAME}, 5, "FHEM shortcut identified: $cmd, device name is $shortcut->{NAME}");
         $cmd  = RHASSPY_EvalSpecialsDefaults($hash, $cmd, \%specials);
                                                  
                                                         
@@ -1738,8 +1740,9 @@ sub RHASSPY_handleIntentStatus($$) {
 
 
 # Eingehende "MediaControls" Intents bearbeiten
-sub RHASSPY_handleIntentMediaControls($$) {
-    my ($hash, $data) = @_;
+sub RHASSPY_handleIntentMediaControls {
+    my $hash = shift // return;
+    my $data = shift // return;
     my $command, my $device, my $room;
     my $mapping;
     my $response = RHASSPY_getResponse($hash, "DefaultError");
@@ -1781,7 +1784,8 @@ sub RHASSPY_handleIntentMediaControls($$) {
         }
     }
     # Antwort senden
-    return RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+    RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, $response);
+    return $device;
 }
 
 
