@@ -1911,15 +1911,18 @@ __END__
 <p>This module receives, processes and executes voice commands coming from Rhasspy voice assistent.</p>
 <a name="RHASSPYdefine"></a>
 <p><b>Define</b></p>
-<p><code>define &lt;name&gt; RHASSPY &lt;MqttDevice&gt; &lt;DefaultRoom&gt;</code></p>
+<p><code>define &lt;name&gt; RHASSPY &lt;DefaultRoom&gt; &lt;DefaultLanguage&gt;</code></p>
 <ul>
-  <li>MqttDevice: Name of the MQTT Device in FHEM which connects to Rhasspys MQTT server</li>
   <li>DefaultRoom: Default room name. Used to speak commands without a room name (e.g. &quot;turn lights on&quot; to turn on the lights in the &quot;default room&quot;)</li>
+  <li>DefaultLanguage: The language voice commands are spoken with</li>
 </ul>
-<p>Example for defining an MQTT device and the Rhasspy device in FHEM:</p>
+<p>Before defining RHASSPY an MQTT2_CLIENT device has to be created which connects to the same MQTT-Server the voice assistant connects to.</p>
+<p>Example for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</p>
 <p>
-  <code>define rhasspyMQTT MQTT &lt;ip-or-hostname-of-rhasspy-master&gt;:12101</code><br>
-  <code>define Rhasspy RHASSPY rhasspyMQTT Wohnzimmer</code>
+  <code><pre>defmod rhasspyMQTT2 MQTT2_CLIENT rhasspy:12183
+attr rhasspyMQTT2 clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE
+attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded</pre></code><br>
+  <code>define Rhasspy RHASSPY Livingroom en</code>
 </p>
 <a name="RHASSPYset"></a>
 <p><b>Set</b></p>
@@ -1965,15 +1968,14 @@ DefaultConfirmation=Klaro, mach ich</code></pre>
   </li>
   <li>
     <b>rhasspyIntents</b><br>
-	<!--Defines custom intents. See <a href="https://github.com/Thyraz/Snips-Fhem#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren" hreflang="de">Custom Intent erstellen</a>.<br>-->
-	Not implemented yet
+	Defines custom intents. See <a href="https://github.com/Thyraz/Snips-Fhem#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren" hreflang="de">Custom Intent erstellen</a>.
   </li>
   <li>
     <b>shortcuts</b><br>
 	Define custom sentences without editing Rhasspy sentences.ini<br>
 	The shortcuts are uploaded to Rhasspy when using the updateSlots set-command.<br>
-	Example:<pre><code>mute on={fhem ("set receiver mute on")}
-mute off={fhem ("set receiver mute off")}</code></pre>
+	Example:<pre><code>mute on=set receiver mute on
+mute off=set receiver mute off</code></pre>
   </li>
   <li>
     <b>forceNEXT</b><br>
@@ -1988,11 +1990,112 @@ mute off={fhem ("set receiver mute off")}</code></pre>
 hermes/dialogueManager/sessionStarted
 hermes/dialogueManager/sessionEnded</code></pre>
      additionally to the other subscriptions desired for other purposes.
-    </li>
-    <li>
-      <b>language</b><br>
-     Placeholder, this is not operational yet....
-    </li>  
+  </li>
+  <li>
+    <b>language</b><br>
+    Placeholder, this is not operational yet....
+  </li>  
+</ul>
+</ul>
+
+=end html
+=cut=pod
+=encoding utf8
+=item device
+=item summary Control FHEM with Rhasspy voice assistant
+=item summary_DE Steuerung von FHEM mittels Rhasspy Sprach-Assistent
+=begin html
+
+<a name="RHASSPY"></a>
+<h3>RHASSPY</h3>
+<ul>
+<p>This module receives, processes and executes voice commands coming from Rhasspy voice assistent.</p>
+<a name="RHASSPYdefine"></a>
+<p><b>Define</b></p>
+<p><code>define &lt;name&gt; RHASSPY &lt;DefaultRoom&gt; &lt;DefaultLanguage&gt;</code></p>
+<ul>
+  <li>DefaultRoom: Default room name. Used to speak commands without a room name (e.g. &quot;turn lights on&quot; to turn on the lights in the &quot;default room&quot;)</li>
+  <li>DefaultLanguage: The language voice commands are spoken with</li>
+</ul>
+<p>Before defining RHASSPY an MQTT2_CLIENT device has to be created which connects to the same MQTT-Server the voice assistant connects to.</p>
+<p>Example for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</p>
+<p>
+  <code><pre>defmod rhasspyMQTT2 MQTT2_CLIENT rhasspy:12183
+attr rhasspyMQTT2 clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE
+attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded</pre></code><br>
+  <code>define Rhasspy RHASSPY Livingroom en</code>
+</p>
+<a name="RHASSPYset"></a>
+<p><b>Set</b></p>
+<ul>
+  <li>
+    <b>speak</b><br>
+    Voice output over TTS.<br>
+	Both arguments (siteId and text) are required!<br>
+    Example: <code>set &lt;rhasspyDevice&gt speak siteId="default" text="This is a test"</code>
+  </li>
+  <li>
+    <b>textCommand</b><br>
+    Send a text command to Rhasspy.<br>
+	Example: <code>set &lt;rhasspyDevice&gt textCommand turn the light on</code>
+  </li>
+  <li>
+    <b>trainRhasspy</b><br>
+	Sends a train-command to the HTTP-API of the Rhasspy master.<br>
+	The attribute <i>rhasspyMaster</i> has to be defined to work.<br>
+	Example: <code>set &lt;rhasspyDevice&gt; trainRhasspy</code>
+  </li>
+  <li>
+    <b>updateSlots</b><br>
+    Sends a command to the HTTP-API of the Rhasspy master to update all slots on Rhasspy with actual FHEM-devices, rooms, etc.<br>
+	The attribute <i>rhasspyMaster</i> has to be defined to work.<br>
+	Example: <code>set &lt;rhasspyDevice&gt; updateSlots</code><br>
+	Do not forget to train Rhasspy afterwards!
+  </li>
+</ul>
+<a name="RHASSPYattr"></a>
+<p><b>Attributes</b></p>
+<ul>
+  <li>
+    <b>rhasspyMaster</b><br>
+    Defines the URL to the Rhasspy Master for sending requests to the HTTP-API. Has to be in Format <code>protocol://fqdn:port</code> (e.g. <i>http://rhasspy.example.com:12101</i>).
+  </li>
+  <li>
+    <b>response</b><br>
+	Optionally define alternative default answers. Available keywords are <code>DefaultError</code>, <code>NoActiveMediaDevice</code> and <code>DefaultConfirmation</code>.<br>
+	Example:
+	<pre><code>DefaultError=
+DefaultConfirmation=Klaro, mach ich</code></pre>
+  </li>
+  <li>
+    <b>rhasspyIntents</b><br>
+	Defines custom intents. See <a href="https://github.com/Thyraz/Snips-Fhem#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren" hreflang="de">Custom Intent erstellen</a>.
+  </li>
+  <li>
+    <b>shortcuts</b><br>
+	Define custom sentences without editing Rhasspy sentences.ini<br>
+	The shortcuts are uploaded to Rhasspy when using the updateSlots set-command.<br>
+	Example:<pre><code>mute on=set receiver mute on
+mute off=set receiver mute off</code></pre>
+  </li>
+  <li>
+    <b>forceNEXT</b><br>
+     If set to 1, RHASSPY will forward incoming messages also to further MQTT2-IO-client modules like MQTT2_DEVICE, even if the topic matches to one of it's own subscriptions. By default, these messages will not be forwarded for better compability with autocreate feature on MQTT2_DEVICE. See also <a href="#MQTT2_CLIENTclientOrder">clientOrder attribute in MQTT2 IO-type commandrefs</a>; setting this in one instance of RHASSPY might affect others, too.</p>
+     <br>Additionals remarks on MQTT2-IO's:
+     Using a separate MQTT server (and not the internal MQTT2_SERVER) is highly recommended, as the Rhasspy scripts also use the MQTT protocol for internal (sound!) data transfers. Best way is to either use MQTT2_CLIENT (see below) or bridge only the relevant topics from mosquitto to MQTT2_SERVER (see e.g. http://www.steves-internet-guide.com/mosquitto-bridge-configuration/ for the principles). When using MQTT2_CLIENT, it's necessary to set clientOrder to include RHASSPY (as most likely, it's the only module listening to the CLIENT, it could be just set to 
+     <pre><code>attr <m2client> clientOrder RHASSPY</code></pre><br>
+     Furthermore, you are highly encouraged to restrict subscriptions only to the relevant topics:
+     <pre><code>attr <m2client> subscriptions setByTheProgram</code></pre><br>
+     In case you are using the MQTT server also for other purposes than Rhasspy, you have to set <i>subscriptions</i> manually to at least include
+     <pre><code>hermes/intent/+
+hermes/dialogueManager/sessionStarted
+hermes/dialogueManager/sessionEnded</code></pre>
+     additionally to the other subscriptions desired for other purposes.
+  </li>
+  <li>
+    <b>language</b><br>
+    Placeholder, this is not operational yet....
+  </li>  
 </ul>
 </ul>
 
