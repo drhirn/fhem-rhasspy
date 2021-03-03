@@ -57,16 +57,20 @@ define RhasspyMQTT2 MQTT2_CLIENT <ip-or-hostname-of-mqtt-server>:12183
 ````
 attr <DeviceName> clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE
 ````
+- Add MQTT-subscriptions needed for this module:
+````
+attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded
+````
 
 ## Definition (DEF) in FHEM
 You can define a new instance of this module with:
 
 ```
-define <name> RHASSPY <MqttDevice> <DefaultRoom>
+define <name> RHASSPY <DefaultRoom> <DefaultLanguage>
 ```
 
-* `MqttDevice`: Name of the MQTT2_CLIENT Device in FHEM which connects to the MQTT server Rhasspy uses.
 * `DefaultRoom`: Name of the default room which should be used if no room-name is present in the command.
+* `DefaultLanguage`: Language of the voice commands spoken to Rhasspy.
 
 ### Set-Commands (SET)
 * **speak**\
