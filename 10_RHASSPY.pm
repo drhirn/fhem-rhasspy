@@ -2168,23 +2168,16 @@ mute off=set receiver mute off</code></pre>
   </li>
   <li>
     <b>forceNEXT</b><br>
-     If set to 1, RHASSPY will forward incoming messages also to further MQTT2-IO-client modules like MQTT2_DEVICE, even if the topic matches to one of it's own subscriptions. By default, these messages will not be forwarded for better compability with autocreate feature on MQTT2_DEVICE. See also <a href="#MQTT2_CLIENTclientOrder">clientOrder attribute in MQTT2 IO-type commandrefs</a>; setting this in one instance of RHASSPY might affect others, too.</p>
-     <br>Additionals remarks on MQTT2-IO's:
-     Using a separate MQTT server (and not the internal MQTT2_SERVER) is highly recommended, as the Rhasspy scripts also use the MQTT protocol for internal (sound!) data transfers. Best way is to either use MQTT2_CLIENT (see below) or bridge only the relevant topics from mosquitto to MQTT2_SERVER (see e.g. http://www.steves-internet-guide.com/mosquitto-bridge-configuration/ for the principles). When using MQTT2_CLIENT, it's necessary to set clientOrder to include RHASSPY (as most likely, it's the only module listening to the CLIENT, it could be just set to 
-     <pre><code>attr <m2client> clientOrder RHASSPY</code></pre><br>
-     Furthermore, you are highly encouraged to restrict subscriptions only to the relevant topics:
-     <pre><code>attr <m2client> subscriptions setByTheProgram</code></pre><br>
-     In case you are using the MQTT server also for other purposes than Rhasspy, you have to set <i>subscriptions</i> manually to at least include
-     <pre><code>hermes/intent/+
-hermes/dialogueManager/sessionStarted
-hermes/dialogueManager/sessionEnded</code></pre>
-     additionally to the other subscriptions desired for other purposes.
+     If set to 1, RHASSPY will forward incoming messages also to further MQTT2-IO-client modules like MQTT2_DEVICE, even if the topic matches to one of it's own subscriptions. By default, these messages will not be forwarded for better compability with autocreate feature on MQTT2_DEVICE. See also <a href="#MQTT2_CLIENTclientOrder">clientOrder attribute in MQTT2 IO-type commandrefs</a>; setting this in one instance of RHASSPY might affect others, too.
   </li>
-  <li>
-    <b>language</b><br>
-    Placeholder, this is not operational yet....
-  </li>  
 </ul>
+<p>&nbsp;</p>
+<p><b>Additionals remarks on MQTT2-IO's:</b></p>
+<p>Using a separate MQTT server (and not the internal MQTT2_SERVER) is highly recommended, as the Rhasspy scripts also use the MQTT protocol for internal (sound!) data transfers. Best way is to either use MQTT2_CLIENT (see below) or bridge only the relevant topics from mosquitto to MQTT2_SERVER (see e.g. <a href="http://www.steves-internet-guide.com/mosquitto-bridge-configuration/">http://www.steves-internet-guide.com/mosquitto-bridge-configuration</a> for the principles). When using MQTT2_CLIENT, it's necessary to set <code>clientOrder</code> to include RHASSPY (as most likely, it's the only module listening to the CLIENT). It could be just set to <pre><code>attr <m2client> clientOrder RHASSPY</code></pre></p>
+<p>Furthermore, you are highly encouraged to restrict subscriptions only to the relevant topics: <pre><code>attr <m2client> subscriptions setByTheProgram</code></pre></p>
+<p>In case you are using the MQTT server also for other purposes than Rhasspy, you have to set <code>subscriptions</code> manually to at least include the following topics additionally to the other subscriptions desired for other purposes.<pre><code>hermes/intent/+
+hermes/dialogueManager/sessionStarted
+hermes/dialogueManager/sessionEnded</code></pre></p>
 </ul>
 
 =end html
