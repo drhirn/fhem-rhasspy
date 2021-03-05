@@ -163,8 +163,10 @@ my $languagevars = {
        '1' => '$device is in'
      },
      'onOff' => {
-       '0' => '$device is off',
-       '1' => '$device is on'
+#       '0' => '$device is off',
+#       '1' => '$device is on',
+       '0' => '$deviceName is off',
+       '1' => '$deviceName is on'
      },
      'openClose' => {
        '0' => '$device is open',
@@ -1689,6 +1691,7 @@ sub RHASSPY_handleIntentGetOnOff {
     if (exists($data->{Device}) && exists($data->{Status})) {
         my $room = RHASSPY_roomName($hash, $data);
         $device = RHASSPY_getDeviceByName($hash, $room, $data->{Device});
+        my $deviceName = $data->{Device};
         my $mapping = RHASSPY_getMapping($hash, $device, 'GetOnOff', undef);
         my $status = $data->{Status};
 
@@ -2399,6 +2402,12 @@ mute off=set receiver mute off</code></pre>
 <p>In case you are using the MQTT server also for other purposes than Rhasspy, you have to set <code>subscriptions</code> manually to at least include the following topics additionally to the other subscriptions desired for other purposes.<pre><code>hermes/intent/+
 hermes/dialogueManager/sessionStarted
 hermes/dialogueManager/sessionEnded</code></pre></p>
+</ul>
+<p>&nbsp;</p>
+<p><b>ToDo</b></p>
+<ul>
+<li>Zeile 1555 u. 1556 (<code>my @params = map { $data->{$_} } @paramNames; my $params = join q{,}, @params;</code>)<br><code>PERL WARNING: Hexadecimal number > 0xffffffff non-portable at (eval 931) line 1</code></li>
+<li>Custom Responses werden nicht gesprochen</li>
 </ul>
 
 =end html
