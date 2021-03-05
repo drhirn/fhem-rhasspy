@@ -390,6 +390,7 @@ sub RHASSPY_Set {
     return $dispatch->{$command}->($hash) if (ref $dispatch->{$command} eq 'CODE');
     
     $values[0] = $h->{text} if ($command eq 'speak' || $command eq 'textCommand' ) && defined $h->{text};
+    $values[1] = $h->{path} if ($command eq 'play' ) && defined $h->{path};
 
     $dispatch = {
         speak       => \&RHASSPY_speak,
@@ -400,7 +401,7 @@ sub RHASSPY_Set {
     return Log3($name, 3, "set $name $command requires at least one argument!") if !@values;
     
     my $params = join q{ }, @values;
-    $params = $h if defined $h->{text};
+    $params = $h if (defined $h->{text} || defined $h->{path});
     return $dispatch->{$command}->($hash, $params) if (ref $dispatch->{$command} eq 'CODE');
     
     if ($command eq 'reinit') {
@@ -2174,20 +2175,14 @@ sub RHASSPY_handleIntentSetTimer {
 }
 
 sub RHASSPY_playWav {
-    my $hash = shift // return;
-    my($unnamedParams, $namedParams) = parseParams(shift);
-    
-    my $siteId = q{default};
-    my $json;
-    my $url = q{/api/play-wav};
-    my $method = q{POST};
-    my $contenttype = q{audio/wav};
-    
+    my $hash = shift;
+    my $cmd = shift;
+
     Log3($hash->{NAME}, 5, "action playWav called");
-    
-    if (defined($namedParams->{siteId}) && defined($namedParams->{path})) {
-        $siteId = $namedParams->{siteId};
-        my $filename = $namedParams->{path};
+
+    if (defined($cmd->{siteId}) && defined($cmd->{path})) {
+        my $siteId = $cmd->{siteId};
+        my $filename = $cmd->{path};
         my $encoding = q{:raw :bytes};
         my $handle   = undef;
         my $topic = "hermes/audioServer/$siteId/playBytes/999";
@@ -2303,9 +2298,10 @@ __END__
 <p>This module receives, processes and executes voice commands coming from Rhasspy voice assistent.</p>
 <a name="RHASSPYdefine"></a>
 <p><b>Define</b></p>
-<p><code>define &lt;name&gt; RHASSPY &lt;DefaultRoom&gt;</code></p>
+<p><code>define &lt;name&gt; RHASSPY &lt;DefaultRoom&gt; &lt;DefaultLanguage&gt;</code></p>
 <ul>
   <li>DefaultRoom: Default room name. Used to speak commands without a room name (e.g. &quot;turn lights on&quot; to turn on the lights in the &quot;default room&quot;)</li>
+  <li>DefaultLanguage: The language voice commands are spoken with</li>
 </ul>
 <p>Before defining RHASSPY an MQTT2_CLIENT device has to be created which connects to the same MQTT-Server the voice assistant connects to.</p>
 <p>Example for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</p>
@@ -2313,11 +2309,24 @@ __END__
   <code><pre>defmod rhasspyMQTT2 MQTT2_CLIENT rhasspy:12183
 attr rhasspyMQTT2 clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE
 attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded</pre></code><br>
-  <code>define Rhasspy RHASSPY Wohnzimmer</code>
+  <code>define Rhasspy RHASSPY Livingroom en</code>
 </p>
 <a name="RHASSPYset"></a>
 <p><b>Set</b></p>
 <ul>
+  <li>
+    <b>play</b><br>
+    Send WAV file to Rhasspy.<br>
+    <b>Not fully implemented yet</b><br>
+    Both arguments (siteId and path) are required!<br>
+    Example: <code>set &lt;rhasspyDevice&gt play siteId="default" path="/opt/fhem/test.wav"</code>
+  </li>
+  <li>
+    <b>reinit</b>
+    Reinitialization of language file.<br>
+    Be sure to execute this command after changing something in the language-configuration files or the attribut <i>configFile</i>!<br>
+    Example: <code>set &lt;rhasspyDevice&gt reinit language</code>
+  </li>
   <li>
     <b>speak</b><br>
     Voice output over TTS.<br>
@@ -2348,7 +2357,14 @@ attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
 <ul>
   <li>
     <b>rhasspyMaster</b><br>
-    Defines the URL to the Rhasspy Master for sending requests to the HTTP-API. Has to be in Format <code>protocol://fqdn:port</code> (e.g. <i>http://rhasspy.example.com:12101</i>).
+    Defines the URL to the Rhasspy Master for sending requests to the HTTP-API. Has to be in Format <code>protocol://fqdn:port</code>
+    This attribute is <b>mandatory</b>!<br>
+    Example: <code>attr &lt;rhasspyDevice&gt; rhasspyMaster http://rhasspy.example.com:12101</code>
+  </li>
+  <li>
+    <b>configFile</b>
+    Path to the language-config file. If this attribute isn't set, english is used as for voice responses.<br>
+    Example: <code>attr &lt;rhasspyDevice&gt; configFile /opt/fhem/.config/rhasspy/rhasspy-de.cfg</code>
   </li>
   <li>
     <b>response</b><br>
@@ -2359,35 +2375,30 @@ DefaultConfirmation=Klaro, mach ich</code></pre>
   </li>
   <li>
     <b>rhasspyIntents</b><br>
-    <!--Defines custom intents. See <a href="https://github.com/Thyraz/Snips-Fhem#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren" hreflang="de">Custom Intent erstellen</a>.<br>-->
-    Not implemented yet
+    Optionally defines custom intents. See <a href="https://github.com/Thyraz/Snips-Fhem#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren" hreflang="de">Custom Intent erstellen</a>.<br>
+    One intent per line.<br>
+    Example: <code>attr &lt;rhasspyDevice&gt; rhasspyIntents Respeak=Respeak()</code>
   </li>
   <li>
     <b>shortcuts</b><br>
     Define custom sentences without editing Rhasspy sentences.ini<br>
     The shortcuts are uploaded to Rhasspy when using the updateSlots set-command.<br>
+    One shortcut per line.<br>
     Example:<pre><code>mute on=set receiver mute on
 mute off=set receiver mute off</code></pre>
   </li>
   <li>
     <b>forceNEXT</b><br>
-     If set to 1, RHASSPY will forward incoming messages also to further MQTT2-IO-client modules like MQTT2_DEVICE, even if the topic matches to one of it's own subscriptions. By default, these messages will not be forwarded for better compability with autocreate feature on MQTT2_DEVICE. See also <a href="#MQTT2_CLIENTclientOrder">clientOrder attribute in MQTT2 IO-type commandrefs</a>; setting this in one instance of RHASSPY might affect others, too.</p>
-     <br>Additionals remarks on MQTT2-IO's:
-     Using a separate MQTT server (and not the internal MQTT2_SERVER) is highly recommended, as the Rhasspy scripts also use the MQTT protocol for internal (sound!) data transfers. Best way is to either use MQTT2_CLIENT (see below) or bridge only the relevant topics from mosquitto to MQTT2_SERVER (see e.g. http://www.steves-internet-guide.com/mosquitto-bridge-configuration/ for the principles). When using MQTT2_CLIENT, it's necessary to set clientOrder to include RHASSPY (as most likely, it's the only module listening to the CLIENT, it could be just set to 
-     <pre><code>attr <m2client> clientOrder RHASSPY</code></pre><br>
-     Furthermore, you are highly encouraged to restrict subscriptions only to the relevant topics:
-     <pre><code>attr <m2client> subscriptions setByTheProgram</code></pre><br>
-     In case you are using the MQTT server also for other purposes than Rhasspy, you have to set <i>subscriptions</i> manually to at least include
-     <pre><code>hermes/intent/+
-hermes/dialogueManager/sessionStarted
-hermes/dialogueManager/sessionEnded</code></pre>
-     additionally to the other subscriptions desired for other purposes.
-    </li>
-    <li>
-      <b>language</b><br>
-     Placeholder, this is not operational yet....
-    </li>  
+     If set to 1, RHASSPY will forward incoming messages also to further MQTT2-IO-client modules like MQTT2_DEVICE, even if the topic matches to one of it's own subscriptions. By default, these messages will not be forwarded for better compability with autocreate feature on MQTT2_DEVICE. See also <a href="#MQTT2_CLIENTclientOrder">clientOrder attribute in MQTT2 IO-type commandrefs</a>; setting this in one instance of RHASSPY might affect others, too.
+  </li>
 </ul>
+<p>&nbsp;</p>
+<p><b>Additionals remarks on MQTT2-IO's:</b></p>
+<p>Using a separate MQTT server (and not the internal MQTT2_SERVER) is highly recommended, as the Rhasspy scripts also use the MQTT protocol for internal (sound!) data transfers. Best way is to either use MQTT2_CLIENT (see below) or bridge only the relevant topics from mosquitto to MQTT2_SERVER (see e.g. <a href="http://www.steves-internet-guide.com/mosquitto-bridge-configuration/">http://www.steves-internet-guide.com/mosquitto-bridge-configuration</a> for the principles). When using MQTT2_CLIENT, it's necessary to set <code>clientOrder</code> to include RHASSPY (as most likely, it's the only module listening to the CLIENT). It could be just set to <pre><code>attr <m2client> clientOrder RHASSPY</code></pre></p>
+<p>Furthermore, you are highly encouraged to restrict subscriptions only to the relevant topics: <pre><code>attr <m2client> subscriptions setByTheProgram</code></pre></p>
+<p>In case you are using the MQTT server also for other purposes than Rhasspy, you have to set <code>subscriptions</code> manually to at least include the following topics additionally to the other subscriptions desired for other purposes.<pre><code>hermes/intent/+
+hermes/dialogueManager/sessionStarted
+hermes/dialogueManager/sessionEnded</code></pre></p>
 </ul>
 
 =end html
