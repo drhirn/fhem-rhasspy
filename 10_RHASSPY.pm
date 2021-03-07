@@ -2038,13 +2038,13 @@ sub RHASSPY_handleIntentMediaControls {
         $mapping = RHASSPY_getMapping($hash, $device, 'MediaControls', undef);
 
         if (defined $device && defined $mapping) {
-            my $cmd = $mapping->{$hash->{helper}{lng}->{Change}->{Media}->{$command}};
-
-#            if    ($command =~ m/^play$/i)   { $cmd = $mapping->{cmdPlay}; }
-#            elsif ($command =~ m/^pause$/i)  { $cmd = $mapping->{cmdPause}; }
-#            elsif ($command =~ m/^stop$/i)   { $cmd = $mapping->{cmdStop}; }
-#            elsif ($command =~ m/^vor$/i)    { $cmd = $mapping->{cmdFwd}; }
-#            elsif ($command =~ m/^zurück$/i) { $cmd = $mapping->{cmdBack}; }
+#            my $cmd = $mapping->{$hash->{helper}{lng}->{Change}->{Media}->{$command}};
+            my $cmd;
+            if    ($command =~ m/^play$/i)   { $cmd = $mapping->{cmdPlay}; }
+            elsif ($command =~ m/^pause$/i)  { $cmd = $mapping->{cmdPause}; }
+            elsif ($command =~ m/^stop$/i)   { $cmd = $mapping->{cmdStop}; }
+            elsif ($command =~ m/^next$/i)    { $cmd = $mapping->{cmdFwd}; }
+            elsif ($command =~ m/^previous$/i) { $cmd = $mapping->{cmdBack}; }
 
             if ( defined $cmd ) {
                 # Cmd ausführen
@@ -2457,7 +2457,11 @@ hermes/dialogueManager/sessionEnded</code></pre></p>
 <p><b>ToDo</b></p>
 <ul>
 <li>Zeile 1555 u. 1556 (<code>my @params = map { $data->{$_} } @paramNames; my $params = join q{,}, @params;</code>)<br><code>PERL WARNING: Hexadecimal number > 0xffffffff non-portable at (eval 931) line 1</code></li>
-<li>Custom Responses werden nicht gesprochen</li>
+<li>Response-Mappings werden nicht gesprochen</li>
+<li>playWav: <code>PERL WARNING: Use of uninitialized value within @values in join or string at ./FHEM/10_RHASSPY.pm line 414.</code></li>
+<li>SetNumeric/SetColor don't change readings of FHEM-Device (&quote;longpoll&quote;)</li>
+<li>Status doesn't do anything (as expected right now)</li>
+<li>MediaChannels doesn't execute command</li>
 </ul>
 
 =end html

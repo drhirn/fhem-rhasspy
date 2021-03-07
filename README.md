@@ -397,8 +397,8 @@ Example-Rhasspy-Sentences:
 (start){Command:play} the playback [$de.fhem.Device{Device}]
 (stop){Command:stop} the playback [$de.fhem.Device{Device}]
 (pause){Command:pause} the playback [$de.fhem.Device{Device}]
-(next){Command:vor} (song|title) [$de.fhem.Device{Device}]
-(previous){Command:zurück} (song|title) [$de.fhem.Device{Device}] [$de.fhem.Room{Room}]
+(next){Command:next} (song|title) [$de.fhem.Device{Device}]
+(previous){Command:previous} (song|title) [$de.fhem.Device{Device}] [$de.fhem.Room{Room}]
 ````
 
 ### MediaChannels
