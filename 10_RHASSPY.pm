@@ -2456,7 +2456,7 @@ hermes/dialogueManager/sessionEnded</code></pre></p>
 <p>&nbsp;</p>
 <p><b>ToDo</b></p>
 <ul>
-<li>Zeile 1555 u. 1556 (<code>my @params = map { $data->{$_} } @paramNames; my $params = join q{,}, @params;</code>)<br><code>PERL WARNING: Hexadecimal number > 0xffffffff non-portable at (eval 931) line 1</code></li>
+<li>Zeile 1571 u. 1572 (<code>my @params = map { $data->{$_} } @paramNames; my $params = join q{,}, @params;</code>)<br><code>PERL WARNING: Hexadecimal number > 0xffffffff non-portable at (eval 931) line 1</code></li>
 <li>Response-Mappings werden nicht gesprochen</li>
 <li>playWav: <code>PERL WARNING: Use of uninitialized value within @values in join or string at ./FHEM/10_RHASSPY.pm line 414.</code></li>
 <li>SetNumeric/SetColor don't change readings of FHEM-Device (&quote;longpoll&quote;)</li>
