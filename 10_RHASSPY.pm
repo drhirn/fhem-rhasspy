@@ -269,6 +269,8 @@ sub firstInit {
     #RemoveInternalTimer($hash);
     
     IOWrite($hash, 'subscriptions', join q{ }, @topics) if InternalVal($IODev,'TYPE',undef) eq 'MQTT2_CLIENT'; # isIODevMQTT2_CLIENT($hash);
+    
+    RHASSPY_fetchSiteIds($hash);
 
     return;
 }
@@ -1313,14 +1315,14 @@ sub RHASSPY_onmessage {
 
 # Antwort ausgeben
 sub RHASSPY_respond { #($$$$$)
-    #my ($hash, $type, $sessionId, $siteId, $response) = @_;
+                                                            
     my $hash      = shift // return;
     my $type      = shift // return;
     my $sessionId = shift // return;
     my $siteId    = shift // return;
     my $response  = shift // return;
     
-    #my $json;
+              
 
     my $sendData =  {
         sessionId => $sessionId,
@@ -1412,9 +1414,9 @@ sub RHASSPY_updateSlots {
     my @types     = RHASSPY_allRhasspyTypes($hash);
     my @shortcuts = keys %{$hash->{helper}{shortcuts}};
 
-#print Dumper($hash->{helper}{shortcuts});
+                                          
     if (@shortcuts) {
-#        my $json;
+                  
         my $deviceData;
         my $url = q{/api/sentences};
         
@@ -1520,10 +1522,10 @@ sub RHASSPY_ParseHttpResponse {
     elsif (grep {/api\/profile/i} $url) {
         my $ref = decode_json($data);
         my $siteIds = encode('UTF-8',$ref->{dialogue}{satellite_site_ids});
-        my @siteIds = split /,/, $siteIds;
+        #my @siteIds = split /,/, $siteIds;
 #print Dumper(@siteIds);
         readingsBulkUpdate($hash, 'siteIds', $siteIds);
-        $hash->{helper}{siteIds} = $siteIds;
+        #$hash->{helper}{siteIds} = $siteIds;
     }
     else {
         Log3($hash->{NAME}, 3, qq(error while requesting $param->{url} - $data));
@@ -1643,10 +1645,10 @@ sub RHASSPY_handleIntentShortcuts {
 
         $cmd  = _replace($hash, $cmd, \%specials);
         #execute Perl command
-                                                               
+
         $ret = RHASSPY_runCmd($hash, undef, $cmd, undef, $data->{siteId});
         $device = $ret if $ret !~ m{Please.define.*first}x;
-                                                                
+
         $response = $ret // _replace($hash, $response, \%specials);
     } else {
         $cmd = $shortcut->{fhem} // return;
@@ -2186,8 +2188,6 @@ sub RHASSPY_handleIntentSetTimer {
     my $name = $hash->{NAME};
     my $unit, my $value;
 
-    my @unitHours = ('stunde','stunden','hour','hours','heure','heures');
-    my @unitMinutes = ('minute','minuten','minute','minutes');
     my $response = RHASSPY_getResponse($hash, 'DefaultError');
 
     Log3($name, 5, 'handleIntentSetTimer called');
@@ -2196,35 +2196,34 @@ sub RHASSPY_handleIntentSetTimer {
     if ($data->{Value}) {$value = $data->{Value}} else {$response = $hash->{helper}{lng}->{responses}->{duration_not_understood}};
     if ($data->{Unit}) {$unit = $data->{Unit}} else {$response = $hash->{helper}{lng}->{responses}->{duration_not_understood}};
     
-    if (!defined $hash->{helper}{siteIds}) {RHASSPY_fetchSiteIds($hash)};
+    my $siteIds = ReadingsVal( $name, 'siteIds',0);
+    RHASSPY_fetchSiteIds($hash) if !$siteIds;
 
-    my @siteIds = split /,/,$hash->{helper}{siteIds};
     my $timerRoom = $siteId;
-    if ( grep {/^$room$/i} @siteIds ) {$timerRoom = $room};
+    $timerRoom = $room if $siteIds =~ m{\b$room\b}ix;
     
     if( $value && $unit && $timerRoom ) {
         my $time = $value;
-        my $roomReading = makeReadingName($room);
+        my $roomReading = "timer_".makeReadingName($room);
         
-        if    ( grep { $_ eq $unit } @unitMinutes ) {$time = $value*60}
-        elsif ( grep { $_ eq $unit } @unitHours )   {$time = $value*3600};
+        if    (  $unit =~ m{ $hash->{helper}{lng}->{units}->{unitMinutes} }x ) {$time = $value*60}
+        elsif ( (  $unit =~ m{ $hash->{helper}{lng}->{units}->{unitHours} }x ) )   {$time = $value*3600};
         
         $time = strftime('%H:%M:%S', gmtime $time);
         
         $response = $hash->{helper}{lng}->{responses}->{timerEnd};
         eval { $response =~ s{(\$\w+)}{$1}eeg; };
 
-        my $cmd = qq(defmod timer_$roomReading at +$time set $name speak siteId=\"$timerRoom\" text=\"$response\";;setreading $name timer_$roomReading 0);
+        my $cmd = qq(defmod $roomReading at +$time set $name speak siteId=\"$timerRoom\" text=\"$response\";;setreading $name $roomReading 0);
         
         RHASSPY_runCmd($hash,'',$cmd);
 
-        readingsSingleUpdate($hash, "timer_" . $roomReading, 1, 1);
+        readingsSingleUpdate($hash, $roomReading, 1, 1);
         
         Log3($name, 5, "Created timer: $cmd");
         
         $response = $hash->{helper}{lng}->{responses}->{timerSet};
         eval { $response =~ s{(\$\w+)}{$1}eeg; };
-        print Dumper($response);
     }
 
     RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
@@ -2356,7 +2355,7 @@ __END__
 <ul>
   <li><b>devspec</b>: A description of devices that should be controlled by Rhasspy. Optional. Default is <code>devspec=room=Rhasspy</code></li>
   <li><b>defaultRoom</b>: Default room name. Used to speak commands without a room name (e.g. &quot;turn lights on&quot; to turn on the lights in the &quot;default room&quot;). Optional. Default is <code>defaultRoom=default</code></li>
-  <li><b>language</b>: The language voice commands are spoken with. Optional. Default is <code>language=en</code></li>
+  <li><b>language</b>: The language voice commands are spoken with. Optional. Default is derived from global, which defaults to <code>language=en</code></li>
 </ul>
 <p>Before defining RHASSPY an MQTT2_CLIENT device has to be created which connects to the same MQTT-Server the voice assistant connects to.</p>
 <p>Example for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</p>
@@ -2465,6 +2464,8 @@ hermes/dialogueManager/sessionEnded</code></pre></p>
 <li>Status doesn't do anything (as expected right now) #Beta-User: intented behaviour?</li>
 <li>MediaChannels doesn't execute command #Beta-User: solved by splitting Channel mapping in keyword/command?</li>
 <li>SetTimer: $hash->{siteIds} leer beim Start von FHEM: <code>PERL WARNING: Use of uninitialized value in split at ./FHEM/10_RHASSPY.pm line 2194.</code></li>
+<li>Dialogue Session wird nicht beendet, wenn SetMute = 1; Reading listening_$roomReading wird nicht 0. Weil das in onmessage nicht zurück gesetzt wird.</li>
+<li>Shortcuts always returning Default-Error but commands are executed.
 </ul>
 
 =end html
