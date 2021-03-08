@@ -90,8 +90,8 @@ my $languagevars = {
      'DefaultError' => "Sorry but something seems not to work as expected.",
      'NoActiveMediaDevice' => "Sorry no active playback device.",
      'DefaultConfirmation' => "OK",
-     'timerSet'   => 'Timer in $room has been set to $value $unit',
-     'timerEnd'   => "Timer expired",
+     'timerSet'   => 'Timer in room $room has been set to $value $unit',
+     'timerEnd'   => 'Timer in room $room expired',
      'timeRequest' => 'it is $hour o clock $min minutes',
      'weekdayRequest' => 'today it is $weekDay',
      'duration_not_understood'   => "Sorry I could not understand the desired duration."
@@ -280,7 +280,6 @@ sub RHASSPY_Define {
     $hash->{prefix} = $h->{prefix} // q{rhasspy};
     
     #Beta-User: Für's Ändern von defaultRoom oder prefix vielleicht (!?!) hilfreich: https://forum.fhem.de/index.php/topic,119150.msg1135838.html#msg1135838 (Rudi zu resolveAttrRename) 
-
 
     # IODev setzen und als MQTT Client registrieren
     #$attr{$name}{IODev} = $IODev;
@@ -1421,9 +1420,7 @@ sub RHASSPY_updateSlots {
     my @types     = RHASSPY_allRhasspyTypes($hash);
     my @shortcuts = keys %{$hash->{helper}{shortcuts}};
 
-#print Dumper($hash->{helper}{shortcuts});
     if (@shortcuts) {
-#        my $json;
         my $deviceData;
         my $url = q{/api/sentences};
         
@@ -1475,7 +1472,9 @@ sub RHASSPY_fetchSiteIds {
     my $hash   = shift // return;
     my $url    = q{/api/profile?layers=profile};
     my $method = q{GET};
-    
+
+    Log3($hash->{NAME}, 5, "fetchSiteIds called");
+
     return RHASSPY_sendToApi($hash, $url, $method, undef);
 }
     
@@ -1528,12 +1527,10 @@ sub RHASSPY_ParseHttpResponse {
     elsif (grep {/api\/profile/i} $url) {
         my $ref = decode_json($data);
         my $siteIds = encode('UTF-8',$ref->{dialogue}{satellite_site_ids});
-        my @siteIds = split /,/, $siteIds;
-#print Dumper(@siteIds);
+#        my @siteIds = split /,/, $siteIds;
         readingsBulkUpdate($hash, 'siteIds', $siteIds);
+        $hash->{helper}{siteIds} = $siteIds;
     }
-#    $hash->{MODULE_VERSION} = "0.4.0";
-#    $hash->{helper}{defaultRoom} = $defaultRoom;
     else {
         Log3($hash->{NAME}, 3, qq(error while requesting $param->{url} - $data));
     }
@@ -2176,36 +2173,39 @@ sub RHASSPY_findSiteId {
 sub RHASSPY_handleIntentSetTimer {
     my $hash = shift;
     my $data = shift // return;
-
+    my $siteId = $data->{siteId} // return;
     my $name = $hash->{NAME};
-    my $unit, my $room, my $value;
-                                  
+    my $unit, my $value;
+
     my @unitHours = ('stunde','stunden','hour','hours','heure','heures');
     my @unitMinutes = ('minute','minuten','minute','minutes');
     my $response = RHASSPY_getResponse($hash, 'DefaultError');
 
     Log3($name, 5, 'handleIntentSetTimer called');
 
-    if ($data->{Room}) {$room = makeReadingName($data->{Room})};
+    my $room = $data->{Room} // $siteId;
     if ($data->{Value}) {$value = $data->{Value}} else {$response = $hash->{helper}{lng}->{responses}->{duration_not_understood}};
-    if ($data->{Unit}) {$unit = $data->{Unit}} else {$response = $hash->{helper}{lng}->{responses}->{duration_not_understood}}; # Should be unit, not duration. Sense depends on Rhasspy-sentences
+    if ($data->{Unit}) {$unit = $data->{Unit}} else {$response = $hash->{helper}{lng}->{responses}->{duration_not_understood}};
+
+    if (!defined $hash->{helper}{siteIds}) {RHASSPY_fetchSiteIds($hash)};
+
+    my @siteIds = split /,/,$hash->{helper}{siteIds};
+    my $timerRoom = $siteId;
+    if ( grep {/^$room$/i} @siteIds ) {$timerRoom = $room};
     
-    my $siteId = $data->{siteId};
-
-    $room = $room // $siteId;
-
-    if( $value && $unit && $room ) {
+    if( $value && $unit && $timerRoom ) {
         my $time = $value;
         my $roomReading = makeReadingName($room);
         
         if    ( grep { $_ eq $unit } @unitMinutes ) {$time = $value*60}
         elsif ( grep { $_ eq $unit } @unitHours )   {$time = $value*3600};
         
-        #$time = strftime('%T', gmtime $time); # Beta-User: %T seems to fail in non-POSIX-Environments...
         $time = strftime('%H:%M:%S', gmtime $time);
         
         $response = $hash->{helper}{lng}->{responses}->{timerEnd};
-        my $cmd = qq(defmod timer_$room at +$time set $name speak siteId=\"$room\" text=\"$response\";;setreading $name timer_$roomReading 0);
+        eval { $response =~ s{(\$\w+)}{$1}eeg; };
+
+        my $cmd = qq(defmod timer_$roomReading at +$time set $name speak siteId=\"$timerRoom\" text=\"$response\";;setreading $name timer_$roomReading 0);
         
         RHASSPY_runCmd($hash,'',$cmd);
 
@@ -2213,14 +2213,9 @@ sub RHASSPY_handleIntentSetTimer {
         
         Log3($name, 5, "Created timer: $cmd");
         
-        #$response = "Taimer in $room gesetzt auf $value $unit";
-        # Variablen ersetzen? (Testcode aus RHASSPY_runCmd())
         $response = $hash->{helper}{lng}->{responses}->{timerSet};
         eval { $response =~ s{(\$\w+)}{$1}eeg; };
-        
-        #$response = _replace( $hash, 
-        #            $hash->{helper}{lng}->{responses}->{timerSet},
-        #            {'$unit' => $unit, '$time' => $time, '$room' => $room, '$value' => $value });
+        print Dumper($response);
     }
 
     RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
@@ -2459,9 +2454,10 @@ hermes/dialogueManager/sessionEnded</code></pre></p>
 <li>Zeile 1571 u. 1572 (<code>my @params = map { $data->{$_} } @paramNames; my $params = join q{,}, @params;</code>)<br><code>PERL WARNING: Hexadecimal number > 0xffffffff non-portable at (eval 931) line 1</code></li>
 <li>Response-Mappings werden nicht gesprochen</li>
 <li>playWav: <code>PERL WARNING: Use of uninitialized value within @values in join or string at ./FHEM/10_RHASSPY.pm line 414.</code></li>
-<li>SetNumeric/SetColor don't change readings of FHEM-Device (&quote;longpoll&quote;)</li>
+<li>SetNumeric/SetColor don't change readings of FHEM-Device (&quot;longpoll&quot;)</li>
 <li>Status doesn't do anything (as expected right now)</li>
 <li>MediaChannels doesn't execute command</li>
+<li>SetTimer: $hash->{siteIds} leer beim Start von FHEM: <code>PERL WARNING: Use of uninitialized value in split at ./FHEM/10_RHASSPY.pm line 2194.</code></li>
 </ul>
 
 =end html
