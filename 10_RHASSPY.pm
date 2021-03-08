@@ -134,20 +134,20 @@ my $languagevars = {
      },
   'stateResponses' => {
      'inOperation' => {
-       '0' => '$device is ready',
-       '1' => '$device is still running'
+       '0' => '$deviceName is ready',
+       '1' => '$deviceName is still running'
      },
      'inOut'       => {
-       '0' => '$device is out',
-       '1' => '$device is in'
+       '0' => '$deviceName is out',
+       '1' => '$deviceName is in'
      },
      'onOff'       => {
-       '0' => '$device is off',
-       '1' => '$device is on'
+       '0' => '$deviceName is off',
+       '1' => '$deviceName is on'
      },
      'openClose'   => {
-       '0' => '$device is open',
-       '1' => '$device is closed'
+       '0' => '$deviceName is open',
+       '1' => '$deviceName is closed'
      }
   }
 };
@@ -1725,8 +1725,6 @@ sub RHASSPY_handleIntentGetOnOff {
         my $mapping = RHASSPY_getMapping($hash, $device, 'GetOnOff', undef);
         my $status = $data->{Status};
 
-#        Log3($hash->{NAME}, 5, "handleIntentGetOnOff - Device: $device - Status: $status");
-
         # Mapping gefunden?
         if (defined $mapping) {
             # Gerät ein- oder ausgeschaltet?
@@ -1739,16 +1737,6 @@ sub RHASSPY_handleIntentGetOnOff {
                 $response = $hash->{helper}{lng}->{stateResponses}{$stateResponseType}->{$value};
                 eval { $response =~ s{(\$\w+)}{$1}eeg; };
             }
-=pod
-            elsif ($status =~ m/^(an|aus)$/ && $value == 1) { $response = $data->{'Device'} . " ist eingeschaltet"; }
-            elsif ($status =~ m/^(an|aus)$/ && $value == 0) { $response = $data->{'Device'} . " ist ausgeschaltet"; }
-            elsif ($status =~ m/^(auf|zu)$/ && $value == 1) { $response = $data->{'Device'} . " ist geöffnet"; }
-            elsif ($status =~ m/^(auf|zu)$/ && $value == 0) { $response = $data->{'Device'} . " ist geschlossen"; }
-            elsif ($status =~ m/^(eingefahren|ausgefahren)$/ && $value == 1) { $response = $data->{'Device'} . " ist eingefahren"; }
-            elsif ($status =~ m/^(eingefahren|ausgefahren)$/ && $value == 0) { $response = $data->{'Device'} . " ist ausgefahren"; }
-            elsif ($status =~ m/^(läuft|fertig)$/ && $value == 1) { $response = $data->{'Device'} . " läuft noch"; }
-            elsif ($status =~ m/^(läuft|fertig)$/ && $value == 0) { $response = $data->{'Device'} . " ist fertig"; }
-=cut
         }
     }
     # Antwort senden
