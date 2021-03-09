@@ -1600,20 +1600,21 @@ sub RHASSPY_handleCustomIntent {
 sub RHASSPY_handleIntentSetMute {
     my $hash = shift // return;
     my $data = shift // return;
-    my $value, my $siteId, my $state = 0;
+    #my $value, my $siteId;#, my $state = 0;
     my $response;# = RHASSPY_getResponse($hash, 'DefaultError');
     
     Log3($hash->{NAME}, 5, "handleIntentSetMute called");
     
     if (exists $data->{Value} && exists $data->{siteId}) {
-        $siteId = makeReadingName($data->{siteId});
-        $value = $data->{Value};
+        my $siteId = makeReadingName($data->{siteId});
+        #my $value = $data->{Value};
         
 #        Log3($hash->{NAME}, 5, "siteId: $siteId, value: $value");
         
-        if ($value eq 'on') {$state = 1};
+        #if ($value eq 'on') {$state = 1};
 
-        readingsSingleUpdate($hash, "mute_$siteId", $state, 1);
+        #readingsSingleUpdate($hash, "mute_$siteId", $state, 1);
+        readingsSingleUpdate($hash, "mute_$siteId", $data->{Value} eq 'on' ? 1 : 0, 1);
         $response = RHASSPY_getResponse($hash, 'DefaultConfirmation');
     }
     $response = $response  // RHASSPY_getResponse($hash, 'DefaultError');
@@ -1627,7 +1628,7 @@ sub RHASSPY_handleIntentShortcuts {
     my $shortcut = $hash->{helper}{shortcuts}{$data->{input}};
     Log3($hash->{NAME}, 5, "handleIntentShortcuts called with $data->{input} key");
     
-    my $response = $shortcut->{response} // RHASSPY_getResponse($hash, 'DefaultError');
+    my $response = $shortcut->{response} // RHASSPY_getResponse($hash, 'DefaultConfirmation');
     my $ret;
     my $device = $shortcut->{NAME};;
     my $cmd    = $shortcut->{perl};
@@ -2465,7 +2466,9 @@ hermes/dialogueManager/sessionEnded</code></pre></p>
 <li>MediaChannels doesn't execute command #Beta-User: solved by splitting Channel mapping in keyword/command?</li>
 <li>SetTimer: $hash->{siteIds} leer beim Start von FHEM: <code>PERL WARNING: Use of uninitialized value in split at ./FHEM/10_RHASSPY.pm line 2194.</code></li>
 <li>Dialogue Session wird nicht beendet, wenn SetMute = 1; Reading listening_$roomReading wird nicht 0. Weil das in onmessage nicht zurück gesetzt wird.</li>
-<li>Shortcuts always returning Default-Error but commands are executed.
+<li>Shortcuts always returning Default-Error but commands are executed. #Beta-User: solved by changing default in line 1630 to DefaultConfirmation?</li>
+<li>Add Shortcuts to README (<a href="https://forum.fhem.de/index.php/topic,118926.msg1136115.html#msg1136115">https://forum.fhem.de/index.php/topic,118926.msg1136115.html#msg1136115</a>) (drhirn)</li>
+<li>Shortcuts: &quot;Longpoll&quot; only works when &quot;n&quot; is given. Perl-Code only works when &quot;n&quot; is given when using $NAME in Perl-code.</li>
 </ul>
 
 =end html
