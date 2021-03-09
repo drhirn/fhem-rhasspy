@@ -1273,8 +1273,9 @@ sub RHASSPY_onmessage {
     }
 
     if ($mute) {
+        $data->{requestType} = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
         RHASSPY_respond($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, q{ });
-        return @updatedList;
+        return \@updatedList;
     }
 
     my $command = $data->{input};
@@ -1327,13 +1328,14 @@ sub RHASSPY_onmessage {
 
 # Antwort ausgeben
 sub RHASSPY_respond {
-
     my $hash      = shift // return;
     my $type      = shift // return;
     my $sessionId = shift // return;
     my $siteId    = shift // return;
     my $response  = shift // return;
-    
+
+print "\n$type\n";
+
     my $sendData =  {
         sessionId => $sessionId,
         siteId => $siteId,
@@ -2485,7 +2487,7 @@ hermes/dialogueManager/sessionEnded</code></pre></p>
 <li>SetNumeric/SetColor don't change readings of FHEM-Device (&quote;longpoll&quote;) #Beta-User: solved by returning $device?</li>
 <li>Status doesn't do anything (as expected right now) #Beta-User: intented behaviour?</li>
 <li>MediaChannels doesn't execute command #Beta-User: solved by splitting Channel mapping in keyword/command?</li>
-<li>SetTimer: $hash->{siteIds} leer beim Start von FHEM: <code>PERL WARNING: Use of uninitialized value in split at ./FHEM/10_RHASSPY.pm line 2194.</code></li>
+<li><s>SetTimer: $hash->{siteIds} leer beim Start von FHEM: <code>PERL WARNING: Use of uninitialized value in split at ./FHEM/10_RHASSPY.pm line 2194.</code></s></li>
 <li>Dialogue Session wird nicht beendet, wenn SetMute = 1; Reading listening_$roomReading wird nicht 0. Weil das in onmessage nicht zurück gesetzt wird.</li>
 <li>Shortcuts always returning Default-Error but commands are executed. #Beta-User: solved by changing default in line 1630 to DefaultConfirmation?</li>
 <li>Add Shortcuts to README (<a href="https://forum.fhem.de/index.php/topic,118926.msg1136115.html#msg1136115">https://forum.fhem.de/index.php/topic,118926.msg1136115.html#msg1136115</a>) (drhirn)</li>
