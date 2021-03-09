@@ -1,7 +1,7 @@
 ----Device----
 defmod lampe1 dummy
 attr lampe1 userattr lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0 rhasspyChannels:textField-long rhasspyColors:textField-long
-attr lampe1 readingList brightness rgb
+attr lampe1 readingList volume brightness rgb
 attr lampe1 rhasspyChannels orf eins=set lampe1 on\
 orf zwei=set lampe1 off\
 orf drei=set lampe1 on
@@ -13,13 +13,14 @@ attr lampe1 rhasspyMapping SetOnOff:cmdOn=on,cmdOff=off,response=Okidoki\
 GetOnOff:currentVal=state,valueOff=off\
 GetNumeric:currentVal=brightness,type=Helligkeit\
 SetNumeric:currentVal=brightness,minVal=0,maxVal=255,map=percent,cmd=brightness,step=1,type=Helligkeit\
+SetNumeric:currentVal=volume,cmd=volume,minVal=0,maxVal=99,step=10,type=Lautstärke\
 Status:response=Die Temperatur in der Küche beträgt [lampe1:brightness] Grad\
 MediaControls:cmdPlay=play,cmdPause=pause,cmdStop=stop,cmdBack=previous,cmdFwd=next\
 
 attr lampe1 rhasspyName deckenlampe,licht,radio
 attr lampe1 rhasspyRoom küche,bad
 attr lampe1 room Rhasspy
-attr lampe1 setList brightness rgb toggle on off play stop pause next previous
+attr lampe1 setList volume brightness rgb toggle on off play stop pause next previous
 
 ----Payloads----
 SetMute
@@ -38,6 +39,7 @@ Msg: hermes/intent/de.fhem_GetOnOff => {"input": "läuft radio wohnzimmer", "int
 SetNumeric:
 Msg: hermes/intent/de.fhem_SetNumeric => {"input": "deckenlampe auf 50 prozent", "intent": {"intentName": "de.fhem:SetNumeric", "confidenceScore": 1.0}, "siteId": "wohnzimmer", "id": null, "slots": [{"entity": "de.fhem.Device", "value": {"kind": "Unknown", "value": "deckenlampe"}, "slotName": "Device", "rawValue": "deckenlampe", "confidence": 1.0, "range": {"start": 0, "end": 11, "rawStart": 0, "rawEnd": 11}}, {"entity": "rhasspy/number", "value": {"kind": "Number", "value": 50}, "slotName": "Value", "rawValue": "fünfzig", "confidence": 1.0, "range": {"start": 16, "end": 18, "rawStart": 16, "rawEnd": 23}}, {"entity": "Unit", "value": {"kind": "Unknown", "value": "prozent"}, "slotName": "Unit", "rawValue": "prozent", "confidence": 1.0, "range": {"start": 19, "end": 26, "rawStart": 24, "rawEnd": 31}}], "sessionId": "wohnzimmer-snowboy-0ae191fc-c0d7-47f5-9ead-8d19e7302c39", "customData": null, "asrTokens": [[{"value": "deckenlampe", "confidence": 1.0, "rangeStart": 0, "rangeEnd": 11, "time": null}, {"value": "auf", "confidence": 1.0, "rangeStart": 12, "rangeEnd": 15, "time": null}, {"value": "50", "confidence": 1.0, "rangeStart": 16, "rangeEnd": 18, "time": null}, {"value": "prozent", "confidence": 1.0, "rangeStart": 19, "rangeEnd": 26, "time": null}]], "asrConfidence": null, "rawInput": "deckenlampe auf fünfzig prozent", "wakewordId": "snowboy", "lang": null}
 Msg: hermes/intent/de.fhem_SetNumeric => {"input": "deckenlampe auf 25", "intent": {"intentName": "de.fhem:SetNumeric", "confidenceScore": 1.0}, "siteId": "wohnzimmer", "id": null, "slots": [{"entity": "de.fhem.Device", "value": {"kind": "Unknown", "value": "deckenlampe"}, "slotName": "Device", "rawValue": "deckenlampe", "confidence": 1.0, "range": {"start": 0, "end": 11, "rawStart": 0, "rawEnd": 11}}, {"entity": "rhasspy/number", "value": {"kind": "Number", "value": 25}, "slotName": "Value", "rawValue": "fünfundzwanzig", "confidence": 1.0, "range": {"start": 16, "end": 18, "rawStart": 16, "rawEnd": 30}}], "sessionId": "wohnzimmer-snowboy-8f199cba-d4c6-46e5-989e-08ec167c20ea", "customData": null, "asrTokens": [[{"value": "deckenlampe", "confidence": 1.0, "rangeStart": 0, "rangeEnd": 11, "time": null}, {"value": "auf", "confidence": 1.0, "rangeStart": 12, "rangeEnd": 15, "time": null}, {"value": "25", "confidence": 1.0, "rangeStart": 16, "rangeEnd": 18, "time": null}]], "asrConfidence": null, "rawInput": "deckenlampe auf fünfundzwanzig", "wakewordId": "snowboy", "lang": null}
+Msg: hermes/intent/de.fhem_SetNumeric => {"input": "mach radio lauter", "intent": {"intentName": "de.fhem:SetNumeric", "confidenceScore": 0.6666666666666667}, "siteId": "default", "id": "cf521ed9-8de4-4bc2-82ae-77ed9a854e0c", "slots": [{"entity": "de.fhem.Device", "value": {"kind": "Unknown", "value": "radio"}, "slotName": "Device", "rawValue": "radio", "confidence": 1.0, "range": {"start": 5, "end": 10, "rawStart": 5, "rawEnd": 10}}, {"entity": "Change", "value": {"kind": "Unknown", "value": "lauter"}, "slotName": "Change", "rawValue": "lauter", "confidence": 1.0, "range": {"start": 11, "end": 17, "rawStart": 11, "rawEnd": 17}}], "sessionId": "cf521ed9-8de4-4bc2-82ae-77ed9a854e0c", "customData": null, "asrTokens": [[{"value": "mach", "confidence": 1.0, "rangeStart": 0, "rangeEnd": 4, "time": null}, {"value": "radio", "confidence": 1.0, "rangeStart": 5, "rangeEnd": 10, "time": null}, {"value": "lauter", "confidence": 1.0, "rangeStart": 11, "rangeEnd": 17, "time": null}]], "asrConfidence": null, "rawInput": "mach das radio lauter", "wakewordId": null, "lang": null}
 
 GetNumeric:
 Msg: hermes/intent/de.fhem_GetNumeric => {"input": "Helligkeit deckenlampe im bad", "intent": {"intentName": "de.fhem:GetNumeric", "confidenceScore": 1.0}, "siteId": "wohnzimmer", "id": null, "slots": [{"entity": "Type", "value": {"kind": "Unknown", "value": "Helligkeit"}, "slotName": "Type", "rawValue": "helligkeit", "confidence": 1.0, "range": {"start": 0, "end": 10, "rawStart": 0, "rawEnd": 10}}, {"entity": "de.fhem.Device", "value": {"kind": "Unknown", "value": "deckenlampe"}, "slotName": "Device", "rawValue": "deckenlampe", "confidence": 1.0, "range": {"start": 11, "end": 22, "rawStart": 11, "rawEnd": 22}}, {"entity": "de.fhem.Room", "value": {"kind": "Unknown", "value": "bad"}, "slotName": "Room", "rawValue": "bad", "confidence": 1.0, "range": {"start": 26, "end": 29, "rawStart": 26, "rawEnd": 29}}], "sessionId": "wohnzimmer-snowboy-b6d9df29-fb48-48b5-b0bb-1658e229e8dd", "customData": null, "asrTokens": [[{"value": "Helligkeit", "confidence": 1.0, "rangeStart": 0, "rangeEnd": 10, "time": null}, {"value": "deckenlampe", "confidence": 1.0, "rangeStart": 11, "rangeEnd": 22, "time": null}, {"value": "im", "confidence": 1.0, "rangeStart": 23, "rangeEnd": 25, "time": null}, {"value": "bad", "confidence": 1.0, "rangeStart": 26, "rangeEnd": 29, "time": null}]], "asrConfidence": null, "rawInput": "helligkeit deckenlampe im bad", "wakewordId": "snowboy", "lang": null}
