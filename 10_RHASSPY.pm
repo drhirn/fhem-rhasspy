@@ -79,19 +79,19 @@ my $languagevars = {
        'soilMoisture' => 'soil moisture',
        'targetValue' => 'target value',
        'temperature' => 'temperature',
-       'volumeSound' => 'volume',
+       'volume' => 'volume',
        'waterLevel' => 'water level'
     },
     'regex' => {
        'darker' => 'brightness',
        'brighter' => 'brightness',
        'cooler' => 'temperature',
-       'louder' => 'volumeSound',
-       'lower' => 'volumeSound',
+       'louder' => 'volume',
+       'lower' => 'volume',
        'warmer' => 'temperature',
        'setTarget' => '(brightness|volume|target.volume)',
        'upward' => '(higher|brighter|louder|rise|warmer)',
-       'volumeSound' => 'sound volume'
+       'volume' => 'sound volume'
     },
     'regexToEn' => {
       'temperature'  => 'temperature',
@@ -101,7 +101,7 @@ my $languagevars = {
       'soilMoisture' => 'soilMoisture',
       'brightness'   => 'brightness',
       'setTarget'    => 'setTarget',
-      'volumeSound'  => 'volumeSound'
+      'volume'       => 'volume'
     },
     'responses' => {
        'airHumidity'  => 'air humidity in $location is $value percent',
@@ -116,7 +116,7 @@ my $languagevars = {
          '0' => 'temperature in $location is $value',
          '1' => 'temperature in $location is $value degrees',
        },
-       'volumeSound'  => '$device has been set to $value',
+       'volume'  => '$device set to $value',
        'waterLevel'   => 'water level in $location is $value percent',
        'knownType'    => '$mappingType in $location is $value percent',
        'unknownType'  => 'value in $location is $value percent'
@@ -1343,12 +1343,9 @@ sub RHASSPY_respond {
     my $json = toJSON($sendData);
 
     readingsBeginUpdate($hash);
-    if ($type eq 'voice') {
-        readingsBulkUpdate($hash, 'voiceResponse', $response);
-    }
-    elsif ($type eq 'text') {
-        readingsBulkUpdate($hash, 'textResponse', $response);
-    } #Beta-User: könnte effizienter notiert werden, wenn sicher ist, dass es nur diese beiden $type geben kann...
+    $type eq 'voice' ?
+        readingsBulkUpdate($hash, 'voiceResponse', $response)
+      : readingsBulkUpdate($hash, 'textResponse', $response);
     readingsBulkUpdate($hash, 'responseType', $type);
     readingsEndUpdate($hash,1);
     IOWrite($hash, 'publish', qq{hermes/dialogueManager/endSession $json});
@@ -1801,7 +1798,7 @@ sub RHASSPY_handleIntentSetNumeric {
 
     # Nur Type = Lautstärke und Value angegeben -> Valid (z.B. Lautstärke auf 10)
     ||!exists $data->{Device} && defined $data->{Type} && exists $data->{Value} && $data->{Type} =~ 
-    m{\A$hash->{helper}{lng}->{Change}->{regex}->{volumeSound}\z}xim;
+    m{\A$hash->{helper}{lng}->{Change}->{regex}->{volume}\z}xim;
 
     if ($validData) {
         $unit = $data->{Unit};
@@ -1822,7 +1819,7 @@ sub RHASSPY_handleIntentSetNumeric {
         if (exists($data->{Device})) {
             $device = RHASSPY_getDeviceByName($hash, $room, $data->{Device});
         #} elsif (defined($type) && $type =~ m/^Lautstärke$/i) {
-        } elsif (defined $type && $type =~ m{\A$hash->{helper}{lng}->{Change}->{Types}->{volumeSound}\z}xi) {
+        } elsif (defined $type && $type =~ m{\A$hash->{helper}{lng}->{Change}->{Types}->{volume}\z}xi) {
             $device = RHASSPY_getActiveDeviceForIntentAndType($hash, $room, 'SetNumeric', $type);
             $response = RHASSPY_getResponse($hash, 'NoActiveMediaDevice') if (!defined $device);
         }
