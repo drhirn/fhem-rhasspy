@@ -1334,8 +1334,6 @@ sub RHASSPY_respond {
     my $siteId    = shift // return;
     my $response  = shift // return;
 
-print "\n$type\n";
-
     my $sendData =  {
         sessionId => $sessionId,
         siteId => $siteId,
