@@ -11,6 +11,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[Set-Commands (SET)](#set-commands-set)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attributes (ATTR)](#attributes-attr)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Readings/Events](#readings--events)\
+[Additionals remarks on MQTT2-IOs](#additionals-remarks-on-mqtt2-ios)\
 [Configure FHEM-devices for use with Rhasspy](#configure-fhem-devices-for-use-with-rhasspy)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Room *Rhasspy*](#room-rhasspy)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyName*](#attribute-rhasspyname)\
@@ -30,6 +31,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[GetWeekDay](#getweekday)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetTimer](#settimer)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetMute](#setmute)\
+&nbsp;&nbsp;&nbsp;&nbsp;[ReSpeak](#respeak)\
 [Custom Intents](#custom-intents)\
 [Tips & Tricks](#tips--tricks)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Rhasspy speaks actual state of device after switching it](#rhasspy-speaks-actual-state-of-device-after-switching-it)\
@@ -66,13 +68,25 @@ attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
 You can define a new instance of this module with:
 
 ```
-define <name> RHASSPY <DefaultRoom> <DefaultLanguage>
+define <name> RHASSPY <devspec> <defaultRoom> <language>
 ```
 
-* `DefaultRoom`: Name of the default room which should be used if no room-name is present in the command.
-* `DefaultLanguage`: Language of the voice commands spoken to Rhasspy.
+* `devspec`: [devspec](https://commandref.fhem.de/commandref.html#devspec) of the device(s) that should be controlled with Rhasspy. Optional. Default is `room=Rhasspy`.
+* `defaultRoom`: Name of the default room which should be used if no room-name is present in the command. Optional. Default is `default`.
+* `language`: Language of the voice commands spoken to Rhasspy. Optional. Default is derived from global, which defaults to `language=en`.
+
+Example:
+````define Rhasspy RHASSPY devspec=room=Rhasspy,room=Music,Light1 defaultRoom=livingroom language=en````
 
 ### Set-Commands (SET)
+* **play**\
+  Send a WAV file to Rhasspy.\
+  Both arguments (siteId and path) are required!\
+  Example: `set <rhasspyDevice> play siteId="default" path="/opt/fhem/test.wav"`
+* **reinit**\
+  Reinitialization of language file.\
+  Be sure to execute this command after changing something in the language-configuration files or the attribut `configFile`!\
+  Example: `set <rhasspyDevice> reinit language`
 * **speak**\
   Voice output over TTS.\
   Both arguments (siteId and text) are required!\
@@ -104,6 +118,11 @@ define <name> RHASSPY <DefaultRoom> <DefaultLanguage>
   Has to be in Format `protocol://fqdn:port`.\
   Example:
   `http://rhasspy.example.com:12101`
+* **configFile**\
+  Path to the language-config file. If this attribute isn't set, english is used for voice responses.\
+  Example: `attr <rhasspyDevice> configFile /opt/fhem/.config/rhasspy/rhasspy-de.cfg`
+* **forceNEXT**\
+  If set to 1, RHASSPY will forward incoming messages also to further MQTT2-IO-client modules like MQTT2_DEVICE, even if the topic matches to one of it's own subscriptions. By default, these messages will not be forwarded for better compability with autocreate feature on MQTT2_DEVICE. See also [clientOrder](https://commandref.fhem.de/commandref.html#MQTT2_CLIENT) attribute in MQTT2 IO-type commandrefs. Setting this in one instance of RHASSPY might affect others, too.
 * **response**\
   Optionally define alternative default answers.\
   Available keywords are `DefaultError`, `NoActiveMediaDevice` and `DefaultConfirmation`.\
@@ -137,6 +156,16 @@ define <name> RHASSPY <DefaultRoom> <DefaultLanguage>
   Can for example be used to mute speakers while Rhasspy is listening to commands.
 * **voiceResponse** and **textResponse**\
   Response to the last voice- or text-command.
+
+##Additionals remarks on MQTT2-IOs
+Using a separate MQTT server (and not the internal MQTT2_SERVER) is highly recommended, as the Rhasspy scripts also use the MQTT protocol for internal (sound!) data transfers. Best way is to either use MQTT2_CLIENT (see below) or bridge only the relevant topics from mosquitto to MQTT2_SERVER (see e.g. http://www.steves-internet-guide.com/mosquitto-bridge-configuration/ for the principles). When using MQTT2_CLIENT, it's necessary to set `clientOrder` to include RHASSPY (as most likely, it's the only module listening to the CLIENT). It could be just set to `attr <m2client> clientOrder RHASSPY`\
+Furthermore, you are highly encouraged to restrict subscriptions only to the relevant topics: `attr <m2client> subscriptions setByTheProgram`\
+In case you are using the MQTT server also for other purposes than Rhasspy, you have to set `subscriptions` manually to at least include the following topics additionally to the other subscriptions desired for other purposes:
+````
+hermes/intent/+
+hermes/dialogueManager/sessionStarted
+hermes/dialogueManager/sessionEnded
+````
 
 ## Configure FHEM-devices for use with Rhasspy
 To control a device with voice-commands, Rhasspy needs to now about the device. This works by adding the device to the FHEM-room *Rhasspy*. When using the set-command *updateSlots*, the module Rhasspy-FHEM then creates a list of all devices in this room and saves it to a Rhasspy-slot called *de.fhem.Device*. After training Rhasspy, the device is recognized and can be controlled.
@@ -565,10 +594,33 @@ stop listening
 
 Example-Rhasspy-Sentences:
 ````
+[de.fhem:SetMute]
 (good night|be quiet){Value:on}
 (good morning|make noise){Value:off}
 ````
 Attention! The `{Value:on}` or `{Value:off}` is mandatory, case sensitive and has to be english!
+
+### ReSpeak
+
+Repeats the last sentence, Rhasspy has spoken. To be exactly: Speaks the content of the FHEM-reading `voiceResponse`.
+
+No FHEM-settings needed
+
+Expample-Sentences:
+````
+what did you say
+can you repeat
+i did not understand you
+````
+
+Example-Rhasspy-Sentences:
+````
+[de.fhem:ReSpeak]
+what did you say
+excuse me
+can you repeat the last sentence
+````
+
 
 ## Custom Intents
 
