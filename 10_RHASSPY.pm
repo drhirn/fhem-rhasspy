@@ -1054,7 +1054,7 @@ sub RHASSPY_runCmd {
 }
 
 # Wert über Format 'reading', 'device:reading' oder '{<perlcode}' lesen
-sub RHASSPY_getValue { #($$$;$$)
+sub RHASSPY_getValue {
     my $hash      = shift // return;
     my $device    = shift // return;
     my $getString = shift // return;
