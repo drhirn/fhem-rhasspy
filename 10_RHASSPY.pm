@@ -69,7 +69,8 @@ my $languagevars = {
      'timerEnd'   => 'Timer in room $room expired',
      'timeRequest' => 'it is $hour o clock $min minutes',
      'weekdayRequest' => 'today it is $weekDay',
-     'duration_not_understood'   => "Sorry I could not understand the desired duration."
+     'duration_not_understood'   => "Sorry I could not understand the desired duration.",
+     'reSpeak_failed'   => 'i am sorry i can not remember'
   },
   'Change' => {
     'Types' => {
@@ -1300,7 +1301,8 @@ sub RHASSPY_onmessage {
         SetColor      => \&RHASSPY_handleIntentSetColor,
         GetTime       => \&RHASSPY_handleIntentGetTime,
         GetWeekday    => \&RHASSPY_handleIntentGetWeekday,
-        SetTimer      => \&RHASSPY_handleIntentSetTimer
+        SetTimer      => \&RHASSPY_handleIntentSetTimer,
+        ReSpeak       => \&RHASSPY_handleIntentReSpeak
     };
     if (ref $dispatch->{$intent} eq 'CODE') {
         $device = $dispatch->{$intent}->($hash, $data);
@@ -1538,10 +1540,7 @@ sub RHASSPY_ParseHttpResponse {
     elsif ( $url =~ m{api/profile}ix ) {
         my $ref = decode_json($data);
         my $siteIds = encode('UTF-8',$ref->{dialogue}{satellite_site_ids});
-        #my @siteIds = split /,/, $siteIds;
-#print Dumper(@siteIds);
         readingsBulkUpdate($hash, 'siteIds', $siteIds);
-        #$hash->{helper}{siteIds} = $siteIds;
     }
     else {
         Log3($hash->{NAME}, 3, qq(error while requesting $param->{url} - $data));
@@ -2250,6 +2249,20 @@ sub RHASSPY_handleIntentSetTimer {
 
     RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
     return $name;
+}
+
+sub RHASSPY_handleIntentReSpeak {
+    my $hash = shift // return;
+    my $data = shift // return;
+    my $name = $hash->{NAME};
+    
+    my $response = ReadingsVal($name,"voiceResponse",$hash->{helper}{lng}->{responses}->{reSpeak_failed});
+    
+    Log3($hash->{NAME}, 5, 'handleIntentReSpeak called');
+    
+    RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
+    
+    return;
 }
 
 sub RHASSPY_playWav {
