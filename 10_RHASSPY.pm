@@ -497,20 +497,18 @@ sub RHASSPY_init_custom_intents {
         my $err = perlSyntaxCheck( $perlcommand );
         return "$err in $line" if $err && $init_done;
         
-        $hash->{helper}{custom}{$+{intent}}{perl} = $perlcommand; #Beta-User: delete after testing!
+        #$hash->{helper}{custom}{$+{intent}}{perl} = $perlcommand; #Beta-User: delete after testing!
         $hash->{helper}{custom}{$intent}{function} = $function;
 
         my $args = trim($+{arg});
         my @params;
         for my $ar (split m{,}x, $args) {
            $ar =trim($ar);
-           next if $ar eq q{};
+           #next if $ar eq q{}; #Beta-User having empty args might be intented...
            push @params, $ar; 
         }
-        #push @params, \$hash;
+
         $hash->{helper}{custom}{$+{intent}}{args} = \@params;
-        $hash->{helper}{custom}{$+{intent}}{argslong} = join q{,}, @params; #Beta-User: delete after testing!
-        
     }
     return;
 }
@@ -1011,6 +1009,7 @@ sub RHASSPY_runCmd {
         my $VALUE  = $val;
 
         Log3($hash->{NAME}, 5, "$cmd has quotes...");
+
         # Anführungszeichen entfernen
         #$cmd =~ s{\A\s*"}{}x;
         #$cmd =~ s{"\s*\z}{}x;
@@ -1062,33 +1061,22 @@ sub RHASSPY_getValue { #($$$;$$)
     my $val       = shift;
     my $siteId    = shift;
     
-    #my $value;
-
-    # Perl Command? -> Umleiten zu RHASSPY_runCmd
-    if ($getString =~ m{\A\s*\{.*\}\s*\z}x #) { 
-        # Wert lesen
-        #$value = RHASSPY_runCmd($hash, $device, $getString, $val, $siteId);
-    ##}
-    # String in Anführungszeichen -> Umleiten zu RHASSPY_runCmd
-    #elsif (
-        || $getString =~ m/^\s*".*"\s*$/) {
-        # Wert lesen
-        #$value = RHASSPY_runCmd($hash, $device, $getString, $val, $siteId);
+    # Perl Command oder in Anführungszeichen? -> Umleiten zu RHASSPY_runCmd
+    if ($getString =~ m{\A\s*\{.*\}\s*\z}x || $getString =~ m/^\s*".*"\s*$/) {
         return RHASSPY_runCmd($hash, $device, $getString, $val, $siteId);
     }
-    # Reading oder Device:Reading
-    #else {
-      # Soll Reading von einem anderen Device gelesen werden?
-      if ($getString =~ m{:}x) {
-          my @replace = split m{:}x, $getString;
-          $device = $replace[0];
-          $getString = $replace[1] // $getString;
-      }
-      #$value = ReadingsVal($device, $getString, 0);
-      return ReadingsVal($device, $getString, 0);
-    #}
 
-    #return $value;
+    # Soll Reading von einem anderen Device gelesen werden?
+    if ($getString =~ m{:}x) {
+        my @replace = split m{:}x, $getString;
+        $device = $replace[0];
+        $getString = $replace[1] // $getString;
+        return ReadingsVal($device, $getString, 0);
+    }
+    # If it's only a string without quotes, return string for TTS
+    else {
+        return $getString;
+    }
 }
 
 
@@ -1578,33 +1566,33 @@ sub RHASSPY_handleCustomIntent {
     if (defined $subName) { #might not be necessary...
         for (@{$params}) {
             if ($_ eq 'NAME') {
-               $_ = $hash->{NAME};
+                $_ = $hash->{NAME};
             } elsif ($_ eq 'DATA') {
                 $_ = $data;
-            } elsif (defined $data->{$_}) {   
-                $_ = $data->{$_}
+            } elsif (defined $data->{$_}) {
+                $_ = $data->{$_};
             }
         }
 
-        my $args;
-        for (@{$params}) {
-            $args .= q{,} if $args;
-            if (ref $_ eq 'SCALAR') {
-               $args .= q{'}. $_ . q{'};
-            } else {
-               $args .= $_;
-            }
-        }
-        #my $args = join q{,}, @{$params};
+        my $args = join q{","}, @{$params};
         my $cmd = qq{ $subName( "$args" ) };
+=pod
+attr rhasspy rhasspyIntents GetAllOff=GetAllOff(Room,Type)\
+SetAllOff=SetAllOff(Room,Type)\
+SetAllOn=SetAllOn(Room,Type)
 
-        Log3($hash->{NAME}, 5, "Calling sub: $cmd");
+sub SetAllOn($$){
+my ($Raum,$Typ) = @_;
+return Log3('rhasspy',3 , "RHASSPY: Raum $Raum, Typ $Typ");
+}
+=cut
+        Log3($hash->{NAME}, 5, "Calling sub: $cmd" );
         my $error = AnalyzePerlCommand($hash, $cmd);
         
-        $response = $error if $error !~ m{Please.define.*first}x;
+        $response = $error; # if $error && $error !~ m{Please.define.*first}x;
      
     }
-    $response = $response // RHASSPY_getResponse($hash, 'DefaultError');
+    $response = $response // RHASSPY_getResponse($hash, 'DefaultConfirmation');
 
     # Antwort senden
     return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
@@ -1636,6 +1624,7 @@ sub RHASSPY_handleIntentSetMute {
     return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
 }
 
+# Handle custom Shortcuts
 sub RHASSPY_handleIntentShortcuts {
     my $hash = shift // return;
     my $data = shift // return;
@@ -1710,7 +1699,6 @@ sub RHASSPY_handleIntentSetOnOff {
 
             # Antwort bestimmen
             #$numericValue = ($value eq 'an') ? 1 : 0;
-
             if (defined $mapping->{response}) { 
                 $numericValue = $value eq $hash->{helper}{lng}->{on} ? 1 : 0; #Beta-User: language
                 #Log3($hash->{NAME}, 5, "numericValue is $numericValue" );
@@ -2298,6 +2286,7 @@ sub RHASSPY_playWav {
 sub RHASSPY_ReplaceReadingsVal {
     my $hash = shift;
     my $arr  = shift // return;
+
     my $to_analyze = join q{ }, @{$arr};
 
     #my @arr  = shift // return;
