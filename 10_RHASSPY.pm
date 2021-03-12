@@ -251,6 +251,7 @@ BEGIN {
     AnalyzePerlCommand
     perlSyntaxCheck
     parseParams
+    ReplaceSetMagic
     ResolveDateWildcards
     HttpUtils_NonblockingGet
     round
@@ -336,7 +337,7 @@ sub firstInit {
     
     IOWrite($hash, 'subscriptions', join q{ }, @topics) if InternalVal($IODev,'TYPE',undef) eq 'MQTT2_CLIENT'; # isIODevMQTT2_CLIENT($hash);
     
-    RHASSPY_fetchSiteIds($hash);
+    RHASSPY_fetchSiteIds($hash) if !ReadingsVal( $hash->{NAME}, 'siteIds', 0 );
 
     return;
 }
@@ -388,6 +389,7 @@ sub RHASSPY_Undefine {
 
 sub RHASSPY_Delete {
     my $hash = shift // return;
+    RemoveInternalTimer($hash);
 
 # DELETE POD AFTER TESTS ARE COMPLETED    
 =begin comment
@@ -422,7 +424,7 @@ sub RHASSPY_Set {
     . join(q{ }, map {
         @{$sets{$_}} ? $_
                       .':'
-                      .join ',', @{$sets{$_}} : $_} sort keys %sets)
+                      .join q{,}, @{$sets{$_}} : $_} sort keys %sets)
     if !defined $sets{$command};
 
     Log3($name, 5, "set $command - value: " . join q{ }, @values);
@@ -457,6 +459,13 @@ sub RHASSPY_Set {
     if ($command eq 'reinit') {
         if ($values[0] eq 'language') {
             return initialize_Language($hash, $hash->{LANGUAGE});
+        }
+        if ($values[0] eq 'devicemap') {
+            return initialize_devicemap($hash);
+        }
+        if ($values[0] eq 'all') {
+            initialize_Language($hash, $hash->{LANGUAGE});
+            return initialize_devicemap($hash);
         }
     }
     
@@ -585,6 +594,54 @@ sub RHASSPY_init_custom_intents {
 
         $hash->{helper}{custom}{$+{intent}}{args} = \@params;
     }
+    return;
+}
+
+
+sub initialize_devicemap {
+    my $hash = shift // return;
+    
+    my $devspec = $hash->{devspec};
+    delete $hash->{helper}{devicemap};
+
+    my @devices = devspec2array($devspec);
+
+    # devspec2array sendet bei keinen Treffern als einziges Ergebnis den devSpec String zurück #Beta-User: ist das so?
+    return if (@devices == 1 && $devices[0] eq $devspec);
+    
+=pod    
+    $room = RHASSPY_roomName($hash, $data);
+    => $data->{Room} oder defaultRoom 
+    
+    
+    $device = RHASSPY_getDeviceByName($hash, $room, $data->{Device});
+        $room oder $name müssen übergeben werden, es werden alle Devices mit passendem rhasspyName auf Übereinstimmung mit $room gecheckt 
+        => Hash mit {$room}{rhasspyName}{FHEM-Device-Name}?
+    
+    $device = RHASSPY_getDeviceByIntentAndType($hash, $room, $intent, $type); 
+        erst wird an RHASSPY_getDevicesByIntentAndType() übergeben => 
+            mapping wird ermittelt, zurückgegeben werden zwei Listen mit passenden mappings (im $room => @matchesInRoom / außerhalb $room)
+        dann wird entweder das erste Device aus @matchesInRoom zurückgegeben, oder ersatzweise erste Device aus dem 2. Array
+        
+    $device = RHASSPY_getActiveDeviceForIntentAndType($hash, $room, $intent, undef);
+        1. RHASSPY_getDevicesByIntentAndType() übergeben (s.o)
+        2. erst in $room, dann "outside":
+           a) RHASSPY_getMapping (GetOnOff) 
+           b) RHASSPY_getOnOffState aus a)
+        
+    $device = RHASSPY_getDeviceByMediaChannel($hash, $room, $channel);
+        1. alle Devices sammeln, 
+        2. rausfiltern, was diesen $channel kennt
+        3. erster Treffer wird device, es sei denn, es wird was im passenden $room gefunden
+        => Hash mit {$channel}{$room}{FHEM-Device-Name}?
+    
+    $mapping = RHASSPY_getMapping($hash, $device, $intent, $type) if defined $device;
+        $type kann ggf. offen bleiben
+        => Hash mit {FHEM-Device-Name}{$intent}{$type}?
+    
+    
+    
+=cut
     return;
 }
 
@@ -978,7 +1035,7 @@ sub RHASSPY_getActiveDeviceForIntentAndType {
 
         for (@{$devices}) {
             my $mapping = RHASSPY_getMapping($subhash, $_, 'GetOnOff', undef, 1);
-            if (defined($mapping)) {
+            if (defined $mapping ) {
                 # Gerät ein- oder ausgeschaltet?
                 my $value = RHASSPY_getOnOffState($subhash, $_, $mapping);
                 if ($value) {
@@ -1015,13 +1072,15 @@ sub RHASSPY_getDeviceByMediaChannel {
     
     my $prefix = $hash->{prefix};
     for (@devices) {
-        my $attrv = AttrVal($_,"${prefix}Room",undef) // next;
-        my @rooms = split m{,}x, $attrv;
+        my $rooms = AttrVal($_,"${prefix}Room",undef) // next;
+                                        
         my $cmd = RHASSPY_getCmd($hash, $_, "${prefix}Channels", $channel, 1) // next;
         
-        # Erster Treffer wälen, überschreiben falls besserer Treffer (Raum matched auch) kommt
-        if (!defined $device || grep {/^$room$/i} @rooms) {
+        # Erster Treffer wählen, überschreiben falls besserer Treffer (Raum matched auch) kommt
+        my $inRoom = $rooms =~ m{\b$room\b}ix;
+        if (!defined $device || $inRoom ) {
             $device = $_;
+            last if $inRoom;
         }
     }
 
@@ -1073,41 +1132,35 @@ sub RHASSPY_splitMappingString {
 sub RHASSPY_getMapping { #($$$$;$)
     #my ($hash, $device, $intent, $type, $disableLog) = @_;
     my $hash       = shift // return;
-    my $device     = shift;
-    my $intent     = shift;
-    my $type       = shift; #Beta-User: any necessary parameters...?
+    my $device     = shift // return;
+    my $intent     = shift // return;
+    my $type       = shift; #Beta-User: seems first three parameters are obligatory...?
     my $disableLog = shift // 0;
     
-    #my @mappings, 
     my $matchedMapping;
     
     my $prefix = $hash->{prefix};
     my $mappingsString = AttrVal($device, "${prefix}Mapping", undef) // return;
 
-    #if (defined($mappingsString)) {
-        # String in einzelne Mappings teilen
-        #@mappings = split m{\n}x, $mappingsString;
+    for (split m{\n}x, $mappingsString) {
 
-        #for (@mappings) {
-        for (split m{\n}x, $mappingsString) {
-            # Nur Mappings vom gesuchten Typ verwenden
-            next if $_ !~ qr/^$intent/;
-            $_ =~ s/$intent://;
-            my %currentMapping = RHASSPY_splitMappingString($_);
+        # Nur Mappings vom gesuchten Typ verwenden
+        next if $_ !~ qr/^$intent/;
+        $_ =~ s/$intent://;
+        my %currentMapping = RHASSPY_splitMappingString($_);
 
-            # Erstes Mapping vom passenden Intent wählen (unabhängig vom Type), dann ggf. weitersuchen ob noch ein besserer Treffer mit passendem Type kommt
-            
-            if (!defined $matchedMapping 
-                || defined $type && lc($matchedMapping->{type}) ne lc($type) && lc($currentMapping{type}) eq lc($type)
-                || defined $type && $de_mappings->{ToEn}->{$matchedMapping->{type}} ne $type && $de_mappings->{ToEn}->{$currentMapping{type}} eq $type
-                ) {
-                $matchedMapping = \%currentMapping;
-                #Beta-User: könnte man ergänzen durch den match "vorne" bei Reading, kann aber sein, dass es effektiver geht, wenn wir das künftig sowieso anders machen...
+        # Erstes Mapping vom passenden Intent wählen (unabhängig vom Type), dann ggf. weitersuchen ob noch ein besserer Treffer mit passendem Type kommt
+        
+        if (!defined $matchedMapping 
+            || lc($matchedMapping->{type}) ne lc($type) && lc($currentMapping{type}) eq lc($type)
+            || $de_mappings->{ToEn}->{$matchedMapping->{type}} ne $type && $de_mappings->{ToEn}->{$currentMapping{type}} eq $type
+            ) {
+            $matchedMapping = \%currentMapping;
+            #Beta-User: könnte man ergänzen durch den match "vorne" bei Reading, kann aber sein, dass es effektiver geht, wenn wir das künftig sowieso anders machen...
 
-                Log3($hash->{NAME}, 5, "${prefix}Mapping selected: $_") if !$disableLog;
-            }
+            Log3($hash->{NAME}, 5, "${prefix}Mapping selected: $_") if !$disableLog;
         }
-    #}
+    }
     return $matchedMapping;
 }
 
@@ -1169,8 +1222,6 @@ sub RHASSPY_runCmd {
         Log3($hash->{NAME}, 5, "$cmd has quotes...");
 
         # Anführungszeichen entfernen
-        #$cmd =~ s{\A\s*"}{}x;
-        #$cmd =~ s{"\s*\z}{}x;
         $cmd = $+{inner};
 
         # Variablen ersetzen?
@@ -1180,7 +1231,7 @@ sub RHASSPY_runCmd {
         # [DEVICE:READING] Einträge ersetzen
         $returnVal = RHASSPY_ReplaceReadingsVal($hash, $cmd);
         # Escapte Kommas wieder durch normale ersetzen
-        $returnVal =~ s/\\,/,/;
+        $returnVal =~ s{\\,}{,}x;
         Log3($hash->{NAME}, 5, "...and is now: $cmd ($returnVal)");
     }
     # FHEM Command oder CommandChain
@@ -1191,8 +1242,8 @@ sub RHASSPY_runCmd {
         $returnVal = (split q{ }, $cmd)[1];
     }
     # Soll Command auf anderes Device umgelenkt werden?
-    elsif ($cmd =~ m/:/) {
-        $cmd   =~ s/:/ /;
+    elsif ($cmd =~ m{:}x) {
+    $cmd   =~ s{:}{ }x;
         $cmd   = qq($cmd $val) if defined($val);
         Log3($hash->{NAME}, 5, "$cmd redirects to another device");
         $error = AnalyzeCommand($hash, "set $cmd");
@@ -1423,6 +1474,7 @@ sub RHASSPY_onmessage {
     if ($mute) {
         $data->{requestType} = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
         RHASSPY_respond($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, q{ });
+        #Beta-User: Da fehlt mir der Soll-Ablauf für das "room-listening"-Reading; das wird ja über einen anderen Topic abgewickelt
         return \@updatedList;
     }
 
@@ -2196,11 +2248,12 @@ sub RHASSPY_handleIntentStatus {
     # Mindestens Device muss existieren
     if (exists $data->{Device}) {
         my $room = RHASSPY_roomName($hash, $data);
-        my $device = RHASSPY_getDeviceByName($hash, $room, $device);
+        $device = RHASSPY_getDeviceByName($hash, $room, $device);
         my $mapping = RHASSPY_getMapping($hash, $device, 'Status', undef);
 
         if ( defined $mapping->{response} ) {
-            $response = RHASSPY_getValue($hash, $device, $mapping->{response},undef, $room);
+            $response = RHASSPY_getValue($hash, $device, $mapping->{response}, undef, $room);
+            $response = RHASSPY_ReplaceReadingsVal($hash, $mapping->{response}) if !$response; #Beta-User: case: plain Text with [device:reading]
         }
     }
     # Antwort senden
@@ -2478,7 +2531,8 @@ sub RHASSPY_ReplaceReadingsVal {
     my $hash = shift;
     my $arr  = shift // return;
 
-    my $to_analyze = join q{ }, @{$arr};
+    #my $to_analyze = join q{ }, @{$arr};
+    my $to_analyze = $arr;
 
     #my @arr  = shift // return;
     #my $to_analyze = join q{ }, @arr;
