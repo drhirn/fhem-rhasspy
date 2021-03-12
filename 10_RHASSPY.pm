@@ -34,6 +34,7 @@ use GPUtils qw(:all);
 use JSON;
 use Encode;
 use HttpUtils;
+use List::Util qw(max min);
 use Data::Dumper;
 
 sub ::RHASSPY_Initialize { goto &RHASSPY_Initialize }
@@ -61,8 +62,15 @@ my $languagevars = {
    },
   'responses' => { 
     'DefaultError' => "Sorry but something seems not to work as expected",
+    'NoValidData' => "Sorry but the received data is not sufficient to derive any action",
+    'NoDeviceFound' => "Sorry but I could not find a matching device",
+    'NoMappingFound' => "Sorry but I could not find a suitable mapping",
+    'NoNewValDerived' => "Sorry but I could not calculate a new value to set",
     'NoActiveMediaDevice' => "Sorry no active playback device",
     'DefaultConfirmation' => "OK",
+    'DefaultConfirmationTimeout' => "Sorry too late to confirm",
+    'DefaultCancelConfir' => "Thanks aborted",
+    'DefaultConfirReceived' => "ok will do it",
     'timerSet'   => 'Timer in room $room has been set to $value $unit',
     'timerEnd'   => 'Timer expired',
     'timerEndwRoom' => 'Timer in room $room expired',
@@ -622,33 +630,59 @@ a) nicht rechtzeitig eine Rückmeldung => Abbruch und Dialog beenden
 b) eine Cancel-Anweisung => Abbruch und Dialog beenden
 c) eine Bestätigung => Ausführen des geparkten Befehls, Dialog beenden
 
-
+Probleme: sessionId ist möglicherweise nicht mehr gültig!
 =cut
 
 sub RHASSPY_sleep {
     my $hash   = shift // return;
     my $mode   = shift; #undef => timeout, 1 => cancellation, 
-                        #2 => set timer, 3 => execution?
-    my $data   = shift;
+                        #2 => set timer
+    my $data   = shift // $hash->{helper}{'.delayed'};
     
+    my $response;
     #timeout Case
     if (!defined $mode) {
         RemoveInternalTimer($hash);
-        
+        $response = $hash->{helper}{lng}->{responses}->{DefaultConfirmationTimeout};
+        RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
+        delete $hash->{helper}{'.delayed'};
         return;
     }
 
     #cancellation Case
     if ( $mode == 1 ) {
         RemoveInternalTimer($hash);
+        $response = $hash->{helper}{lng}->{responses}->{DefaultCancelConfir};
+        RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
+        delete $hash->{helper}{'.delayed'};
+        return $hash->{NAME};
+    }
+    if ( $mode == 2 ) {
+        RemoveInternalTimer($hash);
+        $hash->{helper}{'.delayed'} = $data;
+        $response = $hash->{helper}{shortcuts}{$data->{input}}{conf_req};
+        $response = $hash->{helper}{lng}->{responses}->{DefaultConfirReceived} if $response eq 'default';
         
-        return;
+        InternalTimer(time + $hash->{helper}{shortcuts}{$data->{input}}{conf_timeout}, \&RHASSPY_sleep, $hash, 0);
+
+        RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
+
+        return $hash->{NAME};
     }
     
-    return if $mode != 2;
-    
-    
     return $hash->{NAME};
+}
+
+sub RHASSPY_handleIntentConfirmation {
+    my $hash = shift // return;
+    my $data = shift // return;
+    
+    RemoveInternalTimer($hash);
+    my $data2 = $hash->{helper}{'.delayed'};
+    delete $hash->{helper}{'.delayed'};
+    
+    #Beta-User: most likely we will have to change some fields in $data2 to content from $data
+    return RHASSPY_handleIntentShortcuts($hash,$data2,1);
 }
 
 #from https://stackoverflow.com/a/43873983, modified...
@@ -1746,6 +1780,7 @@ sub RHASSPY_handleIntentSetMute {
 sub RHASSPY_handleIntentShortcuts {
     my $hash = shift // return;
     my $data = shift // return;
+    my $cfdd = shift // 0;
     
     my $shortcut = $hash->{helper}{shortcuts}{$data->{input}};
     Log3($hash->{NAME}, 5, "handleIntentShortcuts called with $data->{input} key");
@@ -1888,17 +1923,8 @@ sub RHASSPY_handleIntentSetNumeric {
     Log3($hash->{NAME}, 5, "handleIntentSetNumeric called");
 
     # Mindestens Device und Value angegeben -> Valid (z.B. Deckenlampe auf 20%)
-=pod
-    $validData = 1 if (exists($data->{Device}) && exists($data->{Value}));
-    # Mindestens Device und Change angegeben -> Valid (z.B. Radio lauter)
-    $validData = 1 if (exists($data->{Device}) && exists($data->{Change}));
-    # Nur Change für Lautstärke angegeben -> Valid (z.B. lauter)
-    $validData = 1 if (!exists $data->{Device} && defined $data->{Change} && $data->{Change} =~ m/^(lauter|leiser)$/i);
-    
-    # Nur Type = Lautstärke und Value angegeben -> Valid (z.B. Lautstärke auf 10)
-    $validData = 1 if (!exists $data->{Device} && defined $data->{Type} && $data->{Type} =~ m/^Lautstärke$/i && exists($data->{Value}));
-=cut
     $validData = 1 if exists $data->{Device} && ( exists $data->{Value} || exists $data->{Change}) #);
+
     # Mindestens Device und Change angegeben -> Valid (z.B. Radio lauter)
     #|| exists $data->{Device} && exists $data->{Change}
     # Nur Change für Lautstärke angegeben -> Valid (z.B. lauter)
@@ -1914,121 +1940,122 @@ sub RHASSPY_handleIntentSetNumeric {
     #m{\A$hash->{helper}{lng}->{Change}->{regex}->{volume}\z}xim;
     || !exists $data->{Device} && defined $data->{Type} && exists $data->{Value} && ( $data->{Type} eq 'volume' || $data->{Type} eq 'Lautstärke' );
 
-    if ($validData) {
-        $unit = $data->{Unit};
-                              
-                                
-        $change = $data->{Change};
-        $type = $data->{Type}
-                // $internal_mappings->{Change}->{$change}->{Type} 
-                // $internal_mappings->{Change}->{$de_mappings->{ToEn}->{$change}}->{Type};
-        $value = $data->{Value};
-        $room = RHASSPY_roomName($hash, $data);
+    if (!$validData) {
+        return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoValidData'));
+    
+    }
+    
+    $unit   = $data->{Unit};
+    $change = $data->{Change};
+    $type   = $data->{Type}
+            # Type not defined? try to derive from Type (en and de)
+            // $internal_mappings->{Change}->{$change}->{Type} 
+            // $internal_mappings->{Change}->{$de_mappings->{ToEn}->{$change}}->{Type};
+    $value  = $data->{Value};
+    $room   = RHASSPY_roomName($hash, $data);
 
-        # Type nicht belegt -> versuchen Type über change Value zu bestimmen
-=pod
-        if (!defined $type && defined $change) {
-            #$type = $hash->{helper}{lng}->{regex}->{$change};
-            $type = $internal_mappings->{changeType}->{$change} // $de_mappings->{ToEn}->{$change} ;
-            #if    ($change =~ m/^(kälter|wärmer)$/)  { $type = "Temperatur"; }
-            #elsif ($change =~ m/^(dunkler|heller)$/) { $type = "Helligkeit"; }
-            #elsif ($change =~ m/^(lauter|leiser)$/)  { $type = "Lautstärke"; }
-        }
-=cut
-        # Gerät über Name suchen, oder falls über Lautstärke ohne Device getriggert wurde das ActiveMediaDevice suchen
-        if ( exists $data->{Device} ) {
-            $device = RHASSPY_getDeviceByName($hash, $room, $data->{Device});
-        #} elsif (defined($type) && $type =~ m/^Lautstärke$/i) {
-        #} elsif (defined $type && $type =~ m{\A$hash->{helper}{lng}->{Change}->{Types}->{volume}\z}xi) {
-        } elsif ( defined $type && ( $type eq 'volume' || $type eq 'Lautstärke' ) ) {
-            $device = RHASSPY_getActiveDeviceForIntentAndType($hash, $room, 'SetNumeric', $type);
-            $response = RHASSPY_getResponse($hash, 'NoActiveMediaDevice') if !defined $device;
-        }
-
-        if ( defined $device ) {
-            $mapping = RHASSPY_getMapping($hash, $device, 'SetNumeric', $type);
-
-            # Mapping und Gerät gefunden -> Befehl ausführen
-            if (defined $mapping  && defined $mapping->{cmd}) {
-                my $cmd     = $mapping->{cmd};
-                my $part    = $mapping->{part};
-                #my $minVal  = (defined($mapping->{minVal})) ? $mapping->{minVal} : 0; # Rhasspy kann keine negativen Nummern bisher, daher erzwungener minVal
-                my $minVal  = $mapping->{minVal} // 0; # Rhasspy kann keine negativen Nummern bisher, daher erzwungener minVal
-                my $maxVal  = $mapping->{maxVal}; # // 100; #Beta-User: might help to avoid uninitialized value in calculation ("line 1947"...
-
-                my $diff    = $value // $mapping->{step} // 10;
-
-                #my $up      = (defined($change) && ($change =~ m/^(höher|heller|lauter|wärmer)$/)) ? 1 : 0;
-
-                #my $up      = (defined $change && $change =~ m{\A$hash->{helper}{lng}->{regex}->{upward}\z}xi) ? 1 : 0;
-                my $up = $change;
-                $up    = $internal_mappings->{Change}->{$change}->{up} 
-                      // $internal_mappings->{Change}->{$de_mappings->{ToEn}->{$change}}->{up}
-                      // ($change =~ m{\A$internal_mappings->{regex}->{upward}\z}xi || $change =~ m{\A$de_mappings->{regex}->{upward}\z}xi ) ? 1 
-                       : 0;
-=pod
-                my $up = !defined $change ? undef 
-                       : $change eq 'up' ? 1 
-                       : $change eq 'down' ? 0 
-                       : ($change =~ m{\A$internal_mappings->{regex}->{upward}\z}xi || $change =~ m{\A$de_mappings->{regex}->{upward}\z}xi ) ? 1 
-                       : 0;
-=cut
-                my $forcePercent = (defined $mapping->{map} && lc($mapping->{map}) eq 'percent') ? 1 : 0;
-
-                # Alten Wert bestimmen
-                my $oldVal  = RHASSPY_getValue($hash, $device, $mapping->{currentVal});
-                if (defined $part) {
-                    my @tokens = split(m{ }x, $oldVal);
-                    $oldVal = $tokens[$part] if (@tokens >= $part);
-                }
-
-                # Neuen Wert bestimmen
-                my $newVal;
-                my $ispct = $unit eq 'percent' || $unit eq $de_mappings->{percent} ? 1 : 0;
-                # Direkter Stellwert ("Stelle Lampe auf 50")
-                #if ($unit ne 'Prozent' && defined $value && !defined $change && !$forcePercent) {
-                if (!$ispct && defined $value && !defined $change && !$forcePercent) {
-                    $newVal = $value;
-                }
-                # Direkter Stellwert als Prozent ("Stelle Lampe auf 50 Prozent", oder "Stelle Lampe auf 50" bei forcePercent)
-                #elsif (defined $value && ( defined $unit && $unit eq 'Prozent' || $forcePercent ) && !defined $change && defined $minVal && defined $maxVal) {
-                elsif (defined $value && ( $ispct || $forcePercent ) && !defined $change && defined $minVal && defined $maxVal) {                    # Wert von Prozent in Raw-Wert umrechnen
-                    $newVal = $value;
-                    $newVal =   0 if ($newVal <   0);
-                    $newVal = 100 if ($newVal > 100);
-                    $newVal = round((($newVal * (($maxVal - $minVal) / 100)) + $minVal), 0);
-                }
-                # Stellwert um Wert x ändern ("Mache Lampe um 20 heller" oder "Mache Lampe heller")
-                #elsif ((!defined $unit || $unit ne 'Prozent') && defined $change && !$forcePercent) {
-                elsif ( ( !defined $unit || !$ispct ) && defined $change && !$forcePercent) {
-                    $newVal = ($up) ? $oldVal + $diff : $oldVal - $diff;
-                    Log3($hash->{NAME}, 5, "change value to +x");
-                }
-                # Stellwert um Prozent x ändern ("Mache Lampe um 20 Prozent heller" oder "Mache Lampe um 20 heller" bei forcePercent oder "Mache Lampe heller" bei forcePercent)
-                #elsif (($unit eq 'Prozent' || $forcePercent) && defined($change)  && defined $minVal && defined $maxVal) {
-                elsif (($ispct || $forcePercent) && defined $change && defined $minVal && defined $maxVal) {
-                    $maxVal = 100 if !looks_like_number($maxVal); #Beta-User: Workaround, should be fixed in mapping (tbd)
-                    my $diffRaw = round((($diff * (($maxVal - $minVal) / 100)) + $minVal), 0);
-                    $newVal = ($up) ? $oldVal + $diffRaw : $oldVal - $diffRaw;
-                    Log3($hash->{NAME}, 5, "change value to +x percent");
-                }
-
-                if (defined $newVal) {
-                    # Begrenzung auf evtl. gesetzte min/max Werte
-                    $newVal = $minVal if defined $minVal && $newVal < $minVal;
-                    $newVal = $maxVal if defined $maxVal && $newVal > $maxVal;
-
-                    # Cmd ausführen
-                    RHASSPY_runCmd($hash, $device, $cmd, $newVal);
-                    
-                    # Antwort festlegen
-                    defined $mapping->{response} 
-                        ? $response = RHASSPY_getValue($hash, $device, $mapping->{response}, $newVal, $room) 
-                        : $response = RHASSPY_getResponse($hash, 'DefaultConfirmation'); 
-                }
-            }
+    # Gerät über Name suchen, oder falls über Lautstärke ohne Device getriggert wurde das ActiveMediaDevice suchen
+    if ( exists $data->{Device} ) {
+        $device = RHASSPY_getDeviceByName($hash, $room, $data->{Device});
+    } elsif ( defined $type && ( $type eq 'volume' || $type eq 'Lautstärke' ) ) {
+        $device = RHASSPY_getActiveDeviceForIntentAndType($hash, $room, 'SetNumeric', $type);
+        if (!defined $device) {
+            $response = RHASSPY_getResponse($hash, 'NoActiveMediaDevice');
+            return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
         }
     }
+
+    if ( !defined $device ) {
+        return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoDeviceFound'));
+    }
+    
+    $mapping = RHASSPY_getMapping($hash, $device, 'SetNumeric', $type);
+
+    # Mapping und Gerät gefunden -> Befehl ausführen
+    if (!defined $mapping || !defined $mapping->{cmd}) {
+        return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoMappingFound'));
+    }
+    my $cmd     = $mapping->{cmd};
+    my $part    = $mapping->{part};
+    my $minVal  = $mapping->{minVal};#  // 0;
+    my $maxVal  = $mapping->{maxVal};# // 100;
+    
+    $minVal     =   0 if defined $minVal && !looks_like_number($minVal);
+    $maxVal     = 100 if defined $maxVal && !looks_like_number($maxVal);
+    my $checkMinMax = defined $minVal && defined $maxVal ? 1 : 0;
+
+    my $diff    = $value // $mapping->{step} // 10;
+
+    #my $up      = (defined($change) && ($change =~ m/^(höher|heller|lauter|wärmer)$/)) ? 1 : 0;
+    my $up = $change;
+    $up    = $internal_mappings->{Change}->{$change}->{up} 
+          // $internal_mappings->{Change}->{$de_mappings->{ToEn}->{$change}}->{up}
+          // ($change =~ m{\A$internal_mappings->{regex}->{upward}\z}xi || $change =~ m{\A$de_mappings->{regex}->{upward}\z}xi ) ? 1 
+           : 0;
+
+    my $forcePercent = (defined $mapping->{map} && lc($mapping->{map}) eq 'percent') ? 1 : 0;
+
+    # Alten Wert bestimmen
+    my $oldVal  = RHASSPY_getValue($hash, $device, $mapping->{currentVal});
+
+    if (defined $part) {
+        my @tokens = split(m{ }x, $oldVal);
+        $oldVal = $tokens[$part] if (@tokens >= $part);
+    }
+
+    # Neuen Wert bestimmen
+    my $newVal;
+    my $ispct = $unit eq 'percent' || $unit eq $de_mappings->{percent} ? 1 : 0;
+    
+    if (!defined $change) {
+        # Direkter Stellwert ("Stelle Lampe auf 50")
+        #if ($unit ne 'Prozent' && defined $value && !defined $change && !$forcePercent) {
+        if (defined $value &&!$ispct && !$forcePercent) {
+            $newVal = $value;
+        } 
+        elsif (defined $value && ( $ispct || $forcePercent ) && $checkMinMax) { 
+        # Direkter Stellwert als Prozent ("Stelle Lampe auf 50 Prozent", oder "Stelle Lampe auf 50" bei forcePercent)
+        #elsif (defined $value && ( defined $unit && $unit eq 'Prozent' || $forcePercent ) && !defined $change && defined $minVal && defined $maxVal) {
+
+        # Wert von Prozent in Raw-Wert umrechnen
+            $newVal = $value;
+            #$newVal =   0 if ($newVal <   0);
+            #$newVal = 100 if ($newVal > 100);
+            $newVal = round((($newVal * (($maxVal - $minVal) / 100)) + $minVal), 0);
+        }
+    } else { # defined $change
+        # Stellwert um Wert x ändern ("Mache Lampe um 20 heller" oder "Mache Lampe heller")
+        #elsif ((!defined $unit || $unit ne 'Prozent') && defined $change && !$forcePercent) {
+        if ( ( !defined $unit || !$ispct ) && !$forcePercent) {
+            $newVal = ($up) ? $oldVal + $diff : $oldVal - $diff;
+        }
+        # Stellwert um Prozent x ändern ("Mache Lampe um 20 Prozent heller" oder "Mache Lampe um 20 heller" bei forcePercent oder "Mache Lampe heller" bei forcePercent)
+        #elsif (($unit eq 'Prozent' || $forcePercent) && defined($change)  && defined $minVal && defined $maxVal) {
+        elsif (($ispct || $forcePercent) && $checkMinMax) {
+            #$maxVal = 100 if !looks_like_number($maxVal); #Beta-User: Workaround, should be fixed in mapping (tbd)
+            #my $diffRaw = round((($diff * (($maxVal - $minVal) / 100)) + $minVal), 0);
+            my $diffRaw = round(($diff * ($maxVal - $minVal) / 100), 0);
+            $newVal = ($up) ? $oldVal + $diffRaw : $oldVal - $diffRaw;
+            $newVal = max( $minVal, min( $maxVal, $newVal ) );
+        }
+    }
+
+    if (!defined $newVal) {
+        return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoNewValDerived'));
+    }
+    
+    # Begrenzung auf evtl. gesetzte min/max Werte
+    $newVal = $minVal if defined $minVal && $newVal < $minVal;
+    $newVal = $maxVal if defined $maxVal && $newVal > $maxVal;
+
+    # Cmd ausführen
+    RHASSPY_runCmd($hash, $device, $cmd, $newVal);
+    
+    # Antwort festlegen
+    defined $mapping->{response} 
+        ? $response = RHASSPY_getValue($hash, $device, $mapping->{response}, $newVal, $room) 
+        : $response = RHASSPY_getResponse($hash, 'DefaultConfirmation'); 
+    
     # Antwort senden
     $response = $response // RHASSPY_getResponse($hash, 'DefaultError');
     RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
