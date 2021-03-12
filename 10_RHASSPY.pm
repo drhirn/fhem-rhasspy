@@ -64,7 +64,8 @@ my $languagevars = {
     'NoActiveMediaDevice' => "Sorry no active playback device",
     'DefaultConfirmation' => "OK",
     'timerSet'   => 'Timer in room $room has been set to $value $unit',
-    'timerEnd'   => 'Timer in room $room expired',
+    'timerEnd'   => 'Timer expired',
+    'timerEndwRoom' => 'Timer in room $room expired',
     'timeRequest' => 'it is $hour o clock $min minutes',
     'weekdayRequest' => 'today it is $weekDay',
     'duration_not_understood'   => "Sorry I could not understand the desired duration",
@@ -119,14 +120,41 @@ my $internal_mappings = {
 #     'volume' => 'volume',
 #     'waterLevel' => 'water level'
 #  },
-  'changeType' => {
-    'darker' => 'brightness',
-    'brighter' => 'brightness',
-    'cooler' => 'temperature',
-    'louder' => 'volume',
-    'lower' => 'volume',
-    'warmer' => 'temperature',
-    'volume' => 'sound volume'
+#  'changeType' => {
+  'Change' => {
+    'lightUp' => { 
+      'Type' => 'brightness',
+      'up'  => '1'
+    },
+    'lightDown' => { 
+      'Type' => 'brightness',
+      'up'  => '0'
+    },
+    'tempUp' => { 
+      'Type' => 'temperature',
+      'up'  => '1'
+    },
+    'tempDown' => { 
+      'Type' => 'temperature',
+      'up'  => '0'
+    },
+    'volUp' => { 
+      'Type' => 'volume',
+      'up'  => '1'
+    },
+    'volDown' => { 
+      'Type' => 'volume',
+      'up'  => '0'
+    },
+    'setUp' => { 
+      'Type' => 'setTarget',
+      'up'  => '1'
+    },
+    'setDown' => { 
+      'Type' => 'setTarget',
+      'up'  => '0'
+    }
+#    'volume' => 'sound volume'
   },
   'regex' => {
     'upward' => '(higher|brighter|louder|rise|warmer)',
@@ -166,12 +194,12 @@ my $de_mappings = {
     'Helligkeit'       => 'brightness',
     'Sollwert'         => 'setTarget',
     'Lautstärke'       => 'volume',
-    'kälter' => 'temperature',
-    'wärmer' => 'temperature',
-    'dunkler' => 'brightness',
-    'heller' => 'brightness',
-    'lauter' => 'volume',
-    'leiser' => 'volume',
+    'kälter' => 'tempDown',
+    'wärmer' => 'tempUp',
+    'dunkler' => 'lightDown',
+    'heller' => 'lightUp',
+    'lauter' => 'volUp',
+    'leiser' => 'volDown',
 
   },
   'regex' => {
@@ -223,6 +251,7 @@ BEGIN {
     ReadingsNum
     FileRead
     trim
+    looks_like_number
   ))
 
 };
@@ -295,7 +324,7 @@ sub firstInit {
 
     return if !$init_done || !defined $IODev;
 
-    #RemoveInternalTimer($hash);
+    RemoveInternalTimer($hash);
     
     IOWrite($hash, 'subscriptions', join q{ }, @topics) if InternalVal($IODev,'TYPE',undef) eq 'MQTT2_CLIENT'; # isIODevMQTT2_CLIENT($hash);
     
@@ -374,7 +403,6 @@ sub RHASSPY_Delete {
 
 # Set Befehl aufgerufen
 sub RHASSPY_Set {
-    #my ($hash, $name, $command, @values) = @_;
     my $hash    = shift;
     my $anon    = shift;
     my $h       = shift;
@@ -401,7 +429,10 @@ sub RHASSPY_Set {
     return $dispatch->{$command}->($hash) if (ref $dispatch->{$command} eq 'CODE');
     
     $values[0] = $h->{text} if ($command eq 'speak' || $command eq 'textCommand' ) && defined $h->{text};
-    $values[1] = $h->{path} if ($command eq 'play' ) && defined $h->{path};
+    if ($command eq 'play' ) {
+        $values[0] = $h->{siteId} if defined $h->{siteId};
+        $values[1] = $h->{path}   if defined $h->{path};
+    }
 
     $dispatch = {
         speak       => \&RHASSPY_speak,
@@ -472,32 +503,40 @@ sub RHASSPY_init_shortcuts {
     my $hash    = shift // return;
     my $attrVal = shift // return;
     
-    my ($intend, $perlcommand, $device, $err );
+    my ($intent, $perlcommand, $device, $err );
     for my $line (split m{\n}x, $attrVal) {
         #old syntax
         if ($line !~ m{\A[\s]*i=}x) {
-            ($intend, $perlcommand) = split q{=}, $line, 2;
+            ($intent, $perlcommand) = split q{=}, $line, 2;
             $err = perlSyntaxCheck( $perlcommand );
             return "$err in $line" if $err && $init_done;
-            $hash->{helper}{shortcuts}{$intend}{perl} = $perlcommand;
-            $hash->{helper}{shortcuts}{$intend}{NAME} = $hash->{NAME};
+            $hash->{helper}{shortcuts}{$intent}{perl} = $perlcommand;
+            $hash->{helper}{shortcuts}{$intent}{NAME} = $hash->{NAME};
             next;
         } 
         next if !length $line;
         my($unnamed, $named) = parseParams($line); 
         #return "unnamed parameters are not supported! (line: $line)" if ($unnamed) > 1 && $init_done;
-        $intend = $named->{i};
+        $intent = $named->{i};
         if (defined($named->{f})) {
-            $hash->{helper}{shortcuts}{$intend}{fhem} = $named->{f};
+            $hash->{helper}{shortcuts}{$intent}{fhem} = $named->{f};
         } elsif (defined($named->{p})) {
             $err = perlSyntaxCheck( $perlcommand );
             return "$err in $line" if $err && $init_done;
-            $hash->{helper}{shortcuts}{$intend}{perl} = $named->{p};
+            $hash->{helper}{shortcuts}{$intent}{perl} = $named->{p};
         } elsif ($init_done) {
             return "Either a fhem or perl command have to be provided!";
         }
-        $hash->{helper}{shortcuts}{$intend}{NAME} = $named->{n} if defined($named->{n});
-        $hash->{helper}{shortcuts}{$intend}{response} = $named->{r} if defined($named->{r});
+        $hash->{helper}{shortcuts}{$intent}{NAME} = $named->{n} if defined $named->{n};
+        $hash->{helper}{shortcuts}{$intent}{response} = $named->{r} if defined $named->{r};
+        if ( defined $named->{c} ) {
+            $hash->{helper}{shortcuts}{$intent}{conf_req} = !looks_like_number($named->{c}) ? $named->{c} : 'default';
+            if (defined $named->{ct}) {
+                $hash->{helper}{shortcuts}{$intent}{conf_timeout} = looks_like_number($named->{ct}) ? $named->{ct} : 15;
+            } else {
+                $hash->{helper}{shortcuts}{$intent}{conf_timeout} = looks_like_number($named->{c}) ? $named->{c} : 15;
+            }
+        }
     }
     return;
 }
@@ -560,6 +599,56 @@ sub RHASSPY_execute {
 
     # CMD ausführen
     return AnalyzePerlCommand( $hash, $cmd );
+}
+
+=pod
+Beta-User: Vorbereitungen für eventuelle spätere Option, etwas erst nach Bestätigung auszuführen
+Ablauf: 
+
+1. in Shortcut wird ein passender intent konfiguriert, dabei kann angegeben werden:
+c:15
+oder 
+c:"Bist du dir wirklich sicher, dass die Festplatte formatiert werden soll?"
+ct:20
+
+c: nummerisch ist Zeit in Sekunden, sonst Rückfragetext
+ct: Zeit in Sekunden, wenn Rückfragetext angegeben
+
+2. wird der Shortcut ausgelöst, wird der Befehl geparkt (Noch unklar: wo und wie...) und die (default)-Rückfrage zurückgegeben. 
+Unklar: Dialog beenden?
+
+3. Es kommt 
+a) nicht rechtzeitig eine Rückmeldung => Abbruch und Dialog beenden
+b) eine Cancel-Anweisung => Abbruch und Dialog beenden
+c) eine Bestätigung => Ausführen des geparkten Befehls, Dialog beenden
+
+
+=cut
+
+sub RHASSPY_sleep {
+    my $hash   = shift // return;
+    my $mode   = shift; #undef => timeout, 1 => cancellation, 
+                        #2 => set timer, 3 => execution?
+    my $data   = shift;
+    
+    #timeout Case
+    if (!defined $mode) {
+        RemoveInternalTimer($hash);
+        
+        return;
+    }
+
+    #cancellation Case
+    if ( $mode == 1 ) {
+        RemoveInternalTimer($hash);
+        
+        return;
+    }
+    
+    return if $mode != 2;
+    
+    
+    return $hash->{NAME};
 }
 
 #from https://stackoverflow.com/a/43873983, modified...
@@ -974,8 +1063,12 @@ sub RHASSPY_getMapping { #($$$$;$)
 
             # Erstes Mapping vom passenden Intent wählen (unabhängig vom Type), dann ggf. weitersuchen ob noch ein besserer Treffer mit passendem Type kommt
             
-            if (!defined $matchedMapping || defined $type && lc($matchedMapping->{type}) ne lc($type) && lc($currentMapping{type}) eq lc($type)) {
+            if (!defined $matchedMapping 
+                || defined $type && lc($matchedMapping->{type}) ne lc($type) && lc($currentMapping{type}) eq lc($type)
+                || defined $type && $de_mappings->{ToEn}->{$matchedMapping->{type}} ne $type && $de_mappings->{ToEn}->{$currentMapping{type}} eq $type
+                ) {
                 $matchedMapping = \%currentMapping;
+                #Beta-User: könnte man ergänzen durch den match "vorne" bei Reading, kann aber sein, dass es effektiver geht, wenn wir das künftig sowieso anders machen...
 
                 Log3($hash->{NAME}, 5, "${prefix}Mapping selected: $_") if !$disableLog;
             }
@@ -1099,6 +1192,7 @@ sub RHASSPY_getValue {
 
     # Soll Reading von einem anderen Device gelesen werden?
     if ($getString =~ m{:}x) {
+        $getString =~ s{\[([^]]+)]}{$1}x; #remove brackets
         my @replace = split m{:}x, $getString;
         $device = $replace[0];
         $getString = $replace[1] // $getString;
@@ -1163,7 +1257,7 @@ sub RHASSPY_parseJSON {
             my $slotName = $slot->{slotName};
             my $slotValue;
 
-            $slotValue = $slot->{value}{value} if exists $slot->{value}{value};
+            $slotValue = $slot->{value}{value} if exists $slot->{value}{value} && $slot->{value}{value} ne '';#Beta-User: dismiss effectively empty fields
             $slotValue = $slot->{value} if exists $slot->{entity} && $slot->{entity} eq 'rhasspy/duration';
 
             $data->{$slotName} = $slotValue;
@@ -1536,26 +1630,19 @@ sub RHASSPY_ParseHttpResponse {
     my $data = shift;
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
+    my $base   = AttrVal($hash->{NAME}, 'rhasspyMaster', undef) // return;
     my $url = lc($param->{url});
 
     readingsBeginUpdate($hash);
     my $urls = { 
-        'api/train'     => 'training', 
-        'api/sentences' => 'updateSentences',
-        'api/slots'     => 'updateSlots'
+        $base.'/api/train'     => 'training', 
+        $base.'/api/sentences' => 'updateSentences',
+        $base.'/api/slots'     => 'updateSlots'
     };
+
     if ( defined $urls->{$url} ) {
         readingsBulkUpdate($hash, $urls->{$url}, $data);
-    #if (grep {/api\/train/i} $url) {
-    #    readingsBulkUpdate($hash, 'training', $data);
-    #}
-    #elsif (grep {/api\/sentences/i} $url) {
-    #    readingsBulkUpdate($hash, 'updateSentences', $data);
-    #}
-    #elsif (grep {/api\/slots/i} $url) {
-    #    readingsBulkUpdate($hash, 'updateSlots', $data);
     }
-    #elsif (grep {/api\/profile/i} $url) {
     elsif ( $url =~ m{api/profile}ix ) {
         my $ref = decode_json($data);
         my $siteIds = encode('UTF-8',$ref->{dialogue}{satellite_site_ids});
@@ -1818,7 +1905,7 @@ sub RHASSPY_handleIntentSetNumeric {
     #|| !exists $data->{Device} && defined $data->{Change} 
     #    && defined $hash->{helper}{lng}->{regex}->{$data->{Change}}
     || !exists $data->{Device} && defined $data->{Change} 
-        && (defined $internal_mappings->{changeType}->{$data->{Change}} ||defined $de_mappings->{ToEn}->{$data->{Change}})
+        && (defined $internal_mappings->{Change}->{$data->{Change}} ||defined $de_mappings->{ToEn}->{$data->{Change}})
         #$data->{Change}=  =~ m/^(lauter|leiser)$/i);
         #Beta-User: muss auf lauter/leiser begrenzt werden? Was ist mit Kleinschreibung? (Letzteres muss/kann ggf. vorher erledigt werden?
 
@@ -1829,12 +1916,17 @@ sub RHASSPY_handleIntentSetNumeric {
 
     if ($validData) {
         $unit = $data->{Unit};
-        $type = $data->{Type};
-        $value = $data->{Value};
+                              
+                                
         $change = $data->{Change};
+        $type = $data->{Type}
+                // $internal_mappings->{Change}->{$change}->{Type} 
+                // $internal_mappings->{Change}->{$de_mappings->{ToEn}->{$change}}->{Type};
+        $value = $data->{Value};
         $room = RHASSPY_roomName($hash, $data);
 
         # Type nicht belegt -> versuchen Type über change Value zu bestimmen
+=pod
         if (!defined $type && defined $change) {
             #$type = $hash->{helper}{lng}->{regex}->{$change};
             $type = $internal_mappings->{changeType}->{$change} // $de_mappings->{ToEn}->{$change} ;
@@ -1842,7 +1934,7 @@ sub RHASSPY_handleIntentSetNumeric {
             #elsif ($change =~ m/^(dunkler|heller)$/) { $type = "Helligkeit"; }
             #elsif ($change =~ m/^(lauter|leiser)$/)  { $type = "Lautstärke"; }
         }
-
+=cut
         # Gerät über Name suchen, oder falls über Lautstärke ohne Device getriggert wurde das ActiveMediaDevice suchen
         if ( exists $data->{Device} ) {
             $device = RHASSPY_getDeviceByName($hash, $room, $data->{Device});
@@ -1862,19 +1954,25 @@ sub RHASSPY_handleIntentSetNumeric {
                 my $part    = $mapping->{part};
                 #my $minVal  = (defined($mapping->{minVal})) ? $mapping->{minVal} : 0; # Rhasspy kann keine negativen Nummern bisher, daher erzwungener minVal
                 my $minVal  = $mapping->{minVal} // 0; # Rhasspy kann keine negativen Nummern bisher, daher erzwungener minVal
-                my $maxVal  = $mapping->{maxVal};
-                #my $diff    = (defined $value) ? $value : ((defined($mapping->{step})) ? $mapping->{step} : 10);
+                my $maxVal  = $mapping->{maxVal}; # // 100; #Beta-User: might help to avoid uninitialized value in calculation ("line 1947"...
 
                 my $diff    = $value // $mapping->{step} // 10;
 
                 #my $up      = (defined($change) && ($change =~ m/^(höher|heller|lauter|wärmer)$/)) ? 1 : 0;
 
                 #my $up      = (defined $change && $change =~ m{\A$hash->{helper}{lng}->{regex}->{upward}\z}xi) ? 1 : 0;
+                my $up = $change;
+                $up    = $internal_mappings->{Change}->{$change}->{up} 
+                      // $internal_mappings->{Change}->{$de_mappings->{ToEn}->{$change}}->{up}
+                      // ($change =~ m{\A$internal_mappings->{regex}->{upward}\z}xi || $change =~ m{\A$de_mappings->{regex}->{upward}\z}xi ) ? 1 
+                       : 0;
+=pod
                 my $up = !defined $change ? undef 
                        : $change eq 'up' ? 1 
                        : $change eq 'down' ? 0 
                        : ($change =~ m{\A$internal_mappings->{regex}->{upward}\z}xi || $change =~ m{\A$de_mappings->{regex}->{upward}\z}xi ) ? 1 
                        : 0;
+=cut
                 my $forcePercent = (defined $mapping->{map} && lc($mapping->{map}) eq 'percent') ? 1 : 0;
 
                 # Alten Wert bestimmen
@@ -1904,12 +2002,15 @@ sub RHASSPY_handleIntentSetNumeric {
                 #elsif ((!defined $unit || $unit ne 'Prozent') && defined $change && !$forcePercent) {
                 elsif ( ( !defined $unit || !$ispct ) && defined $change && !$forcePercent) {
                     $newVal = ($up) ? $oldVal + $diff : $oldVal - $diff;
+                    Log3($hash->{NAME}, 5, "change value to +x");
                 }
                 # Stellwert um Prozent x ändern ("Mache Lampe um 20 Prozent heller" oder "Mache Lampe um 20 heller" bei forcePercent oder "Mache Lampe heller" bei forcePercent)
                 #elsif (($unit eq 'Prozent' || $forcePercent) && defined($change)  && defined $minVal && defined $maxVal) {
-                elsif (($ispct || $forcePercent) && defined($change)  && defined $minVal && defined $maxVal) {
+                elsif (($ispct || $forcePercent) && defined $change && defined $minVal && defined $maxVal) {
+                    $maxVal = 100 if !looks_like_number($maxVal); #Beta-User: Workaround, should be fixed in mapping (tbd)
                     my $diffRaw = round((($diff * (($maxVal - $minVal) / 100)) + $minVal), 0);
                     $newVal = ($up) ? $oldVal + $diffRaw : $oldVal - $diffRaw;
+                    Log3($hash->{NAME}, 5, "change value to +x percent");
                 }
 
                 if (defined $newVal) {
@@ -1978,7 +2079,7 @@ sub RHASSPY_handleIntentGetNumeric {
               $value = $tokens[$part] if @tokens >= $part;
             }
             $value = round( ($value * ($maxVal - $minVal) / 100 + $minVal), 0) if $forcePercent;
-            my $isNumber = ::looks_like_number($value);
+            my $isNumber = looks_like_number($value);
 
             # Punkt durch Komma ersetzen in Dezimalzahlen
             $value =~ s{\.}{\,}gx if $hash->{helper}{lng}->{commaconversion};
@@ -2060,7 +2161,7 @@ sub RHASSPY_handleIntentGetNumeric {
 sub RHASSPY_handleIntentStatus {
     my $hash = shift // return;
     my $data = shift // return;
-    
+    my $device = $data->{Device} // return;
     my $response; # = RHASSPY_getResponse($hash, 'DefaultError');
 
     Log3($hash->{NAME}, 5, "handleIntentStatus called");
@@ -2068,7 +2169,7 @@ sub RHASSPY_handleIntentStatus {
     # Mindestens Device muss existieren
     if (exists $data->{Device}) {
         my $room = RHASSPY_roomName($hash, $data);
-        my $device = RHASSPY_getDeviceByName($hash, $room, $data->{Device});
+        my $device = RHASSPY_getDeviceByName($hash, $room, $device);
         my $mapping = RHASSPY_getMapping($hash, $device, 'Status', undef);
 
         if ( defined $mapping->{response} ) {
@@ -2267,8 +2368,14 @@ sub RHASSPY_handleIntentSetTimer {
     RHASSPY_fetchSiteIds($hash) if !$siteIds;
 
     my $timerRoom = $siteId;
-    $timerRoom = $room if $siteIds =~ m{\b$room\b}ix;
-    
+
+    my $responseEnd = $hash->{helper}{lng}->{responses}->{timerEndwRoom};
+
+    if ($siteIds =~ m{\b$room\b}ix) {
+        $timerRoom = $room if $siteIds =~ m{\b$room\b}ix;
+        $responseEnd = $hash->{helper}{lng}->{responses}->{timerEnd};
+    }
+
     if( $value && $unit && $timerRoom ) {
         my $time = $value;
         my $roomReading = "timer_".makeReadingName($room);
@@ -2278,11 +2385,9 @@ sub RHASSPY_handleIntentSetTimer {
         
         $time = strftime('%H:%M:%S', gmtime $time);
         
-        $response = $hash->{helper}{lng}->{responses}->{timerEnd};
-        #eval { $response =~ s{(\$\w+)}{$1}eegx; };
-        $response =~ s{(\$\w+)}{$1}eegx;
+        $responseEnd =~ s{(\$\w+)}{$1}eegx;
 
-        my $cmd = qq(defmod $roomReading at +$time set $name speak siteId=\"$timerRoom\" text=\"$response\";;setreading $name $roomReading 0);
+        my $cmd = qq(defmod $roomReading at +$time set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";;setreading $name $roomReading 0);
         
         RHASSPY_runCmd($hash,'',$cmd);
 
@@ -2291,7 +2396,6 @@ sub RHASSPY_handleIntentSetTimer {
         Log3($name, 5, "Created timer: $cmd");
         
         $response = $hash->{helper}{lng}->{responses}->{timerSet};
-        #eval { $response =~ s{(\$\w+)}{$1}eegx; };
         $response =~ s{(\$\w+)}{$1}eegx;
     }
 
@@ -2542,16 +2646,17 @@ hermes/dialogueManager/sessionEnded</code></pre></p>
 <p><b>ToDo</b></p>
 <ul>
 <li>Zeile 1571 u. 1572 (<code>my @params = map { $data->{$_} } @paramNames; my $params = join q{,}, @params;</code>)<br><code>PERL WARNING: Hexadecimal number > 0xffffffff non-portable at (eval 931) line 1</code>#Beta-User: solved by code refactoring?</li>
-<li>Response-Mappings werden nicht gesprochen</li>
-<li>playWav: <code>PERL WARNING: Use of uninitialized value within @values in join or string at ./FHEM/10_RHASSPY.pm line 414.</code> #Beta-User: strange behaviour, as code should return in case no arg is provided... pls. provide typical call of this function</li>
-<li>SetNumeric/SetColor don't change readings of FHEM-Device (&quote;longpoll&quote;) #Beta-User: solved by returning $device?</li>
-<li>Status doesn't do anything (as expected right now) #Beta-User: intented behaviour?</li>
+<li><s>Response-Mappings werden nicht gesprochen</s></li>
+<li>playWav: <code>PERL WARNING: Use of uninitialized value within @values in join or string at ./FHEM/10_RHASSPY.pm line 414.</code> #Beta-User: strange behaviour, as code should return in case no arg is provided... pls. provide typical call of this function<br><code>set Rhasspy play siteId="wohnzimmer" path="/opt/fhem/test.wav"</code></li>
+<li><s>SetNumeric/SetColor don't change readings of FHEM-Device (&quote;longpoll&quote;) #Beta-User: solved by returning $device?</s></li>
+<li><s>Status doesn't do anything (as expected right now) #Beta-User: intented behaviour? ##drhirn: Should return freely chosen information of a device. E.g. <code>Status:response="Temperatur ist [Thermo:temp] Grad bei [Thermo:hum] Prozent Luftfeuchtigkeit"</code> or <code>Status:response={my $value=ReadingsVal("device","reading",""); return "Der Wert beträgt $value";}</code></s></li>
 <li>MediaChannels doesn't execute command #Beta-User: solved by splitting Channel mapping in keyword/command?</li>
 <li><s>SetTimer: $hash->{siteIds} leer beim Start von FHEM: <code>PERL WARNING: Use of uninitialized value in split at ./FHEM/10_RHASSPY.pm line 2194.</code></s></li>
 <li>Dialogue Session wird nicht beendet, wenn SetMute = 1; Reading listening_$roomReading wird nicht 0. Weil das in onmessage nicht zurück gesetzt wird.</li>
-<li>Shortcuts always returning Default-Error but commands are executed. #Beta-User: solved by changing default in line 1630 to DefaultConfirmation?</li>
+<li><s>Shortcuts always returning Default-Error but commands are executed. #Beta-User: solved by changing default in line 1630 to DefaultConfirmation?</s></li>
 <li>Add Shortcuts to README (<a href="https://forum.fhem.de/index.php/topic,118926.msg1136115.html#msg1136115">https://forum.fhem.de/index.php/topic,118926.msg1136115.html#msg1136115</a>) (drhirn)</li>
 <li>Shortcuts: &quot;Longpoll&quot; only works when &quot;n&quot; is given. Perl-Code only works when &quot;n&quot; is given when using $NAME in Perl-code.</li>
+<li>getValue doesn't work with device/reading (e.g. [lampe1:volume])</li>
 </ul>
 
 =end html
