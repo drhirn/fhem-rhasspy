@@ -2674,16 +2674,16 @@ hermes/dialogueManager/sessionEnded</code></pre></p>
 <ul>
 <li>Zeile 1571 u. 1572 (<code>my @params = map { $data->{$_} } @paramNames; my $params = join q{,}, @params;</code>)<br><code>PERL WARNING: Hexadecimal number > 0xffffffff non-portable at (eval 931) line 1</code>#Beta-User: solved by code refactoring?</li>
 <li><s>Response-Mappings werden nicht gesprochen</s></li>
-<li>playWav: <code>PERL WARNING: Use of uninitialized value within @values in join or string at ./FHEM/10_RHASSPY.pm line 414.</code> #Beta-User: strange behaviour, as code should return in case no arg is provided... pls. provide typical call of this function<br><code>set Rhasspy play siteId="wohnzimmer" path="/opt/fhem/test.wav"</code></li>
+<li><s>playWav: <code>PERL WARNING: Use of uninitialized value within @values in join or string at ./FHEM/10_RHASSPY.pm line 414.</code> #Beta-User: strange behaviour, as code should return in case no arg is provided... pls. provide typical call of this function<br><code>set Rhasspy play siteId="wohnzimmer" path="/opt/fhem/test.wav"</code></s></li>
 <li><s>SetNumeric/SetColor don't change readings of FHEM-Device (&quote;longpoll&quote;) #Beta-User: solved by returning $device?</s></li>
 <li><s>Status doesn't do anything (as expected right now) #Beta-User: intented behaviour? ##drhirn: Should return freely chosen information of a device. E.g. <code>Status:response="Temperatur ist [Thermo:temp] Grad bei [Thermo:hum] Prozent Luftfeuchtigkeit"</code> or <code>Status:response={my $value=ReadingsVal("device","reading",""); return "Der Wert beträgt $value";}</code></s></li>
-<li>MediaChannels doesn't execute command #Beta-User: solved by splitting Channel mapping in keyword/command?</li>
+<li><s>MediaChannels doesn't execute command #Beta-User: solved by splitting Channel mapping in keyword/command?</s></li>
 <li><s>SetTimer: $hash->{siteIds} leer beim Start von FHEM: <code>PERL WARNING: Use of uninitialized value in split at ./FHEM/10_RHASSPY.pm line 2194.</code></s></li>
 <li>Dialogue Session wird nicht beendet, wenn SetMute = 1; Reading listening_$roomReading wird nicht 0. Weil das in onmessage nicht zurück gesetzt wird.</li>
 <li><s>Shortcuts always returning Default-Error but commands are executed. #Beta-User: solved by changing default in line 1630 to DefaultConfirmation?</s></li>
 <li>Add Shortcuts to README (<a href="https://forum.fhem.de/index.php/topic,118926.msg1136115.html#msg1136115">https://forum.fhem.de/index.php/topic,118926.msg1136115.html#msg1136115</a>) (drhirn)</li>
 <li>Shortcuts: &quot;Longpoll&quot; only works when &quot;n&quot; is given. Perl-Code only works when &quot;n&quot; is given when using $NAME in Perl-code.</li>
-<li>getValue doesn't work with device/reading (e.g. [lampe1:volume])</li>
+<li><s>getValue doesn't work with device/reading (e.g. [lampe1:volume])</s></li>
 </ul>
 
 =end html
