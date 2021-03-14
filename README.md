@@ -79,14 +79,26 @@ Example:
 ````define Rhasspy RHASSPY devspec=room=Rhasspy,room=Music,Light1 defaultRoom=livingroom language=en````
 
 ### Set-Commands (SET)
+* **fetchSiteIds**\
+  Fetch all available siteIds from Rhasspy-Base and create a reading _siteIds_. Used for e.g. to determine on which Rhasspy satellite the user gets informed that a timer has ended.\
+  Has to be executed everytime a new satellite is installed or a new siteId is added to Rhasspy.
+  Example: `set <rhasspyDevice> fetchSiteIds`
 * **play**\
   Send a WAV file to Rhasspy.\
   Both arguments (siteId and path) are required!\
   Example: `set <rhasspyDevice> play siteId="default" path="/opt/fhem/test.wav"`
 * **reinit**\
-  Reinitialization of language file.\
-  Be sure to execute this command after changing something in the language-configuration files or the attribut `configFile`!\
-  Example: `set <rhasspyDevice> reinit language`
+  * **language**\
+    Reinitialization of language file.\
+    Be sure to execute this command after changing something in the language-configuration files or the attribut `configFile`!\
+    Example: `set <rhasspyDevice> reinit language`
+  * **devicemap**\
+    Reinitialization of device controlled by this module.\
+	Has to be executed after changes to the attributes of a Rhasspy-controlled devices.\
+	Example: `set <rhasspyDevice> reinit devicemap`
+  * **all**\
+    Reinitialization of language file and devicemap.\
+	Example: `set <rhasspyDevice> reinit all`
 * **speak**\
   Voice output over TTS.\
   Both arguments (siteId and text) are required!\
@@ -154,8 +166,25 @@ Example:
   Changes to 1 if a wake-word was recognized and back to 0 if the Rhasspy-session has ended.\
   There is one reading for every single satellite/master.\
   Can for example be used to mute speakers while Rhasspy is listening to commands.
+* **responseType**\
+  Shows the type of the last response.\
+  Possible values are `text` or `voice`.
 * **voiceResponse** and **textResponse**\
   Response to the last voice- or text-command.
+* **mute_*roomname***\
+  Shows if a room/siteId is muted and doesn't execute any commands.\
+  There is one reading for every siteId.\
+  Default is 0.
+* **siteIds**\
+  Reading contains every available siteId.\
+  Can be updated with running `fetchSiteIds`.
+* **training**\
+  Contains the last response of the `trainRhasspy` command.
+* **updateSentences**\
+  Contains the last response ot the `updateSlots` command.`
+* **updateSlots**\
+  Contains the last response ot the `updateSlots` command.`
+
 
 ## Additionals remarks on MQTT2-IOs
 Using a separate MQTT server (and not the internal MQTT2_SERVER) is highly recommended, as the Rhasspy scripts also use the MQTT protocol for internal (sound!) data transfers. Best way is to either use MQTT2_CLIENT (see below) or bridge only the relevant topics from mosquitto to MQTT2_SERVER (see e.g. http://www.steves-internet-guide.com/mosquitto-bridge-configuration/ for the principles). When using MQTT2_CLIENT, it's necessary to set `clientOrder` to include RHASSPY (as most likely, it's the only module listening to the CLIENT). It could be just set to `attr <m2client> clientOrder RHASSPY`\
@@ -293,9 +322,9 @@ Intent to dim, change volume, set temperature, ...
 Example-Mappings:
 ```
 SetNumeric:currentVal=pct,cmd=dim,minVal=0,maxVal=99,step=25
-SetNumeric:currentVal=brightness,minVal=0,maxVal=255,map=percent,cmd=brightness,step=1,type=Helligkeit
 SetNumeric:currentVal=volume,cmd=volume,minVal=0,maxVal=99,step=10,type=Lautstärke
 ```
+<!--SetNumeric:currentVal=brightness,minVal=0,maxVal=255,map=percent,cmd=brightness,step=1,type=Helligkeit-->
 
 Options:
   * **currentVal** Reading which contains the acual value.
@@ -304,22 +333,22 @@ Options:
   * **minVal** Lowest possible value
   * **maxVal** Highest possible value
   * **step** Step-size for changes (e.g. *turn the volume up*)
-  * **map** Currently only one possible value: percent. See below.
-  * **type** To differentiate between multiple possible SetNumeric-Intents for the same device. Currently supports only the german hard-coded values **Helligkeit**, **Temperatur**, **Sollwert**, **Lautstärke**, **Luftfeuchtigkeit**, **Batterie**, **Wasserstand**
+<!--  * **map** Currently only one possible value: percent. See below.-->
+  * **type** To differentiate between multiple possible SetNumeric-Intents for the same device. Currently supports only the following hard-coded values **brightness**, **temperature**, **setTarget**, **volume**, **airHumidity**, **battery**, **waterLevel**, **soilMoisture**
 
-Explanation for `map=percent`:\
+<!--Explanation for `map=percent`:\
 If this option is set, all numeric control values are taken as percentage between *minVal* and *maxVal*.\
-If there is a light-device with the setting *minVal=0* and *maxVal=255*, then "turn the light to 50" means the same as "turn the light to 50 percent". The light is then set to 127 instead of 50.
+If there is a light-device with the setting *minVal=0* and *maxVal=255*, then "turn the light to 50" means the same as "turn the light to 50 percent". The light is then set to 127 instead of 50.-->
 
-Specifics with `type=Lautstärke`:\
-To use the commands *lauter* or *leiser* without the need to speak a device-name, the module has to now which device is currently playing. Thus it uses the *GetOnOff-Mappings* to search a turned on device with `type=Lautstärke`. First it searches in the actual *rhasspyRoom* (the *siteId* or - if missing - the default rhasspyRoom), next in all other *rhasspyRoom*s.\
+Specifics with `type=volume`:\
+To use the commands *louder* or *lower* without the need to speak a device-name, the module has to now which device is currently playing. Thus it uses the *GetOnOff-Mappings* to search a turned on device with `type=volume`. First it searches in the actual *rhasspyRoom* (the *siteId* or - if missing - the default rhasspyRoom), next in all other *rhasspyRoom*s.\
 That's why it's advisable to also set a *GetOnOff*-Mapping if using a *SetNumeric*-Mapping.
 
 Example-sentences:
 ```
-Stelle die Deckenlampe auf 30 Prozent
-Mach das Radio leiser
-Stelle die Heizung im Büro um 2 Grad wärmer Lauter
+Set to light to 30 percent
+Turn the radio down
+Set the temperature in the living room 2 degree warmer
 ```
 
 Example-Rhasspy-Sentences:
