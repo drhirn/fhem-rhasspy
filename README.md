@@ -398,8 +398,7 @@ Intent to get specific information of a device. The respone can be defined.
 
 Example-Mappings:
 ```
-Status:response="Temperature is [Thermo:temp] degree ati [Thermo:hum] percent humidity"
-Status:response={my $value=ReadingsVal("device","reading",""); return "The value is $value";}
+Status:response="Temperature is [Thermo:temp] degree at [Thermo:hum] percent humidity"
 Status:response={my $value=ReadingsVal("$DEVICE","brightness",""); return "Brightness is $value";}
 ```
 
@@ -429,7 +428,7 @@ Intent to control media devices
 
 Example-Mapping:
 ```
-MediaControls:cmdPlay=play,cmdPause=pause,cmdStop=stop
+MediaControls:cmdPlay=play,cmdPause=pause,cmdStop=stop,cmdBack=previous,cmdFwd=next
 ```
 
 Options:
@@ -455,11 +454,11 @@ previous
 Example-Rhasspy-Sentences:
 ````
 [de.fhem:MediaControls]
-(start){Command:play} the playback [$de.fhem.Device{Device}]
-(stop){Command:stop} the playback [$de.fhem.Device{Device}]
-(pause){Command:pause} the playback [$de.fhem.Device{Device}]
-(next){Command:next} (song|title) [$de.fhem.Device{Device}]
-(previous){Command:previous} (song|title) [$de.fhem.Device{Device}] [$de.fhem.Room{Room}]
+(start){Command:cmdPlay} the playback [$de.fhem.Device{Device}]
+(stop){Command:cmdStop} the playback [$de.fhem.Device{Device}]
+(pause){Command:cmdPause} the playback [$de.fhem.Device{Device}]
+(next){Command:Fwd} (song|title) [$de.fhem.Device{Device}]
+(previous){Command:Back} (song|title) [$de.fhem.Device{Device}] [$de.fhem.Room{Room}]
 ````
 
 ### MediaChannels
@@ -538,7 +537,7 @@ color the light in the sleeping room white
 
 Example-Rhasspy-Sentences:
 ```
-[de.fhem:SetColor]
+[en.fhem:SetColor]
 \[change|color] $de.fhem.Device{Device} [$de.fhem.Room{Room}] $de.fhem.Color{Color}
 ```
 
@@ -546,19 +545,18 @@ Example-Rhasspy-Sentences:
 
 Intent to let Rhasspy speak the actual time.
 
-German only. No FHEM-settings needed.
+No FHEM-settings needed.
 
 Example-Sentences:
 ```
-wie spät ist es
-sag mir die uhrzeit
+what is the time
+tell me the time
 ```
 
 Example-Rhasspy-Sentences:
 ```
-[de.fhem:GetTime]
-wie spät ist es
-sag mir die uhrzeit
+[en.fhem:GetTime]
+(what is|tell me) the time
 ```
 
 ### GetWeekDay
