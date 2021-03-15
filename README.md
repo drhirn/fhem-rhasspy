@@ -288,7 +288,8 @@ Example-Spoken-Sentences:
  Example-Rhasspy-Sentences:
  ```
  [de.fhem:SetOnOff]
- (turn on|turn off|open|close|start|stop) $de.fhem.Device{Device} [$de.fhem.Room{Room}]
+ (turn on|open|start){Value:on) $de.fhem.Device{Device} [$de.fhem.Room{Room}]
+ (turn off|close|stop){Value:off} $de.fhem.Device{Device} [$de.fhem.Room{Room}]
  ```
  
 ### GetOnOff
@@ -312,7 +313,7 @@ Example-Sentences:
 Example-Rhasspy-Sentences:
 ```
 [de.fhem:GetOnOff]
-(is) $de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched on|switched off|running|stopped|opened|closed){Status}
+(is) $de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched on|running|opened){Status}
 ```
 
 ### SetNumeric
@@ -609,7 +610,7 @@ Be sure to make the unit optional! Else there is always a random "unit" added to
 
 Intent to disable/enable the processing of intents on a specific siteId. Rhasspy will still listen to the wakeword but will not process any intents.
 
-This intents creates a Reading __mute_siteId__ vor every siteId it get's a voice-command from.
+This intents creates a Reading __mute_siteId__ for every siteId it get's a voice-command from.
 
 No FHEM-settings needed
 

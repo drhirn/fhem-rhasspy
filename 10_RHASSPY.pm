@@ -1880,20 +1880,12 @@ return Log3('rhasspy',3 , "RHASSPY: Raum $Raum, Typ $Typ");
 sub RHASSPY_handleIntentSetMute {
     my $hash = shift // return;
     my $data = shift // return;
-    #my $value, my $siteId;#, my $state = 0;
-    my $response;# = RHASSPY_getResponse($hash, 'DefaultError');
+    my $response;
     
     Log3($hash->{NAME}, 5, "handleIntentSetMute called");
     
     if (exists $data->{Value} && exists $data->{siteId}) {
         my $siteId = makeReadingName($data->{siteId});
-        #my $value = $data->{Value};
-        
-#        Log3($hash->{NAME}, 5, "siteId: $siteId, value: $value");
-        
-        #if ($value eq 'on') {$state = 1};
-
-        #readingsSingleUpdate($hash, "mute_$siteId", $state, 1);
         readingsSingleUpdate($hash, "mute_$siteId", $data->{Value} eq 'on' ? 1 : 0, 1);
         $response = RHASSPY_getResponse($hash, 'DefaultConfirmation');
     }
@@ -1948,17 +1940,17 @@ sub RHASSPY_handleIntentShortcuts {
     return $device;
 }
 
-# Eingehende "SetOnOff" Intents bearbeiten
+# Handle incoming "SetOnOff" intents
 sub RHASSPY_handleIntentSetOnOff {
     my $hash = shift // return;
     my $data = shift // return;
     my $value, my $numericValue, my $device, my $room, my $siteId;
     my $mapping;
-    my $response; # = RHASSPY_getResponse($hash, 'DefaultError');
+    my $response;
 
     Log3($hash->{NAME}, 5, "handleIntentSetOnOff called");
 
-    # Mindestens Gerät und Wert müssen übergeben worden sein
+    # Device AND Value must exist
     if (exists $data->{Device} && exists $data->{Value}) {
         $room = RHASSPY_roomName($hash, $data);
         $value = $data->{Value};
@@ -1966,44 +1958,42 @@ sub RHASSPY_handleIntentSetOnOff {
         $device = RHASSPY_getDeviceByName($hash, $room, $data->{Device});
         $mapping = RHASSPY_getMapping($hash, $device, 'SetOnOff', undef);
 
-        # Mapping gefunden?
+        # Mapping found?
         if (defined $device && defined $mapping) {
-            my $cmdOn  = $mapping->{cmdOn} //'on';
+            my $cmdOn  = $mapping->{cmdOn} // 'on';
             my $cmdOff = $mapping->{cmdOff} // 'off';
             my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
 
-            # Cmd ausführen
+            # execute Cmd
             RHASSPY_runCmd($hash, $device, $cmd);
             Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
 
-            # Antwort bestimmen
-            #$numericValue = ($value eq 'an') ? 1 : 0;
+            # Define response
             if (defined $mapping->{response}) { 
                 $numericValue = $value eq 'on' ? 1 : 0;
-                #Log3($hash->{NAME}, 5, "numericValue is $numericValue" );
                 $response = RHASSPY_getValue($hash, $device, $mapping->{response}, $numericValue, $room); 
                 Log3($hash->{NAME}, 5, "Response is $response" );
             }
             else { $response = RHASSPY_getResponse($hash, 'DefaultConfirmation'); }
         }
     }
-    # Antwort senden
+    # Send response
     $response = $response  // RHASSPY_getResponse($hash, 'DefaultError');
     RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
     return $device;
 }
 
 
-# Eingehende "GetOnOff" Intents bearbeiten
+# Handle incomint GetOnOff intents
 sub RHASSPY_handleIntentGetOnOff {
     my $hash = shift // return;
     my $data = shift // return;
     my $device;
-    my $response;# = RHASSPY_getResponse($hash, 'DefaultError');
+    my $response;
 
     Log3($hash->{NAME}, 5, "handleIntentGetOnOff called");
 
-    # Mindestens Gerät und Status-Art wurden übergeben
+    # Device AND Status must exist
     if (exists($data->{Device}) && exists($data->{Status})) {
         my $room = RHASSPY_roomName($hash, $data);
         $device = RHASSPY_getDeviceByName($hash, $room, $data->{Device});
@@ -2011,25 +2001,23 @@ sub RHASSPY_handleIntentGetOnOff {
         my $mapping = RHASSPY_getMapping($hash, $device, 'GetOnOff', undef);
         my $status = $data->{Status};
 
-        # Mapping gefunden?
+        # Mapping found?
         if (defined $mapping) {
-            # Gerät ein- oder ausgeschaltet?
+            # Device on or off?
             my $value = RHASSPY_getOnOffState($hash, $device, $mapping);
 
-            # Antwort bestimmen
+            # Define reponse
             if    (defined $mapping->{response}) { 
                 $response = RHASSPY_getValue($hash, $device, $mapping->{response}, $value, $room); 
             }
             else {
-                #my $stateResponseType = $hash->{helper}{lng}->{stateResponseType}->{$status};
                 my $stateResponseType = $internal_mappings->{stateResponseType}->{$status} // $de_mappings->{stateResponseType}->{$status};
                 $response = $hash->{helper}{lng}->{stateResponses}{$stateResponseType}->{$value};
-                #eval { $response =~ s{(\$\w+)}{$1}eeg; };
                 $response =~ s{(\$\w+)}{$1}eegx;
             }
         }
     }
-    # Antwort senden
+    # Send response
     $response = $response // RHASSPY_getResponse($hash, 'DefaultError');
     RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
     return $device;
@@ -2194,7 +2182,6 @@ sub RHASSPY_handleIntentGetNumeric {
     my $data = shift // return;
     my $value, my $device, my $room, my $type;
     my $mapping;
-    #my $response = RHASSPY_getResponse($hash, 'DefaultError');
     my $response; 
 
     Log3($hash->{NAME}, 5, "handleIntentGetNumeric called");
@@ -2244,7 +2231,7 @@ sub RHASSPY_handleIntentGetNumeric {
     if ( defined $mapping->{response} ) { 
         return RHASSPY_getValue($hash, $device, $mapping->{response}, $value, $location);
     }
-    
+
     #elsif ($mappingType =~ m/^(Helligkeit|Lautstärke|Sollwert)$/i) { $response = $data->{Device} . " ist auf $value gestellt."; }
     #if ($mappingType =~ m{\A$hash->{helper}{lng}->{Change}->{regex}->{setTarget}\z}xim) {
     if ($mappingType eq 'setTarget' 
@@ -2253,16 +2240,16 @@ sub RHASSPY_handleIntentGetNumeric {
         $response = $hash->{helper}{lng}->{Change}->{responses}->{setTarget}; 
     }
     else {
-
         $response = 
             $hash->{helper}{lng}->{responses}->{Change}->{$mappingType} 
         //  $hash->{helper}{lng}->{responses}->{Change}->{$de_mappings->{ToEn}->{$mappingType}} 
-        //  $hash->{helper}{lng}->{responses}->{Change}->{$type} 
+        //  $hash->{helper}{lng}->{res ponses}->{Change}->{$type} 
         //  $hash->{helper}{lng}->{responses}->{Change}->{$de_mappings->{ToEn}->{$type}}; 
-        ; 
+        ;
         #my $isNumber = looks_like_number($value);
         $response = $response->{looks_like_number($value)} if ref $response eq 'HASH';
    }
+
    $response = $response            #we already are done?
         // defined $mappingType ?   #or not and at least know the type...
             $hash->{helper}{lng}->{Change}->{responses}->{knownType}
