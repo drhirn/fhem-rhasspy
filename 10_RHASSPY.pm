@@ -2346,23 +2346,21 @@ sub RHASSPY_handleIntentGetNumeric {
 
     #elsif ($mappingType =~ m/^(Helligkeit|Lautstärke|Sollwert)$/i) { $response = $data->{Device} . " ist auf $value gestellt."; }
     #if ($mappingType =~ m{\A$hash->{helper}{lng}->{Change}->{regex}->{setTarget}\z}xim) {
-    if ($mappingType eq 'setTarget' 
-            || $mappingType=~ m{\A$internal_mappings->{regex}->{setTarget}\z}xim 
-            || $mappingType=~ m{\A$de_mappings->{regex}->{setTarget}\z}xim) { 
-        $response = $hash->{helper}{lng}->{Change}->{responses}->{setTarget}; 
-    }
-    else {
-        $response = 
-            $hash->{helper}{lng}->{responses}->{Change}->{$mappingType} 
-        //  $hash->{helper}{lng}->{responses}->{Change}->{$de_mappings->{ToEn}->{$mappingType}} 
-        //  $hash->{helper}{lng}->{responses}->{Change}->{$type} 
-        //  $hash->{helper}{lng}->{responses}->{Change}->{$de_mappings->{ToEn}->{$type}}; 
+    $response =
+        $hash->{helper}{lng}->{Change}->{responses}->{$mappingType}
+        //  $hash->{helper}{lng}->{Change}->{responses}->{$de_mappings->{ToEn}->{$mappingType}}
+        //  $hash->{helper}{lng}->{Change}->{responses}->{$type}
+        //  $hash->{helper}{lng}->{Change}->{responses}->{$de_mappings->{ToEn}->{$type}};
         ;
-        #my $isNumber = looks_like_number($value);
         $response = $response->{looks_like_number($value)} if ref $response eq 'HASH';
-   }
 
-   $response = $response            #we already are done?
+    if (!defined $response && (
+            $mappingType=~ m{\A$internal_mappings->{regex}->{setTarget}\z}xim
+            || $mappingType=~ m{\A$de_mappings->{regex}->{setTarget}\z}xim)) {
+        $response = $hash->{helper}{lng}->{Change}->{responses}->{setTarget};
+    }
+
+    $response = $response            #we already are done?
         // defined $mappingType ?   #or not and at least know the type...
             $hash->{helper}{lng}->{Change}->{responses}->{knownType}
             : $hash->{helper}{lng}->{Change}->{responses}->{unknownType};
