@@ -73,8 +73,10 @@ my $languagevars = {
     'DefaultCancelConfir' => "Thanks aborted",
     'DefaultConfirReceived' => "ok will do it",
     'timerSet'   => 'Timer in room $room has been set to $value $unit',
-    'timerEnd'   => 'Timer expired',
-    'timerEndwRoom' => 'Timer in room $room expired',
+    'timerEnd'   => {
+        '0' => 'Timer expired',
+        '1' =>  'Timer in room $room expired'
+    },
     'timeRequest' => 'it is $hour o clock $min minutes',
     'weekdayRequest' => 'today it is $weekDay',
     'duration_not_understood'   => "Sorry I could not understand the desired duration",
@@ -2586,11 +2588,11 @@ sub RHASSPY_handleIntentSetTimer {
 
     my $timerRoom = $siteId;
 
-    my $responseEnd = $hash->{helper}{lng}->{responses}->{timerEndwRoom};
+    my $responseEnd = $hash->{helper}{lng}->{responses}->{timerEnd}->{1};
 
     if ($siteIds =~ m{\b$room\b}ix) {
         $timerRoom = $room if $siteIds =~ m{\b$room\b}ix;
-        $responseEnd = $hash->{helper}{lng}->{responses}->{timerEnd};
+        $responseEnd = $hash->{helper}{lng}->{responses}->{timerEnd}->{0};
     }
 
     if( $value && $unit && $timerRoom ) {
