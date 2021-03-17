@@ -1870,7 +1870,7 @@ sub RHASSPY_updateSlots {
     if (@devices || @rooms || @channels || @types ) {
       my $json;
       my $deviceData;
-      my $url = "/api/slots?overwrite_all=true";
+      my $url = '/api/slots?overwrite_all=true';
 
       $deviceData->{qq(${language}.${fhemId}.Device)}        = \@devices if @devices;
       $deviceData->{qq(${language}.${fhemId}.Room)}          = \@rooms if @rooms;
@@ -1946,9 +1946,9 @@ sub RHASSPY_ParseHttpResponse {
     
     readingsBeginUpdate($hash);
     my $urls = { 
-        $base.'/api/train'     => 'training', 
-        $base.'/api/sentences' => 'updateSentences',
-        $base.'/api/slots'     => 'updateSlots'
+        $base.'/api/train'                      => 'training',
+        $base.'/api/sentences'                  => 'updateSentences',
+        $base.'/api/slots?overwrite_all=true'   => 'updateSlots'
     };
 
     if ( defined $urls->{$url} ) {
