@@ -273,7 +273,7 @@ sub RHASSPY_Initialize {
     $hash->{SetFn}       = \&RHASSPY_Set;
     $hash->{AttrFn}      = \&RHASSPY_Attr;
     $hash->{AttrList}    = "IODev defaultRoom rhasspyIntents:textField-long shortcuts:textField-long rhasspyMaster response:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals configFile " . $readingFnAttributes;
-    $hash->{Match}       = ".*";
+    $hash->{Match}       = q{.*};
     $hash->{ParseFn}     = \&RHASSPY_Parse;
     $hash->{parseParams} = 1;
 
@@ -418,7 +418,7 @@ sub RHASSPY_Set {
     return "Unknown argument $command, choose one of " 
     . join(q{ }, map {
         @{$sets{$_}} ? $_
-                      .':'
+                      .q{:}
                       .join q{,}, @{$sets{$_}} : $_} sort keys %sets)
     if !defined $sets{$command};
 
@@ -519,7 +519,7 @@ sub RHASSPY_init_shortcuts {
     for my $line (split m{\n}x, $attrVal) {
         #old syntax
         if ($line !~ m{\A[\s]*i=}x) {
-            ($intent, $perlcommand) = split q{=}, $line, 2;
+            ($intent, $perlcommand) = split m{=}x, $line, 2;
             $err = perlSyntaxCheck( $perlcommand );
             return "$err in $line" if $err && $init_done;
             $hash->{helper}{shortcuts}{$intent}{perl} = $perlcommand;
@@ -704,6 +704,48 @@ sub _analyze_genDevType {
     my $hash   = shift // return;
     my $device = shift // return;
     
+    #prerequesite: gdt has to be set!
+    my $gdt = AttrVal($device, 'genericDeviceType', undef) // return; 
+    
+    #additional names?
+    my @names = split m{,}x, AttrVal($device,'alexaName',undef);
+    push @names, split m{,}x, AttrVal($device,'siriName',undef);
+    my $alias = AttrVal($device,'alias',undef);
+    push @names, $alias if !@names && $alias;
+    push @names, $device if !@names;
+    
+    #convert to lower case
+    for (@names) { $names[$_] = lc; }
+    
+    my @rooms = split m{,}x,AttrVal($device,'alexaRoom',undef);
+    push @rooms, split m{,}x, AttrVal($device,'room',undef);
+    $rooms[0] = $hash->{helper}{defaultRoom} if !@rooms;
+
+    #convert to lower case
+    for (@rooms) { $rooms[$_] = lc; }
+
+    for my $dn (@names) {
+       for (@rooms) {
+           $hash->{helper}{devicemap}{rhasspyRooms}{$_}{$dn} = $device;
+       }
+    }
+    
+    my $hbmap = AttrVal($device, 'homeBridgeMapping', undef); 
+    #{ getAllSets('lampe2') }
+    
+=pod    
+    attr DEVICE genericDeviceType switch
+    attr DEVICE genericDeviceType light
+    für "brightness":
+    attr DEVICE homebridgeMapping Brightness=brightness::brightness,maxValue=100,factor=0.39216,delay=true
+
+    attr DEVICE genericDeviceType blind
+    
+    attr DEVICE genericDeviceType thermostat
+    
+
+    
+=cut    
     return;
 }
 
@@ -874,10 +916,19 @@ sub _combineHashes {
 sub RHASSPY_allRhasspyNames {
     my $hash = shift // return;
     #my $devspec = 'room=Rhasspy';
-    return keys %{$hash->{helper}{devicemap}{devices}} if defined $hash->{helper}{devicemap};
+    #return keys %{$hash->{helper}{devicemap}{devices}} if defined $hash->{helper}{devicemap};
+    my @devices;
+    
+    if (defined $hash->{helper}{devicemap}) {
+        my $rRooms = $hash->{helper}{devicemap}{rhasspyRooms};
+        for my $key (keys %{$rRooms}) {
+            push @devices, keys %{$rRooms->{$key}};
+        }
+        return get_unique(\@devices, 1 );
+    }
 
     my @devs = devspec2array($hash->{devspec});
-    my @devices;
+
     my $prefix = $hash->{prefix};
 
     # Alle RhasspyNames sammeln
@@ -926,7 +977,7 @@ sub RHASSPY_allRhasspyChannels {
         my $attrv = AttrVal($_,"${prefix}Channels",undef) // next;
         my @rows = split m{\n}x, $attrv;
         for (@rows) {
-            my @tokens = split('=', $_);
+            my @tokens = split m{=}x;
             push @channels, shift @tokens;
         }
     }
@@ -940,10 +991,11 @@ sub RHASSPY_allRhasspyTypes {
     my @types;
 
     if (defined $hash->{helper}{devicemap}) {
-        
         for my $dev (keys %{$hash->{helper}{devicemap}{devices}}) {
             for my $intent (keys %{$hash->{helper}{devicemap}{devices}{$dev}{intents}}) {
-                push @types, $hash->{helper}{devicemap}{devices}{$dev}{intents}{$intent}->{type} if $intent =~ m{\A[SG]etNumeric\z}x;
+                my $type;
+                $type = $hash->{helper}{devicemap}{devices}{$dev}{intents}{$intent};
+                push @types, keys %{$type} if $intent =~ m{\A[GS]etNumeric}x;
             }
         }
         return get_unique(\@types, 1 );
@@ -959,8 +1011,9 @@ sub RHASSPY_allRhasspyTypes {
         my @mappings = split m{\n}x, $attrv;
         for (@mappings) {
             # Nur GetNumeric und SetNumeric verwenden
-            next if $_ !~ m{\ASetNumeric|\AGetNumeric}x;
-            $_ =~ s{(SetNumeric|GetNumeric):}{}x;
+            next if $_ !~ m{\A[SG]etNumeric}x;
+            #$_ =~ s{[SG]etNumeric:}{}x;
+            s{[SG]etNumeric:}{}x;
             my %mapping = RHASSPY_splitMappingString($_);
 
             push @types, $mapping{type} if defined $mapping{type};
@@ -990,7 +1043,7 @@ sub RHASSPY_allRhasspyColors {
     for(@devs) {
         my $attrv = AttrVal($_,"${prefix}Colors",undef) // next;
         for (split m{\n}x, $attrv) {
-            my @tokens = split m{=}x, $_;
+            my @tokens = split m{=}x;
             my $color = shift @tokens;
             push @colors, $color;
         }
@@ -1110,7 +1163,6 @@ sub RHASSPY_getDevicesByIntentAndType {
     # devspec2array sendet bei keinen Treffern als einziges Ergebnis den devSpec String zurück
     return if (@devices == 1 && $devices[0] eq $devspec);
 
-                                 
     for my $devs (@devices) {
         # Array bilden mit Räumen des Devices
         #my @rooms = split m{,}x, AttrVal($_,"${prefix}Room",undef);
@@ -1123,12 +1175,10 @@ sub RHASSPY_getDevicesByIntentAndType {
         # Geräte sammeln
         if ( !defined $type ) {
             $rooms =~ m{\b$room\b}ix
-            #grep ( {/^$room$/i} @rooms)
                 ? push @matchesInRoom, $devs 
                 : push @matchesOutsideRoom, $devs;
         }
         elsif ( defined $type && $mappingType && $type =~ m{\A$mappingType\z}ix ) {
-            #grep( {/^$room$/i} @rooms)
             $rooms =~ m{\b$room\b}ix
             ? push @matchesInRoom, $devs
             : push @matchesOutsideRoom, $devs;
@@ -1152,8 +1202,8 @@ sub RHASSPY_getDeviceByIntentAndType {
     my ($matchesInRoom, $matchesOutsideRoom) = RHASSPY_getDevicesByIntentAndType($hash, $room, $intent, $type);
 
     # Erstes Device im passenden Raum zurückliefern falls vorhanden, sonst erstes Device außerhalb
-    Log3($hash->{NAME}, 4, "Devices in Room $room: ".join q{, }, @{$matchesInRoom});
-    Log3($hash->{NAME}, 4, "Devices outside Room $room: ".join q{, }, @{$matchesOutsideRoom});
+    #Log3($hash->{NAME}, 4, "Devices in Room $room: ".join q{, }, @{$matchesInRoom});
+    #Log3($hash->{NAME}, 4, "Devices outside Room $room: ".join q{, }, @{$matchesOutsideRoom});
     $device = (@{$matchesInRoom}) ? shift @{$matchesInRoom} : shift @{$matchesOutsideRoom};
 
     Log3($hash->{NAME}, 5, "Device selected: ". $device ? $device : "none");
@@ -1265,12 +1315,12 @@ sub RHASSPY_splitMappingString {
     my %parsedMapping;
 
     # String in Kommagetrennte Tokens teilen
-    for my $char (split(//, $mapping)) {
-        if ($char eq '{' && $lastChar ne '\\') {
+    for my $char ( split q{}, $mapping ) {
+        if ($char eq q<{> && $lastChar ne '\\') {
             $bracketLevel += 1;
             $token .= $char;
         }
-        elsif ($char eq '}' && $lastChar ne '\\') {
+        elsif ($char eq q<}> && $lastChar ne '\\') {
             $bracketLevel -= 1;
             $token .= $char;
         }
@@ -1281,7 +1331,6 @@ sub RHASSPY_splitMappingString {
         else {
             $token .= $char;
         }
-
         $lastChar = $char;
     }
     push @tokens, $token if length $token;
@@ -2268,8 +2317,8 @@ sub RHASSPY_handleIntentSetNumeric {
     }
 
     # Begrenzung auf evtl. gesetzte min/max Werte
-    $newVal = max( $minVal, $newVal ) if defined $minVal; # && $newVal < $minVal;
-    $newVal = min( $maxVal, $newVal ) if defined $maxVal; # && $newVal > $maxVal;
+    $newVal = max( $minVal, $newVal ) if defined $minVal;
+    $newVal = min( $maxVal, $newVal ) if defined $maxVal;
 
     # Cmd ausführen
     RHASSPY_runCmd($hash, $device, $cmd, $newVal);
@@ -2440,7 +2489,7 @@ sub RHASSPY_handleIntentMediaControls {
                 Log3($hash->{NAME}, 4, "MediaControls with outdated mapping $command called. Please change to avoid future problems...");
             }
 
-            if ( defined $cmd ) {
+            else {
                 # Execute Cmd
                 RHASSPY_runCmd($hash, $device, $cmd);
                 
