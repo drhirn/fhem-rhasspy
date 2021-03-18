@@ -25,6 +25,7 @@
 # You should have received a copy of the GNU General Public License
 # along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
+# $Id$
 ###########################################################################
 package MQTT::RHASSPY; ##no critic qw(Package)
 use strict;
@@ -51,9 +52,8 @@ my %sets = (
     textCommand  => [],
     trainRhasspy => [],
     fetchSiteIds => [],
-    #reinit       => [qw(language)]
-    reinit       => [qw(language devicemap all)]
-#    "volume" => ""
+    reinit       => [qw(language devicemap all)],
+    volume       => []
 );
 
 my $languagevars = {
@@ -424,7 +424,6 @@ sub RHASSPY_Set {
 
     Log3($name, 5, "set $command - value: " . join q{ }, @values);
 
-    
     my $dispatch = {
         updateSlots  => \&RHASSPY_updateSlots,
         trainRhasspy => \&RHASSPY_trainRhasspy,
@@ -433,22 +432,27 @@ sub RHASSPY_Set {
     
     return $dispatch->{$command}->($hash) if ref $dispatch->{$command} eq 'CODE';
     
-    $values[0] = $h->{text} if ($command eq 'speak' || $command eq 'textCommand' ) && defined $h->{text};
+    $values[0] = $h->{text} if ($command eq 'speak' || $command eq 'textCommand') && defined $h->{text};
     if ($command eq 'play' ) {
         $values[0] = $h->{siteId} if defined $h->{siteId};
         $values[1] = $h->{path}   if defined $h->{path};
+    }
+    if ($command eq 'volume' ) {
+        $values[0] = $h->{siteId} if defined $h->{siteId};
+        $values[1] = $h->{volume}   if defined $h->{volume};
     }
 
     $dispatch = {
         speak       => \&RHASSPY_speak,
         textCommand => \&RHASSPY_textCommand,
-        play        => \&RHASSPY_playWav
+        play        => \&RHASSPY_playWav,
+        volume      => \&RHASSPY_setVolume
     };
     
     return Log3($name, 3, "set $name $command requires at least one argument!") if !@values;
     
     my $params = join q{ }, @values; #error case: playWav => PERL WARNING: Use of uninitialized value within @values in join or string
-    $params = $h if defined $h->{text} || defined $h->{path};
+    $params = $h if defined $h->{text} || defined $h->{path} || defined $h->{volume};
     return $dispatch->{$command}->($hash, $params) if ref $dispatch->{$command} eq 'CODE';
     
     if ($command eq 'reinit') {
@@ -1902,7 +1906,7 @@ sub RHASSPY_fetchSiteIds {
     my $hash   = shift // return;
     my $url    = q{/api/profile?layers=profile};
     my $method = q{GET};
-    
+
     Log3($hash->{NAME}, 5, "fetchSiteIds called");
     return RHASSPY_sendToApi($hash, $url, $method, undef);
 }
@@ -2714,6 +2718,28 @@ sub RHASSPY_playWav {
     return;
 }
 
+# Set volume on specific siteId
+sub RHASSPY_setVolume {
+    my $hash = shift // return;
+    my $cmd = shift;
+    my $sendData =  {
+        id => '0',
+        sessionId => '0'
+    };
+    
+    Log3($hash->{NAME}, 5, 'setVolume called');
+    
+    if (defined $cmd->{siteId} && defined $cmd->{volume}) {
+        $sendData->{siteId} = $cmd->{siteId};
+        $sendData->{volume} = 0 + $cmd->{volume};
+        
+        my $json = toJSON($sendData);
+        return IOWrite($hash, 'publish', qq{rhasspy/audioServer/setVolume $json});    
+    }
+    return;
+}
+
+
 # Abgespeckte Kopie von ReplaceSetMagic aus fhem.pl
 sub RHASSPY_ReplaceReadingsVal {
     my $hash = shift;
@@ -2856,6 +2882,12 @@ attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
     The attribute <i>rhasspyMaster</i> has to be defined to work.<br>
     Example: <code>set &lt;rhasspyDevice&gt; updateSlots</code><br>
     Do not forget to train Rhasspy afterwards!
+  </li>
+  <li>
+    <b>volume</b><br>
+    Sets volume of given siteId between 0 and 1 (float)<br>
+    Both arguments (siteId and volume) are required!<br>
+    Example: <code>set &lt;rhasspyDevice&gt; siteId="default" volume="0.5"</code>
   </li>
 </ul>
 <a name="RHASSPYattr"></a>
