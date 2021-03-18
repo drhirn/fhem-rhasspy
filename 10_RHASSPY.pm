@@ -1,3 +1,4 @@
+# $Id$
 ###########################################################################
 #
 # FHEM RHASSPY modul  (https://github.com/rhasspy)
@@ -25,7 +26,6 @@
 # You should have received a copy of the GNU General Public License
 # along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-# $Id$
 ###########################################################################
 package MQTT::RHASSPY; ##no critic qw(Package)
 use strict;
@@ -50,8 +50,8 @@ my %sets = (
     play         => [],
     updateSlots  => [qw(noArg)],
     textCommand  => [],
-    trainRhasspy => [],
-    fetchSiteIds => [],
+    trainRhasspy => [qw(noArg)],
+    fetchSiteIds => [qw(noArg)],
     reinit       => [qw(language devicemap all)],
     volume       => []
 );
@@ -154,7 +154,6 @@ my $internal_mappings = {
       'Type' => 'setTarget',
       'up'  => '0'
     }
-#    'volume' => 'sound volume'
   },
   'regex' => {
     'upward' => '(higher|brighter|louder|rise|warmer)',
@@ -306,7 +305,9 @@ sub RHASSPY_Define {
     initialize_prefix($hash, $h->{prefix}) if !defined $hash->{prefix} || $hash->{prefix} ne $h->{prefix};
     $hash->{prefix} = $h->{prefix} // q{rhasspy};
     $hash->{encoding} = $h->{encoding};
-    
+    initialize_prefix($hash, $h->{prefix}) if !defined $hash->{prefix} || $hash->{prefix} ne $h->{prefix};
+    $hash->{useHash} = $h->{useHash};
+    $hash->{addDGTAttrs} = $h->{addDGTAttrs};
     #Beta-User: Für's Ändern von defaultRoom oder prefix vielleicht (!?!) hilfreich: https://forum.fhem.de/index.php/topic,119150.msg1135838.html#msg1135838 (Rudi zu resolveAttrRename) 
 
 
@@ -330,6 +331,7 @@ sub firstInit {
     IOWrite($hash, 'subscriptions', join q{ }, @topics) if InternalVal($IODev,'TYPE',undef) eq 'MQTT2_CLIENT';
     
     RHASSPY_fetchSiteIds($hash) if !ReadingsVal( $hash->{NAME}, 'siteIds', 0 );
+    initialize_devicemap($hash) if defined $hash->{useHash};
 
     return;
 }
@@ -420,6 +422,7 @@ sub RHASSPY_Set {
         @{$sets{$_}} ? $_
                       .q{:}
                       .join q{,}, @{$sets{$_}} : $_} sort keys %sets)
+
     if !defined $sets{$command};
 
     Log3($name, 5, "set $command - value: " . join q{ }, @values);
@@ -432,14 +435,11 @@ sub RHASSPY_Set {
     
     return $dispatch->{$command}->($hash) if ref $dispatch->{$command} eq 'CODE';
     
-    $values[0] = $h->{text} if ($command eq 'speak' || $command eq 'textCommand') && defined $h->{text};
-    if ($command eq 'play' ) {
+    $values[0] = $h->{text} if ( $command eq 'speak' || $command eq 'textCommand' ) && defined $h->{text};
+    if ( $command eq 'play' || $command eq 'volume' ) {
         $values[0] = $h->{siteId} if defined $h->{siteId};
         $values[1] = $h->{path}   if defined $h->{path};
-    }
-    if ($command eq 'volume' ) {
-        $values[0] = $h->{siteId} if defined $h->{siteId};
-        $values[1] = $h->{volume}   if defined $h->{volume};
+        $values[1] = $h->{volume} if defined $h->{volume};
     }
 
     $dispatch = {
@@ -672,16 +672,21 @@ sub _analyze_rhassypAttr {
            $hash->{helper}{devicemap}{rhasspyRooms}{$_}{$dn} = $device;
        }
     }
-    for my $item ("Channels", "Colors") {
+    for my $item ('Channels', 'Colors') {
         my @rows = split m{\n}x, AttrVal($device, "${prefix}${item}", q{});
 
         for my $row (@rows) {
             
             my ($key, $val) = split m{=}x, $row, 2;
             next if !$val; 
-            for (@rooms) {
-                $hash->{helper}{devicemap}{$item}{$_}{$key} = $device;
-            }
+            #for my $dn (@names) {
+                for my $rooms (@rooms) {
+                    #$hash->{helper}{devicemap}{$item}{$_}{$key} = $device;
+                    #push @{$hash->{helper}{devicemap}{$item}{$key}{$dn}}, $device if !grep( { m{\A$device\z}x } @{$hash->{helper}{devicemap}{$item}{$key}{$dn}});
+                    push @{$hash->{helper}{devicemap}{$item}{$rooms}{$key}}, $device if !grep { m{\A$device\z}x } @{$hash->{helper}{devicemap}{$item}{$rooms}{$key}};
+                }
+            #}
+             
             $hash->{helper}{devicemap}{devices}{$device}{$item}{$key} = $val;
         }
     }
@@ -695,7 +700,8 @@ sub _analyze_rhassypAttr {
         my %currentMapping = RHASSPY_splitMappingString($val);
 
         # Übersetzen, falls möglich:
-        $currentMapping{type} = $de_mappings->{ToEn}->{$currentMapping{type}} // $currentMapping{type};
+        $currentMapping{type} = $de_mappings->{ToEn}->{$currentMapping{type}} // $currentMapping{type} // $key;
+        $currentMapping{type} = $de_mappings->{ToEn}->{$currentMapping{type}} // $currentMapping{type} // $key;
         $hash->{helper}{devicemap}{devices}{$device}{intents}{$key}->{$currentMapping{type}} = \%currentMapping;
     }
     push @{$hash->{helper}{devicemap}{devices}{$device}{rooms}}, @rooms;
@@ -1265,14 +1271,18 @@ sub RHASSPY_getDeviceByMediaChannel {
     my $device;
     
     if (defined $hash->{helper}{devicemap}) {
-        $device = $hash->{helper}{devicemap}{Channels}{$room}{$channel};
+        my $devices = $hash->{helper}{devicemap}{Channels}{$room}->{$channel};
+        $device = ${$devices}[0];
         #return $device if $device;
         if ($device) {
             Log3($hash->{NAME}, 5, "Device selected (by hash, with room and channel): $device");
             return $device ;
         }
         for (sort keys %{$hash->{helper}{devicemap}{Channels}}) {
-            $device = $hash->{helper}{devicemap}{Channels}{$_}{$channel};
+            #$device = $hash->{helper}{devicemap}{Channels}{$_}{$channel};
+            my $devices = $hash->{helper}{devicemap}{Channels}{$_}{$channel};
+            $device = ${$devices}[0];
+        
             #return $device if $device;
             if ($device) {
                 Log3($hash->{NAME}, 5, "Device selected (by hash, using only channel): $device");
@@ -1352,7 +1362,7 @@ sub RHASSPY_getMapping { #($$$$;$)
     my $hash       = shift // return;
     my $device     = shift // return;
     my $intent     = shift // return;
-    my $type       = shift; #Beta-User: seems first three parameters are obligatory...?
+    my $type       = shift // $intent; #Beta-User: seems first three parameters are obligatory...?
     my $fromHash   = shift // 0;
     my $disableLog = shift // 0;
     
@@ -1820,16 +1830,19 @@ sub RHASSPY_speak {
         sessionId => '0'
     };
     if (ref $cmd eq 'HASH') {
+        return 'speak with explicite params needs siteId and text as arguments!' if !defined $cmd->{siteId} || !defined $cmd->{text};
         $sendData->{siteId} =  $cmd->{siteId};
         $sendData->{text} =  $cmd->{text};
-    } else {    
+    } else {    #Beta-User: might need review, as parseParams is used by default...!
         my $siteId = 'default';
         my $text = $cmd;
         my($unnamedParams, $namedParams) = parseParams($cmd);
-    
+
         if (defined $namedParams->{siteId} && defined $namedParams->{text}) {
             $sendData->{siteId} = $namedParams->{siteId};
             $sendData->{text} = $namedParams->{text};
+        } else {
+            return 'speak needs siteId and text as arguments!';
         }
     }
     my $json = toJSON($sendData);
@@ -1844,6 +1857,7 @@ sub RHASSPY_updateSlots {
     my $method   = q{POST};
     my $contenttype = q{application/json};
 
+    initialize_devicemap($hash) if defined $hash->{useHash} && $hash->{useHash};
     # Collect everything and store it in arrays
     my @devices   = RHASSPY_allRhasspyNames($hash);
     my @rooms     = RHASSPY_allRhasspyRooms($hash);
@@ -1874,7 +1888,7 @@ sub RHASSPY_updateSlots {
     if (@devices || @rooms || @channels || @types ) {
       my $json;
       my $deviceData;
-      my $url = '/api/slots?overwrite_all=true';
+      my $url = q{/api/slots?overwrite_all=true};
 
       $deviceData->{qq(${language}.${fhemId}.Device)}        = \@devices if @devices;
       $deviceData->{qq(${language}.${fhemId}.Room)}          = \@rooms if @rooms;
@@ -2320,19 +2334,19 @@ sub RHASSPY_handleIntentSetNumeric {
         return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoNewValDerived'));
     }
 
-    # Begrenzung auf evtl. gesetzte min/max Werte
+    # limit to min/max  (if set)
     $newVal = max( $minVal, $newVal ) if defined $minVal;
     $newVal = min( $maxVal, $newVal ) if defined $maxVal;
 
-    # Cmd ausführen
+    # execute Cmd
     RHASSPY_runCmd($hash, $device, $cmd, $newVal);
 
-    # Antwort festlegen
+    # get response 
     defined $mapping->{response} 
         ? $response = RHASSPY_getValue($hash, $device, $mapping->{response}, $newVal, $room) 
         : $response = RHASSPY_getResponse($hash, 'DefaultConfirmation'); 
 
-    # Antwort senden
+    # send response
     $response = $response // RHASSPY_getResponse($hash, 'DefaultError');
     RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
     return $device;
@@ -2416,8 +2430,8 @@ sub RHASSPY_handleIntentGetNumeric {
     }
     if (!defined $response) {
                                                           
-        defined $mappingType   #or not and at least know the type...
-            ? $responses->{knownType}
+        defined $mappingType   
+            ? $responses->{knownType} #or not and at least know the type...
             : $responses->{unknownType};
     }
 
@@ -2695,7 +2709,9 @@ sub RHASSPY_playWav {
     
     Log3($hash->{NAME}, 5, "action playWav called");
     
-    if (defined($cmd->{siteId}) && defined($cmd->{path})) {
+    return 'playWav needs siteId and path to file as parameters!' if !defined $cmd->{siteId} || !defined $cmd->{path};
+    
+    #if (defined($cmd->{siteId}) && defined($cmd->{path})) {
         my $siteId = $cmd->{siteId};
         my $filename = $cmd->{path};
         my $encoding = q{:raw :bytes};
@@ -2714,7 +2730,7 @@ sub RHASSPY_playWav {
 
             close($handle);
         }
-    }
+    #}
     return;
 }
 
@@ -2722,21 +2738,21 @@ sub RHASSPY_playWav {
 sub RHASSPY_setVolume {
     my $hash = shift // return;
     my $cmd = shift;
+
+    return 'setVolume needs siteId and volume as parameters!' if !defined $cmd->{siteId} || !defined $cmd->{volume};
+
     my $sendData =  {
         id => '0',
         sessionId => '0'
     };
-    
+
     Log3($hash->{NAME}, 5, 'setVolume called');
-    
-    if (defined $cmd->{siteId} && defined $cmd->{volume}) {
-        $sendData->{siteId} = $cmd->{siteId};
-        $sendData->{volume} = 0 + $cmd->{volume};
-        
-        my $json = toJSON($sendData);
-        return IOWrite($hash, 'publish', qq{rhasspy/audioServer/setVolume $json});    
-    }
-    return;
+
+    $sendData->{siteId} = $cmd->{siteId};
+    $sendData->{volume} = 0 + $cmd->{volume};
+
+    my $json = toJSON($sendData);
+    return IOWrite($hash, 'publish', qq{rhasspy/audioServer/setVolume $json});    
 }
 
 
