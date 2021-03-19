@@ -272,13 +272,17 @@ Intents are used to tell FHEM what to do after receiving a voice-/text-command. 
 ### SetOnOff
 Intent to turn on/off, open/close, start/stop, ... devices.
 
-Example-Mapping:
+Example-Mappings:
 
 `SetOnOff:cmdOn=on,cmdOff=off`
+`SetOnOff:cmdOn=on,cmdOff=off,response="$DEVICE now [$DEVICE:state]"`
 
-Options:
+Arguments:
   * **cmdOn** Command to turn the device on. See [Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping).
   * **cmdOff** Command to turn the device off. See [Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping).
+
+Optional Arguments:
+  * **response** Define a custom response for this mapping
 
 Example-Spoken-Sentences:
   > turn on the light\
