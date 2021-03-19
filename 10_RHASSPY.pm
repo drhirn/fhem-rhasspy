@@ -58,8 +58,18 @@ my %sets = (
 
 my $languagevars = {
   'units' => {
-      'unitHours' => '(hour|hours)',
-      'unitMinutes' => '(minute|minutes)'
+      'unitHours' => {
+          0    => 'hours',
+          1    => 'one hour'
+      },
+      'unitMinutes' => {
+          0    => 'minutes',
+          1    => 'one minute'
+      },
+      'unitSeconds' => {
+          0    => 'seconds',
+          1    => 'one second'
+      }
    },
   'responses' => { 
     'DefaultError' => "Sorry but something seems not to work as expected",
@@ -72,7 +82,7 @@ my $languagevars = {
     'DefaultConfirmationTimeout' => "Sorry too late to confirm",
     'DefaultCancelConfir' => "Thanks aborted",
     'DefaultConfirReceived' => "ok will do it",
-    'timerSet'   => 'Timer in room $room has been set to $value $unit',
+    'timerSet'   => 'Timer in room $room has been set to $text',
     'timerEnd'   => {
         '0' => 'Timer expired',
         '1' =>  'Timer in room $room expired'
@@ -2310,9 +2320,7 @@ sub RHASSPY_handleIntentSetNumeric {
             // return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoActiveMediaDevice'));
     }
 
-    if ( !defined $device ) {
-        return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoDeviceFound'));
-    }
+    return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoDeviceFound')) if !defined $device;
     
     my $mapping = 
         RHASSPY_getMapping($hash, $device, 'SetNumeric', $type, defined $hash->{helper}{devicemap}, 0)
@@ -2696,15 +2704,41 @@ sub RHASSPY_handleIntentSetTimer {
     my $data = shift // return;
     my $siteId = $data->{siteId} // return;
     my $name = $hash->{NAME};
-    my $unit, my $value;
-
-    my $response = RHASSPY_getResponse($hash, 'DefaultError');
+    my ($value, $response, $time, $text);
 
     Log3($name, 5, 'handleIntentSetTimer called');
 
     my $room = $data->{Room} // $siteId;
-    if ($data->{Value}) {$value = $data->{Value}} else {$response = $hash->{helper}{lng}->{responses}->{duration_not_understood}};
-    if ($data->{Unit}) {$unit = $data->{Unit}} else {$response = $hash->{helper}{lng}->{responses}->{duration_not_understood}};
+    
+    if ($data->{hour}) {
+        my $hour = $data->{hour};
+        $value = 3600 * $hour;
+        if ($hour > 1) {
+            $text = $hour." ".$hash->{helper}{lng}->{units}->{unitHours}->{0}
+        } else {
+            $text = $hash->{helper}{lng}->{units}->{unitHours}->{1}
+        }
+    }
+    if ($data->{min}) {
+        my $min = $data->{min};
+        $value += 60 * $min;
+        if ($min > 1) {
+            $text .= $min." ".$hash->{helper}{lng}->{units}->{unitMinutes}->{0}
+        } else {
+            $text .= $hash->{helper}{lng}->{units}->{unitMinutes}->{1}
+        }
+    }
+    if ($data->{sec}) {
+        my $sec = $data->{sec};
+        $value += $sec;
+        if ($sec > 1) {
+            $text .= $sec." ".$hash->{helper}{lng}->{units}->{unitSeconds}->{0}
+        } else {
+            $text .= $hash->{helper}{lng}->{units}->{unitSeconds}->{1}
+        }
+    }
+
+    if (!$value) {$response = $hash->{helper}{lng}->{responses}->{duration_not_understood}};
     
     my $siteIds = ReadingsVal( $name, 'siteIds',0);
     RHASSPY_fetchSiteIds($hash) if !$siteIds;
@@ -2718,18 +2752,14 @@ sub RHASSPY_handleIntentSetTimer {
         $responseEnd = $hash->{helper}{lng}->{responses}->{timerEnd}->{0};
     }
 
-    if( $value && $unit && $timerRoom ) {
-        my $time = $value;
+    if( $value && $text && $timerRoom ) {
         my $roomReading = "timer_".makeReadingName($room);
         
-        if    (  $unit =~ m{ $hash->{helper}{lng}->{units}->{unitMinutes} }x ) {$time = $value*60}
-        elsif ( (  $unit =~ m{ $hash->{helper}{lng}->{units}->{unitHours} }x ) )   {$time = $value*3600};
-        
-        $time = strftime('%H:%M:%S', gmtime $time);
+        $value = strftime('%H:%M:%S', gmtime $value);
         
         $responseEnd =~ s{(\$\w+)}{$1}eegx;
 
-        my $cmd = qq(defmod $roomReading at +$time set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";;setreading $name $roomReading 0);
+        my $cmd = qq(defmod $roomReading at +$value set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";;setreading $name $roomReading 0);
         
         RHASSPY_runCmd($hash,'',$cmd);
 
@@ -2740,6 +2770,8 @@ sub RHASSPY_handleIntentSetTimer {
         $response = $hash->{helper}{lng}->{responses}->{timerSet};
         $response =~ s{(\$\w+)}{$1}eegx;
     }
+
+    $response = $response // RHASSPY_getResponse($hash, 'DefaultError');
 
     RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
     return $name;
