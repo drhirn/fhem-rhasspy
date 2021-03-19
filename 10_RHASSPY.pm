@@ -659,14 +659,14 @@ sub _analyze_rhassypAttr {
     my $prefix = $hash->{prefix};
     my $ret = 1;
     #rhasspyRooms ermitteln
-    my @rooms = split m{,}x,AttrVal($device,"${prefix}Room",undef);
+    my @rooms = split m{,}x,AttrVal($device,"${prefix}Room",q{});
     if (!@rooms) {
         $rooms[0] = $hash->{helper}{defaultRoom};
         $ret = 0;
     };
 
     #rhasspyNames ermitteln
-    my @names = split m{,}x, AttrVal($device,"${prefix}Name",undef);
+    my @names = split m{,}x, AttrVal($device,"${prefix}Name",q{});
     
     return 0 if !@names && !$ret; #might need review!
     
@@ -681,21 +681,20 @@ sub _analyze_rhassypAttr {
         for my $row (@rows) {
             
             my ($key, $val) = split m{=}x, $row, 2;
-            next if !$val; 
-            #for my $dn (@names) {
-                for my $rooms (@rooms) {
-                    #$hash->{helper}{devicemap}{$item}{$_}{$key} = $device;
-                    #push @{$hash->{helper}{devicemap}{$item}{$key}{$dn}}, $device if !grep( { m{\A$device\z}x } @{$hash->{helper}{devicemap}{$item}{$key}{$dn}});
-                    push @{$hash->{helper}{devicemap}{$item}{$rooms}{$key}}, $device if !grep { m{\A$device\z}x } @{$hash->{helper}{devicemap}{$item}{$rooms}{$key}};
-                }
-            #}
-             
+            next if !$val;
+
+            for my $rooms (@rooms) {
+                #$hash->{helper}{devicemap}{$item}{$_}{$key} = $device;
+                #push @{$hash->{helper}{devicemap}{$item}{$key}{$dn}}, $device if !grep( { m{\A$device\z}x } @{$hash->{helper}{devicemap}{$item}{$key}{$dn}});
+                 push @{$hash->{helper}{devicemap}{$item}{$rooms}{$key}}, $device if !grep { m{\A$device\z}x } @{$hash->{helper}{devicemap}{$item}{$rooms}{$key}};
+            }
+
             $hash->{helper}{devicemap}{devices}{$device}{$item}{$key} = $val;
         }
     }
-    
+
     #Hash mit {FHEM-Device-Name}{$intent}{$type}?
-    my $mappingsString = AttrVal($device, "${prefix}Mapping", undef);
+    my $mappingsString = AttrVal($device, "${prefix}Mapping", q{});
     for (split m{\n}x, $mappingsString) {
         my ($key, $val) = split m{:}x, $_, 2;
         #$key = lc($key);
@@ -703,8 +702,10 @@ sub _analyze_rhassypAttr {
         my %currentMapping = RHASSPY_splitMappingString($val);
 
         # Übersetzen, falls möglich:
-        $currentMapping{type} = $de_mappings->{ToEn}->{$currentMapping{type}} // $currentMapping{type} // $key;
-        $currentMapping{type} = $de_mappings->{ToEn}->{$currentMapping{type}} // $currentMapping{type} // $key;
+        $currentMapping{type} = 
+            defined $currentMapping{type} ?
+            $de_mappings->{ToEn}->{$currentMapping{type}} // $currentMapping{type} // $key
+            : $key;
         $hash->{helper}{devicemap}{devices}{$device}{intents}{$key}->{$currentMapping{type}} = \%currentMapping;
     }
     push @{$hash->{helper}{devicemap}{devices}{$device}{rooms}}, @rooms;
@@ -721,22 +722,22 @@ sub _analyze_genDevType {
     my $gdt = AttrVal($device, 'genericDeviceType', undef) // return; 
 
     #additional names?
-    my @names = split m{,}x, AttrVal($device,'alexaName',undef);
-    push @names, split m{,}x, AttrVal($device,'siriName',undef);
+    my @names = split m{,}x, AttrVal($device,'alexaName',q{});
+    push @names, split m{,}x, AttrVal($device,'siriName',q{});
     my $alias = AttrVal($device,'alias',undef);
     push @names, $alias if !@names && $alias;
     push @names, $device if !@names;
 
     #convert to lower case
-    for (@names) { $names[$_] = lc; }
+    for (@names) { $_ = lc; }
 
     my @rooms;
-    my $attrv = join q{,}, (AttrVal($device,'alexaRoom',undef), AttrVal($device,'room',undef));
+    my $attrv = join q{,}, ( AttrVal($device,'alexaRoom',q{}), AttrVal($device,'room',q{}) );
     push @rooms, split m{,}x, $attrv if $attrv;
     $rooms[0] = $hash->{helper}{defaultRoom} if !@rooms;
 
     #convert to lower case
-    for (@rooms) { $rooms[$_] = lc; }
+    for (@rooms) { $_ = lc; }
 
     my $devmp = $hash->{helper}{devicemap};
 
@@ -747,12 +748,11 @@ sub _analyze_genDevType {
     }
     push @{$devmp->{devices}{$device}{rooms}}, @rooms;
 
-    my $hbmap  = AttrVal($device, 'homeBridgeMapping', undef); 
-    my $gdt    = AttrVal($device, 'genericDeviceType', undef); 
+    my $hbmap  = AttrVal($device, 'homeBridgeMapping', q{});
     my $allset = getAllSets($device);
     my $currentMapping;
 
-    if ( ($gdt eq 'switch' || $gdt eq 'light') && $allset =~ m{\bo[nf]+\b}x ) {
+    if ( ($gdt eq 'switch' || $gdt eq 'light') && $allset =~ m{\bo[nf]+[\b:]}x ) {
         #$hash->{helper}{devicemap}{devices}{$device}{intents}
         #{$key}->{$currentMapping{type}} = \%currentMapping;
         $currentMapping = 
@@ -2485,9 +2485,9 @@ sub RHASSPY_handleIntentGetNumeric {
         #Log3($hash->{NAME}, 3, "#2384: resp now is $response");
     }
     if (!defined $response) {
-                                                          
+        #or not and at least know the type...?
         defined $mappingType   
-            ? $responses->{knownType} #or not and at least know the type...
+            ? $responses->{knownType} 
             : $responses->{unknownType};
     }
 
@@ -3013,11 +3013,11 @@ hermes/dialogueManager/sessionEnded</code></pre></p>
 <p>&nbsp;</p>
 <p><b>ToDo</b></p>
 <ul>
-<li>Status: &quot;[Device:Reading]&quot; isn't recognized</li>
 <li>MediaChannels <code>RHASSPY_getCmd($hash, $device, 'rhasspyChannels', $channel, undef);</code> stays undef</li>
 <li>Add Shortcuts to README (<a href="https://forum.fhem.de/index.php/topic,118926.msg1136115.html#msg1136115">https://forum.fhem.de/index.php/topic,118926.msg1136115.html#msg1136115</a>) (drhirn)</li>
 <li>Shortcuts: &quot;Longpoll&quot; only works when &quot;n&quot; is given. Perl-Code does never &quot;longpoll&quot;</li>
 <li>GetNumeric: Answer "already at max/min" if minVal or maxVal is reached</li>
+<li><s>Status: &quot;[Device:Reading]&quot; isn't recognized</s></li>
 <li><s>getValue doesn't work with device/reading (e.g. [lampe1:volume])</s></li>
 <li><s>SetTimer: $hash->{siteIds} leer beim Start von FHEM: <code>PERL WARNING: Use of uninitialized value in split at ./FHEM/10_RHASSPY.pm line 2194.</code></s></li>
 <li><s>Dialogue Session wird nicht beendet, wenn SetMute = 1; Reading listening_$roomReading wird nicht 0. Weil das in onmessage nicht zurück gesetzt wird.</s></li>
