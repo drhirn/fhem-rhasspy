@@ -275,6 +275,7 @@ Intent to turn on/off, open/close, start/stop, ... devices.
 Example-Mappings:
 
 `SetOnOff:cmdOn=on,cmdOff=off`\
+`SetOnOff:cmdOn=on,cmdOff=off,response="Sir yes Sir"`\
 `SetOnOff:cmdOn=on,cmdOff=off,response="$DEVICE now [$DEVICE:state]"`
 
 Arguments:
@@ -291,7 +292,7 @@ Example-Spoken-Sentences:
  
  Example-Rhasspy-Sentences:
  ```
- [de.fhem:SetOnOff]
+ [en.fhem:SetOnOff]
  (turn on|open|start){Value:on) $de.fhem.Device{Device} [$de.fhem.Room{Room}]
  (turn off|close|stop){Value:off} $de.fhem.Device{Device} [$de.fhem.Room{Room}]
  ```
@@ -303,11 +304,14 @@ Example-Mapping:
 
 `GetOnOff:currentVal=state,valueOff=closed`
 
-Options:\
+Arguments:\
 *Hint: only valueOn OR valueOff need to be set. All other values are assigned the other state.*
   * **currentVal** Reading to read the current value from.
-  * **valueOff** Value from *currentVal* which represents **off**.
-  * **valueOn** Value from *currentVal* which represents **on**.
+  * **valueOff** Value from *currentVal* which represents the **off**-state of the FHEM-device.
+  * **valueOn** Value from *currentVal* which represents the **on**-state of the FHEM-device.
+
+Optional Arguments:
+  * **response** Define a custom response for this mapping
 
 Example-Sentences:
   > is the light in the bathroom switched on?\
@@ -316,7 +320,7 @@ Example-Sentences:
   
 Example-Rhasspy-Sentences:
 ```
-[de.fhem:GetOnOff]
+[en.fhem:GetOnOff]
 (is) $de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched on|running|opened){Status}
 ```
 
@@ -327,27 +331,28 @@ Intent to dim, change volume, set temperature, ...
 Example-Mappings:
 ```
 SetNumeric:currentVal=pct,cmd=dim,minVal=0,maxVal=99,step=25
-SetNumeric:currentVal=volume,cmd=volume,minVal=0,maxVal=99,step=10,type=Lautstärke
+SetNumeric:currentVal=volume,cmd=volume,minVal=0,maxVal=99,step=10,type=volume
 ```
 <!--SetNumeric:currentVal=brightness,minVal=0,maxVal=255,map=percent,cmd=brightness,step=1,type=Helligkeit-->
 
-Options:
+Arguments:
   * **currentVal** Reading which contains the acual value.
   * **part** Used to split *currentVal* into separate values. Separator is a blank. E.g. if *currentVal* is *23 C*, part=1 results in *23*
   * **cmd** Set-command of the device that should be called after analysing the voice-command.
   * **minVal** Lowest possible value
   * **maxVal** Highest possible value
   * **step** Step-size for changes (e.g. *turn the volume up*)
-<!--  * **map** Currently only one possible value: percent. See below.-->
+  * **map** Currently only one possible value: percent. See below.
   * **type** To differentiate between multiple possible SetNumeric-Intents for the same device. Currently supports only the following hard-coded values **brightness**, **temperature**, **setTarget**, **volume**, **airHumidity**, **battery**, **waterLevel**, **soilMoisture**
 
-<!--Explanation for `map=percent`:\
+Explanation for `map=percent` or `{Unit:percent}`:
 If this option is set, all numeric control values are taken as percentage between *minVal* and *maxVal*.\
 If there is a light-device with the setting *minVal=0* and *maxVal=255*, then "turn the light to 50" means the same as "turn the light to 50 percent". The light is then set to 127 instead of 50.-->
 
-Specifics with `type=volume`:\
-To use the commands *louder* or *lower* without the need to speak a device-name, the module has to now which device is currently playing. Thus it uses the *GetOnOff-Mappings* to search a turned on device with `type=volume`. First it searches in the actual *rhasspyRoom* (the *siteId* or - if missing - the default rhasspyRoom), next in all other *rhasspyRoom*s.\
-That's why it's advisable to also set a *GetOnOff*-Mapping if using a *SetNumeric*-Mapping.
+Specifics with `type=volume`:
+To use the commands *louder* or *lower* without the need to speak a device-name, the module has to know which device is currently playing. Thus it uses the *GetOnOff-Mappings* to search a turned on device with `type=volume`. First it searches in the actual *rhasspyRoom* (the *siteId* or - if missing - the default rhasspyRoom), next in all other *rhasspyRoom*s.\
+That's why it's advisable to also set a *GetOnOff*-Mapping if using a *SetNumeric*-Mapping.-->
+
 
 Example-sentences:
 ```
@@ -358,9 +363,20 @@ Set the temperature in the living room 2 degree warmer
 
 Example-Rhasspy-Sentences:
 ```
-[de.fhem:SetNumeric]
-\[stelle|mache|schalte] $de.fhem.Device{Device} [$de.fhem.Device{Room}] [auf|um] [(0..100){Value}] [(prozent|grad|dezibel){Unit}] [(heller|dunkler|leiser|lauter|wärmer|kälter){Change}]
+[en.fhem:SetNumeric]
+(turn up|increase){Change:volUp} [the volume] [of] $en.fhem.Device{Device} [by] [(0..10){Value!float}] [decibel{Unit}]
+(turn down|lower){Change:volDown} [the volume] [of] $en.fhem.Device{Device} [by] [(0..10){Value!float}] [decibel{Unit}]
+(turn up|increase){Change:tempUp} [the heating|the temperature] [of] $en.fhem.Device{Device} [by] [(0..10){Value!float}] [degree{Unit}]
+(turn down|lower){Change:tempDown} [the heating|the temperature] [of] $en.fhem.Device{Device} [by] [(0..10){Value!float}] [degree{Unit}]
+(turn up|increase){Change:lightUp} [the light] [of] $en.fhem.Device{Device} [by] [(0..100){Value}] [percent{Unit:percent}]
+(turn down|decrease){Change:lightDown} [the light] [of] $en.fhem.Device{Device} [by] [(0..100){Value}] [percent{Unit:percent}]
 ```
+
+Currently there are four possible types for `{Change}`:
+* tempUp / tempDown
+* volUp / volDown
+* lightUp / lightDown
+* setUp / setDown
 
 ### GetNumeric
 
