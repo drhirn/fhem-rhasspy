@@ -274,7 +274,7 @@ Intent to turn on/off, open/close, start/stop, ... devices.
 
 Example-Mappings:
 
-`SetOnOff:cmdOn=on,cmdOff=off`
+`SetOnOff:cmdOn=on,cmdOff=off`\
 `SetOnOff:cmdOn=on,cmdOff=off,response="$DEVICE now [$DEVICE:state]"`
 
 Arguments:
