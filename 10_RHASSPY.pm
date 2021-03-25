@@ -86,10 +86,17 @@ my $languagevars = {
     'DefaultConfirmationTimeout' => "Sorry too late to confirm",
     'DefaultCancelConfir' => "Thanks aborted",
     'DefaultConfirReceived' => "ok will do it",
-    'timerSet'   => 'Timer in room $room has been set to $text',
+    'timerSet'   => {
+        '0' => 'Timer $label in room $room has been set to $seconds seconds',
+        '1' => 'Timer $label in room $room has been set to $minutes minutes $seconds',
+        '2' => 'Timer $label in room $room has been set to $minutes minutes',
+        '3' => 'Timer $label in room $room has been set to $hours hours $minutes minutes',
+        '4' => 'Timer $label in room $room has been set to $hour o clock $minutes',
+        '5' => 'Timer $label in room $room has been set to tomorrow $hour o clock $minutes'
+    },
     'timerEnd'   => {
-        '0' => 'Timer expired',
-        '1' =>  'Timer in room $room expired'
+        '0' => 'Timer $label expired',
+        '1' =>  'Timer $label in room $room expired'
     },
     'timeRequest' => 'it is $hour o clock $min minutes',
     'weekdayRequest' => 'today it is $weekDay',
@@ -237,6 +244,9 @@ BEGIN {
     attr
     cmds
     L
+    DAYSECONDS
+    HOURSECONDS
+    MINUTESECONDS
     init_done
     InternalTimer
     RemoveInternalTimer
@@ -1032,6 +1042,8 @@ sub RHASSPY_confirm_timer {
     return $hash->{NAME};
 }
 
+=pod
+(Old Version, Shortcuts only)
 sub RHASSPY_handleIntentConfirmation {
     my $hash = shift // return;
     my $data = shift // return;
@@ -1043,7 +1055,7 @@ sub RHASSPY_handleIntentConfirmation {
     #Beta-User: most likely we will have to change some fields in $data2 to content from $data
     return RHASSPY_handleIntentShortcuts($hash,$data2,1);
 }
-
+=cut
 
 
 #from https://stackoverflow.com/a/43873983, modified...
@@ -1099,7 +1111,7 @@ sub _combineHashes {
         }
         if ( ref $hash1->{$key} eq 'HASH' and ref $hash2->{$key} eq 'HASH' ) {
             _combineHashes($hash1->{$key}, $hash2->{$key}, $key);
-        } else { 
+        } elsif ( !ref $hash1->{$key} && !ref $hash2->{$key} ) { 
             $hash1->{$key} = $hash2->{$key};
         }
     }
@@ -2148,16 +2160,16 @@ sub RHASSPY_handleIntentShortcuts {
     my $shortcut = $hash->{helper}{shortcuts}{$data->{input}};
     Log3($hash->{NAME}, 5, "handleIntentShortcuts called with $data->{input} key");
     
-    if (defined $hash->{helper}{shortcuts}{$data->{input}}{conf_timeout} && !$data->{Confirmation}) {
+    my $response;
+    if ( defined $hash->{helper}{shortcuts}{$data->{input}}{conf_timeout} && !$data->{Confirmation} ) {
         my $timeout = $hash->{helper}{shortcuts}{$data->{input}}{conf_timeout};
-        my $response = $hash->{helper}{shortcuts}{$data->{input}}{conf_req};
-        return RHASSPY_confirm_timer($hash, 2, $data, $timeout, $response);
+        $response = $hash->{helper}{shortcuts}{$data->{input}}{conf_req};return RHASSPY_confirm_timer($hash, 2, $data, $timeout, $response);
     }
-    my $response = $shortcut->{response} // RHASSPY_getResponse($hash, 'DefaultConfirmation');
+    $response = $shortcut->{response} // RHASSPY_getResponse($hash, 'DefaultConfirmation');
     my $ret;
     my $device = $shortcut->{NAME};;
     my $cmd    = $shortcut->{perl};
-                                 
+
     my $self   = $hash->{NAME};
     my $name   = $shortcut->{NAME} // $self;
     my %specials = (
@@ -2776,38 +2788,32 @@ sub RHASSPY_handleIntentSetTimer {
     my $data = shift // return;
     my $siteId = $data->{siteId} // return;
     my $name = $hash->{NAME};
-    my ($value, $response, $text);
+    
+    my $response;
 
     Log3($name, 5, 'handleIntentSetTimer called');
 
     my $room = $data->{Room} // $siteId;
     
-    if ($data->{hour}) {
-        my $hour = $data->{hour};
-        $value = 3600 * $hour;
-        if ($hour > 1) {
-            $text = $hour." ".$hash->{helper}{lng}->{units}->{unitHours}->{0}
-        } else {
-            $text = $hash->{helper}{lng}->{units}->{unitHours}->{1}
-        }
+    my $hour = 0;
+    my $value = time;
+    my $now = $value;
+    my @time = localtime($now);
+    if ( defined $data->{hourabs} ) {
+        $hour  = $data->{hourabs};
+        $value = $value - ($time[2] * HOURSECONDS) - ($time[1] * MINUTESECONDS) - $time[0]; #last midnight
     }
-    if ($data->{min}) {
-        my $min = $data->{min};
-        $value += 60 * $min;
-        if ($min > 1) {
-            $text .= $min." ".$hash->{helper}{lng}->{units}->{unitMinutes}->{0}
-        } else {
-            $text .= $hash->{helper}{lng}->{units}->{unitMinutes}->{1}
-        }
+    elsif ($data->{hour}) {
+        $hour = $data->{hour};
     }
-    if ($data->{sec}) {
-        my $sec = $data->{sec};
-        $value += $sec;
-        if ($sec > 1) {
-            $text .= $sec." ".$hash->{helper}{lng}->{units}->{unitSeconds}->{0}
-        } else {
-            $text .= $hash->{helper}{lng}->{units}->{unitSeconds}->{1}
-        }
+    $value += HOURSECONDS * $hour;
+    $value += MINUTESECONDS * $data->{min} if $data->{min};
+    $value += $data->{sec} if $data->{sec};
+    
+    my $tomorrow = 0;
+    if ( $value < $now ) {
+        $tomorrow = 1;
+        $value += +DAYSECONDS;
     }
 
     if (!$value) {$response = $hash->{helper}{lng}->{responses}->{duration_not_understood}};
@@ -2824,22 +2830,50 @@ sub RHASSPY_handleIntentSetTimer {
         $responseEnd = $hash->{helper}{lng}->{responses}->{timerEnd}->{0};
     }
 
-    if( $value && $text && $timerRoom ) {
+    if( $value && $timerRoom ) {
         my $roomReading = "timer_".makeReadingName($room);
-        
-        $value = strftime('%H:%M:%S', gmtime $value);
-        
+        my $label = $data->{label} // q{};
+        $roomReading .= "_$label" if $label ne ''; 
+        my $seconds = $value - $now; 
+        my $diff = $seconds;
+        my $attime = strftime('%H', gmtime $diff);
+        $attime += 24 if $tomorrow;
+        $attime .= strftime(':%M:%S', gmtime $diff);
+
         $responseEnd =~ s{(\$\w+)}{$1}eegx;
 
-        my $cmd = qq(defmod $roomReading at +$value set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";;setreading $name $roomReading 0);
-        
+        my $cmd = qq(defmod $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";;setreading $name $roomReading 0);
+
         RHASSPY_runCmd($hash,'',$cmd);
 
         readingsSingleUpdate($hash, $roomReading, 1, 1);
-        
+
         Log3($name, 5, "Created timer: $cmd");
-        
-        $response = $hash->{helper}{lng}->{responses}->{timerSet};
+
+        my ($range, $minutes, $hours);
+        @time = localtime($value);
+        if ( $seconds < 101 ) { 
+            $range = 0;
+        } elsif ( $seconds < HOURSECONDS ) {
+            $minutes = int ($seconds/MINUTESECONDS);
+            $range = $seconds < 9*MINUTESECONDS ? 1 : 2;
+            $seconds = $seconds % MINUTESECONDS;
+        } elsif ( $seconds < 3 * HOURSECONDS ) {
+            $hours = $time[2];
+            $seconds = $seconds % HOURSECONDS;
+            $minutes = int ($seconds/MINUTESECONDS) + $time[1];
+            $range = 3;
+#        } elsif ($tomorrow) {
+#           $hours   =  strftime('%H', gmtime $diff);
+#            $minutes =  strftime('%M', gmtime $diff);
+#            $range = 4 + $tomorrow;
+        } else {
+            $hours = $time[2];
+            #$seconds = $seconds % HOURSECONDS;
+            $minutes = $time[1];
+            $range = 4 + $tomorrow;
+        }
+        $response = $hash->{helper}{lng}->{responses}->{timerSet}->{$range};
         $response =~ s{(\$\w+)}{$1}eegx;
     }
 
@@ -2864,6 +2898,7 @@ sub RHASSPY_handleIntentConfirmAction {
     
     $data_old->{siteId} = $data->{siteId};
     $data_old->{sessionId} = $data->{sessionId};
+    $data_old->{requestType} = $data->{requestType};
     $data_old->{Confirmation} = 1;
     
     my $intent = $data_old->{intent};
