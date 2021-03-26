@@ -98,6 +98,7 @@ my $languagevars = {
         '0' => 'Timer $label expired',
         '1' =>  'Timer $label in room $room expired'
     },
+    'timerCancellation' => 'timer $label for $room deleted',
     'timeRequest' => 'it is $hour o clock $min minutes',
     'weekdayRequest' => 'today it is $weekDay',
     'duration_not_understood'   => "Sorry I could not understand the desired duration",
@@ -257,12 +258,15 @@ BEGIN {
     AttrVal
     InternalVal
     ReadingsVal
+    ReadingsNum
     devspec2array
     gettimeofday
     toJSON
     setVolume
     AnalyzeCommandChain
     AnalyzeCommand
+    CommandDefMod
+    CommandDelete
     EvalSpecials
     AnalyzePerlCommand
     perlSyntaxCheck
@@ -272,7 +276,6 @@ BEGIN {
     round
     strftime
     makeReadingName
-    ReadingsNum
     FileRead
     trim
     looks_like_number
@@ -329,6 +332,7 @@ sub RHASSPY_Define {
     $hash->{prefix} = $h->{prefix} // q{rhasspy};
     $hash->{encoding} = $h->{encoding};
     $hash->{useGenericAttrs} = $h->{useGenericAttrs};
+    $hash->{'.asyncQueue'} = [];
     #Beta-User: Für's Ändern von defaultRoom oder prefix vielleicht (!?!) hilfreich: https://forum.fhem.de/index.php/topic,119150.msg1135838.html#msg1135838 (Rudi zu resolveAttrRename) 
 
     if ($hash->{useGenericAttrs}) {
@@ -783,7 +787,7 @@ sub _analyze_rhassypAttr {
             my $specials = {};
             my $partOf = $named->{partOf} // shift @{$unnamed};
             $specials->{partOf} = $partOf if defined $partOf;
-            $specials->{send_delay} = $named->{send_delay} if defined $named->{send_delay};
+            $specials->{async_delay} = $named->{async_delay} if defined $named->{async_delay};
             $specials->{prio} = $named->{prio} if defined $named->{prio};
 
             $hash->{helper}{devicemap}{devices}{$device}{group_specials} = $specials;
@@ -1102,6 +1106,31 @@ sub _combineHashes {
     return $hash1;
 }
     
+# derived from structureRHASSPY_asyncQueue
+sub RHASSPY_asyncQueue {
+    my $hash = shift // return;
+    my $next_cmd = shift @{$hash->{".asyncQueue"}};
+    if (defined $next_cmd) {
+        RHASSPY_runCmd($hash, $next_cmd->{device}, $next_cmd->{cmd});
+        my $async_delay = $next_cmd->{delay} // 0;
+        InternalTimer(time+$async_delay,\&RHASSPY_asyncQueue,$hash,0);
+    }
+    return;
+}
+
+sub _sortAsyncQueue {
+    my $hash = shift // return;
+    my $queue = @{$hash->{".asyncQueue"}};
+    
+    #push @{$hash->{".asyncQueue"}}, {$devices->{$device}->{delay}=>{cmd => $cmd}, prio=>$devices->{$device}->{prio}};
+    my @devlist = sort {
+        $a->{prio} <=> $b->{prio}
+        or
+        $a->{delay} <=> $b->{delay}
+        } @{$queue};
+    $hash->{".asyncQueue"} = @devlist;
+    return;
+}
 
 # Get all devicenames with Rhasspy relevance
 sub RHASSPY_allRhasspyNames {
@@ -1195,7 +1224,9 @@ sub RHASSPY_roomName {
     # Slot "Room" im JSON vorhanden? Sonst Raum des angesprochenen Satelites verwenden
     return $data->{Room} if exists($data->{Room});
     
-    my $room = $data->{siteId};
+    my $room;
+    $room = $
+    $data->{siteId};
     $room = $hash->{helper}{defaultRoom} if ($room eq 'default' || !(length $room));
 
     return $room;
@@ -1373,7 +1404,7 @@ sub RHASSPY_getDevicesByGroup {
         next if !grep { m{\A$group\z}ix } @{$allgroups};
         my $specials = $hash->{helper}{devicemap}{devices}{$dev}{group_specials};
         my $label = $specials->{partOf} // $dev;
-        my $delay = $specials->{send_delay} // 0;
+        my $delay = $specials->{async_delay} // 0;
         my $prio  = $specials->{prio} // 0;
 
         $devices->{$label} = { delay => $delay, prio => $prio };
@@ -2167,6 +2198,7 @@ sub RHASSPY_handleIntentShortcuts {
 
         $cmd  = _replace($hash, $cmd, \%specials);
         #execute Perl command
+        $cmd = qq({$cmd}) if ($cmd !~ m{\A\{.*\}\z}x); 
 
         $ret = RHASSPY_runCmd($hash, undef, $cmd, undef, $data->{siteId});
         $device = $ret if $ret !~ m{Please.define.*first}x;
@@ -2257,6 +2289,9 @@ sub RHASSPY_handleIntentSetOnOffGroup {
     
     my $updatedList;
 
+    my $init_delay = 0;
+    my $needs_sorting = (@{$hash->{".asyncQueue"}});
+        
     for my $device (@devlist) {
         my $mapping = RHASSPY_getMapping($hash, $device, 'SetOnOff', undef, defined $hash->{helper}{devicemap});
 
@@ -2267,7 +2302,6 @@ sub RHASSPY_handleIntentSetOnOffGroup {
         my $cmdOff = $mapping->{cmdOff} // 'off';
         my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
 
-            
         # execute Cmd
         if ( !$delaysum) {
             RHASSPY_runCmd($hash, $device, $cmd);
@@ -2275,11 +2309,14 @@ sub RHASSPY_handleIntentSetOnOffGroup {
             $delaysum += $devices->{$device}->{delay};
             $updatedList = $updatedList ? "$updatedList,$device" : $device;
         } else {
-        InternalTimer(time + $delaysum, sub { \&RHASSPY_runCmd($hash, $device, $cmd) }, $hash, 0);
-            Log3($hash->{NAME}, 5, "Delayed command [$cmd] on device [$device], waiting for $delaysum seconds" );
-            $delaysum += $devices->{$device}->{delay};
+            my $hlabel = $devices->{$device}->{delay};
+            push @{$hash->{".asyncQueue"}}, {device => $device, cmd => $cmd, prio => $devices->{$device}->{prio}, delay => $hlabel};
+            InternalTimer(time+$delaysum,\&RHASSPY_asyncQueue,$hash,0) if !$init_delay;
+            $init_delay = 1;
         }
     }
+    
+    _sortAsyncQueue($hash) if $init_delay && $needs_sorting;
 
     # Send response
     RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'DefaultConfirmation'));
@@ -2792,7 +2829,8 @@ Die ganze Logik würde sich dann erweitern, indem erst geschaut wird, ob eines d
 
     Log3($name, 5, 'handleIntentSetTimer called');
 
-    my $room = $data->{Room} // $siteId;
+    my $room = RHASSPY_roomName($hash, $data); #$data->{Room} // $siteId
+    
     
     my $hour = 0;
     my $value = time;
@@ -2828,11 +2866,22 @@ Die ganze Logik würde sich dann erweitern, indem erst geschaut wird, ob eines d
         $timerRoom = $room if $siteIds =~ m{\b$room\b}ix;
         $responseEnd = $hash->{helper}{lng}->{responses}->{timerEnd}->{0};
     }
+    
+    my $roomReading = "timer_".makeReadingName($room);
+    my $label = $data->{label} // q{};
+    $roomReading .= "_$label" if $label ne ''; 
 
+    if (defined $data->{Cancel}) {
+        CommandDelete($hash, $roomReading);
+        readingsSingleUpdate( $hash,$roomReading, 0, 1 );
+        Log3($name, 5, "deleted timer: $roomReading");
+        $response = RHASSPY_getResponse($hash, 'timerCancellation');
+        $response =~ s{(\$\w+)}{$1}eegx;
+        RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
+        return $name;
+    }
+    
     if( $value && $timerRoom ) {
-        my $roomReading = "timer_".makeReadingName($room);
-        my $label = $data->{label} // q{};
-        $roomReading .= "_$label" if $label ne ''; 
         my $seconds = $value - $now; 
         my $diff = $seconds;
         my $attime = strftime('%H', gmtime $diff);
@@ -2841,13 +2890,14 @@ Die ganze Logik würde sich dann erweitern, indem erst geschaut wird, ob eines d
 
         $responseEnd =~ s{(\$\w+)}{$1}eegx;
 
-        my $cmd = qq(defmod $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";;setreading $name $roomReading 0);
+        #my $cmd = qq(defmod $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";;setreading $name $roomReading 0);
 
-        RHASSPY_runCmd($hash,'',$cmd);
+        #RHASSPY_runCmd($hash,'',$cmd);
+        CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";;setreading $name $roomReading 0");
 
         readingsSingleUpdate($hash, $roomReading, 1, 1);
 
-        Log3($name, 5, "Created timer: $cmd");
+        Log3($name, 5, "Created timer: $roomReading at +$attime");
 
         my ($range, $minutes, $hours);
         @time = localtime($value);
@@ -3375,16 +3425,16 @@ yellow=rgb 00F000</pre></code><br>
     <li>
     <b><a id="RHASSPY-attr-rhasspySpecials">rhasspySpecials</a></b><br>
     key=value line by line arguments similar to <a href="#RHASSPY-attr-rhasspyTweaks">rhasspyTweaks</a>.
-    Example: </pre><code>attr lamp1 rhasspySpecials group:send_delay=100 prio=1 group=lights</pre></code><br>
+    Example: </pre><code>attr lamp1 rhasspySpecials group:async_delay=100 prio=1 group=lights</pre></code><br>
     *) At the moment, only group related stuff is implemented, this could be the place to hold additional options, e.g. for confirmation requests
     Explanation on the above group line, all arguments are optional:
     <ul>
     <li>group<br>
     If set, the device will not be directly addressed, but the mentioned group - typically a FHEM <a href="#structure">structure</a> device or a HUEDevice-type group. This has the advantage of saving RF ressources and/or already implemented logics. Note: all addressed devices will be switched, even if they are not member of the rhasspyGroup! Each group should only be addressed once, but it's recommended to put this info in all devices beeing unter RHASSPY control in the same external group logic.
-    <li>send_delay<br>
-    Float nummeric value, just as send_delay in structure; the delay will be obeyed prior to the next sending command.</li> 
+    <li>async_delay<br>
+    Float nummeric value, just as async_delay in structure; the delay will be obeyed prior to the next sending command.</li> 
     <li>prio<br>
-    Numeric value, defaults to "0". <i>prio</i> and <i>send_delay</i> will be used to determine the sending order as follows: first devices will be those with lowest prio arg, second sort argument is <i>send_delay</i> with lowest value first </li>
+    Numeric value, defaults to "0". <i>prio</i> and <i>async_delay</i> will be used to determine the sending order as follows: first devices will be those with lowest prio arg, second sort argument is <i>async_delay</i> with lowest value first </li>
     </ul>
     </li>
 
