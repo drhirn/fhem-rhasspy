@@ -1225,8 +1225,7 @@ sub RHASSPY_roomName {
     return $data->{Room} if exists($data->{Room});
     
     my $room;
-    $room = $
-    $data->{siteId};
+    $room = $data->{siteId};
     $room = $hash->{helper}{defaultRoom} if ($room eq 'default' || !(length $room));
 
     return $room;
