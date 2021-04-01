@@ -51,6 +51,7 @@ my %gets = (
 my %sets = (
     speak        => [],
     play         => [],
+    customSlot   => [],
 #    updateSlots  => [qw(noArg)],
     textCommand  => [],
     trainRhasspy => [qw(noArg)],
@@ -322,7 +323,7 @@ sub RHASSPY_Define {
     my $type = shift @{$anon};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     my $language = $h->{language} // shift @{$anon} // lc(AttrVal('global','language','en'));
-    $hash->{MODULE_VERSION} = "0.4.6a";
+    $hash->{MODULE_VERSION} = "0.4.7";
     $hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -354,15 +355,13 @@ sub firstInit {
     my $IODev = AttrVal($hash->{NAME},'IODev',undef);
 
     return if !$init_done || !defined $IODev;
-
     RemoveInternalTimer($hash);
-    
+
     IOWrite($hash, 'subscriptions', join q{ }, @topics) if InternalVal($IODev,'TYPE',undef) eq 'MQTT2_CLIENT';
-    
+
     RHASSPY_fetchSiteIds($hash) if !ReadingsVal( $hash->{NAME}, 'siteIds', 0 );
-    
     initialize_rhasspyTweaks($hash);
-    
+    initialize_DialogManager($hash);
     initialize_devicemap($hash); # if defined $hash->{useHash};
 
     return;
@@ -539,6 +538,13 @@ sub RHASSPY_Set {
             return RHASSPY_trainRhasspy($hash);
         }
     }
+    if ($command eq 'customSlot') {
+        my $slotname = $h->{slotname}  // shift @values;
+        my $slotdata = $h->{slotdata}  // shift @values;
+        my $overwr   = $h->{overwrite} // shift @values;
+        my $training = $h->{training}  // shift @values;
+        return RHASSPY_updateSingleSlot($hash, $slotname, $slotdata, $overwr, $training);
+    }
     return;
 }
 
@@ -634,6 +640,30 @@ sub initialize_rhasspyTweaks {
     return;
 }
 
+sub initialize_DialogManager {
+    my $hash    = shift // return;
+    my $language = $hash->{LANGUAGE};
+    my $fhemId   = $hash->{fhemId};
+    
+=pod    disable some intents by default https://rhasspy.readthedocs.io/en/latest/reference/#dialogue-manager
+hermes/dialogueManager/configure (JSON)
+
+    Sets the default intent filter for all subsequent dialogue sessions
+    intents: [object] - Intents to enable/disable (empty for all intents)
+        intentId: string - Name of intent
+        enable: bool - true if intent should be eligible for recognition
+    siteId: string = "default" - Hermes site ID
+=cut
+    my $sendData =  {
+        siteId  => $fhemId,
+        intents => [{intentId => "${language}.${fhemId}.ConfirmAction", enable => "false"}]
+    };
+
+    my $json = toJSON($sendData);
+
+    IOWrite($hash, 'publish', qq{hermes/dialogueManager/configure $json});
+    return;
+}
 
 sub RHASSPY_init_custom_intents {
     my $hash    = shift // return;
@@ -1022,28 +1052,17 @@ sub RHASSPY_confirm_timer {
         #InternalTimer(time + $hash->{helper}{shortcuts}{$data->{input}}{conf_timeout}, \&RHASSPY_confirm_timer, $hash, 0);
         InternalTimer(time + $timeout, \&RHASSPY_confirm_timer, $hash, 0);
 
-        RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
+        #interactive dialogue as described in https://rhasspy.readthedocs.io/en/latest/reference/#dialoguemanager_continuesession and https://docs.snips.ai/articles/platform/dialog/multi-turn-dialog
+        my $reaction = { text => $response, intentFilter => [qw(ConfirmAction)]
+            };
+
+        RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $reaction);
 
         return $hash->{NAME};
     }
     
     return $hash->{NAME};
 }
-
-=pod
-(Old Version, Shortcuts only)
-sub RHASSPY_handleIntentConfirmation {
-    my $hash = shift // return;
-    my $data = shift // return;
-    
-    RemoveInternalTimer($hash);
-    my $data2 = $hash->{helper}{'.delayed'};
-    delete $hash->{helper}{'.delayed'};
-    
-    #Beta-User: most likely we will have to change some fields in $data2 to content from $data
-    return RHASSPY_handleIntentShortcuts($hash,$data2,1);
-}
-=cut
 
 
 #from https://stackoverflow.com/a/43873983, modified...
@@ -1882,11 +1901,22 @@ sub RHASSPY_respond {
     my $siteId    = shift // return;
     my $response  = shift // return;
 
+    my $topic = q{endSession};
+
     my $sendData =  {
         sessionId => $sessionId,
-        siteId    => $siteId,
-        text      => $response
+        siteId    => $siteId
     };
+
+    if (ref $response eq 'HASH' && keys %{$response} > 1) {
+        #intentFilter
+        $topic = q{continueSession};
+        for my $key (keys %{$response}) {
+            $sendData->{$key} = $response->{$key};
+        }
+    } else {
+        $sendData->{text} = $response
+    }
 
     my $json = toJSON($sendData);
 
@@ -1896,7 +1926,7 @@ sub RHASSPY_respond {
       : readingsBulkUpdate($hash, 'textResponse', $response);
     readingsBulkUpdate($hash, 'responseType', $type);
     readingsEndUpdate($hash,1);
-    IOWrite($hash, 'publish', qq{hermes/dialogueManager/endSession $json});
+    IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
     return;
 }
 
@@ -2017,6 +2047,33 @@ sub RHASSPY_updateSlots {
     return;
 }
 
+# Send all devices, rooms, etc. to Rhasspy HTTP-API to update the slots
+sub RHASSPY_updateSingleSlot {
+    my $hash     = shift // return;
+    my $slotname = shift // return;
+    my $slotdata = shift // return;
+    my $overwr   = shift // q{true};
+    my $training = shift;
+    $overwr = q{false} if $overwr ne 'true';
+    my @data = split m{,}xms, $slotdata;
+    my $language = $hash->{LANGUAGE};
+    my $fhemId   = $hash->{fhemId};
+    my $method   = q{POST};
+    
+    my $url = qq{/api/slots?overwrite_all=$overwr};
+
+    my $deviceData->{qq(${language}.${fhemId}.$slotname)} = \@data;
+
+    my $json = eval { toJSON($deviceData) };
+
+    Log3($hash->{NAME}, 5, "Updating Rhasspy single slot with data ($language): $json");
+
+    RHASSPY_sendToApi($hash, $url, $method, $json);
+    return RHASSPY_trainRhasspy($hash) if $training;
+
+    return;
+}
+
 # Use the HTTP-API to instruct Rhasspy to re-train it's data
 sub RHASSPY_trainRhasspy {
     my $hash = shift // return;
@@ -2107,7 +2164,7 @@ sub RHASSPY_handleCustomIntent {
     my $data       = shift;
    
     if (!defined $hash->{helper}{custom} || !defined $hash->{helper}{custom}{$intentName}) {
-        Log3($hash->{NAME}, 2, "handleIntentShortcuts called with invalid $intentName key");
+        Log3($hash->{NAME}, 2, "handleIntentCustomIntent called with invalid $intentName key");
         return;
     }
     my $custom = $hash->{helper}{custom}{$intentName};
@@ -2138,9 +2195,7 @@ sub RHASSPY_handleCustomIntent {
         my $args = join q{","}, @rets;
         my $cmd = qq{ $subName( "$args" ) };
 =pod
-attr rhasspy rhasspyIntents GetAllOff=GetAllOff(Room,Type)\
-SetAllOff=SetAllOff(Room,Type)\
-SetAllOn=SetAllOn(Room,Type)
+attr rhasspy rhasspyIntents SetAllOn=SetAllOn(Room,Type)
 
 sub SetAllOn($$){
 my ($Raum,$Typ) = @_;
@@ -2470,7 +2525,6 @@ sub RHASSPY_handleIntentSetNumeric {
     if (!defined $device || !isValidData($data)) {
         return if defined $data->{'.inBulk'};
         return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoValidData'));
-        #nnnnn
     }
     
     my $unit   = $data->{Unit};
@@ -3355,6 +3409,16 @@ attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
     Example: <code>set &lt;rhasspyDevice&gt; updateSlots</code><br>
     Do not forget to train Rhasspy afterwards!</s> (deprecated)
   </li>
+    <li>
+    <b><a id="RHASSPY-set-customSlot">customSlot</a></b><br>
+    Provide slotname, slotdata and (optional) info, if existing data shall be overwritten and training shall be initialized immediately afterwards. 
+    First two arguments are required, third and fourth are optional!<br>
+    <i>overwrite</i> defaults to <i>true</i>, setting any other value than <i>true</i> will keep existing Rhasspy slot data.<br>
+    Examples: <code>set &lt;rhasspyDevice&gt; customSlot mySlot a,b,c overwrite training </code> or 
+    <code>set &lt;rhasspyDevice&gt; customSlot slotname=mySlot slotdata=a,b,c overwrite=false</code>
+  </li>
+
+  
 </ul>
 <a id="RHASSPY-attr"></a>
 <p><b>Attributes</b></p>
@@ -3375,12 +3439,12 @@ attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
     configFile also allows combining e.g. a default set of German sentences with some few own modifications by using "defaults" subtree for the defaults and "user" subtree for your modified versions. This feature might be helpfull in case the base language structure has to be changed in the future.
   </li>
   <li>
-    <s><b>response</b><br>
+    <b>response</b><br>
     Optionally define alternative default answers. Available keywords are <code>DefaultError</code>, <code>NoActiveMediaDevice</code> and <code>DefaultConfirmation</code>.<br>
     Example:
     <pre><code>DefaultError=
-DefaultConfirmation=Klaro, mach ich</code></pre></s><p>
-    Beta-User: Was never part of the code? Use configFile instead!
+DefaultConfirmation=Klaro, mach ich</code></pre><p>
+    Note: Kept for compability reasons. Consider using configFile instead!
   </li>
   <li>
     <a id="RHASSPY-attr-rhasspyIntents"></a><b>rhasspyIntents</b><br>
