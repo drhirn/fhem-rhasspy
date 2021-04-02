@@ -323,7 +323,7 @@ sub RHASSPY_Define {
     my $type = shift @{$anon};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     my $language = $h->{language} // shift @{$anon} // lc(AttrVal('global','language','en'));
-    $hash->{MODULE_VERSION} = "0.4.7";
+    $hash->{MODULE_VERSION} = "0.4.6a";
     $hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -372,12 +372,10 @@ sub initialize_Language {
     my $lang = shift // return;
     my $cfg  = shift // AttrVal($hash->{NAME},'configFile',undef);
     
-    #my $cp = $hash->{encoding} // q{UTF-8};
     my $cp = q{UTF-8};
-    my $lngvars = $languagevars;
     
     #default to english first
-    $hash->{helper}{lng} = $lngvars if !$init_done || !defined $hash->{helper}{lng};
+    $hash->{helper}->{lng} = $languagevars if !defined $hash->{helper}->{lng} || !$init_done;
 
     my ($ret, $content) = RHASSPY_readLanguageFromFile($hash, $cfg);
     return $ret if $ret;
@@ -395,7 +393,10 @@ sub initialize_Language {
     }
 
     #$hash->{helper}{lng} = $decoded;
-    $hash->{helper}{lng} = _combineHashes( $lngvars, $decoded);
+    my $lng = $hash->{helper}->{lng};
+    my $lngvars = _combineHashes( $lng, $decoded);
+
+    $hash->{helper}->{lng} = $lngvars;
     return;
 }
 
@@ -1112,18 +1113,20 @@ sub _replace {
 #Beta-User: might be usefull in case we want to allow some kind of default + user-diff logic, especially in language...
 sub _combineHashes {
     my ($hash1, $hash2, $parent) = @_;
-
+    my $hash3 = {};
+    
     for my $key (keys %{$hash1}) {
+        $hash3->{$key} = $hash1->{$key};
         if (!exists $hash2->{$key}) {
             next;
         }
-        if ( ref $hash1->{$key} eq 'HASH' and ref $hash2->{$key} eq 'HASH' ) {
-            _combineHashes($hash1->{$key}, $hash2->{$key}, $key);
-        } elsif ( !ref $hash1->{$key} && !ref $hash2->{$key} ) { 
-            $hash1->{$key} = $hash2->{$key};
+        if ( ref $hash3->{$key} eq 'HASH' and ref $hash2->{$key} eq 'HASH' ) {
+            $hash3->{$key} = _combineHashes($hash3->{$key}, $hash2->{$key}, $key);
+        } elsif ( !ref $hash3->{$key} && !ref $hash2->{$key} ) { 
+            $hash3->{$key} = $hash2->{$key};
         }
     }
-    return $hash1;
+    return $hash3;
 }
     
 # derived from structureRHASSPY_asyncQueue
@@ -1908,7 +1911,7 @@ sub RHASSPY_respond {
         siteId    => $siteId
     };
 
-    if (ref $response eq 'HASH' && keys %{$response} > 1) {
+    if (ref $response eq 'HASH') {
         #intentFilter
         $topic = q{continueSession};
         for my $key (keys %{$response}) {
