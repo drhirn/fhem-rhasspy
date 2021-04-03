@@ -323,7 +323,7 @@ sub RHASSPY_Define {
     my $type = shift @{$anon};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     my $language = $h->{language} // shift @{$anon} // lc(AttrVal('global','language','en'));
-    $hash->{MODULE_VERSION} = "0.4.6a";
+    $hash->{MODULE_VERSION} = "0.4.7";
     $hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -393,10 +393,10 @@ sub initialize_Language {
     }
 
     #$hash->{helper}{lng} = $decoded;
-    my $lng = $hash->{helper}->{lng};
-    my $lngvars = _combineHashes( $lng, $decoded);
+    #my $lng = $hash->{helper}->{lng};
+    #my $lngvars = _combineHashes( $lng, $decoded);
 
-    $hash->{helper}->{lng} = $lngvars;
+    $hash->{helper}->{lng} = _combineHashes( $hash->{helper}->{lng}, $decoded);
     return;
 }
 
@@ -2525,7 +2525,7 @@ sub RHASSPY_handleIntentSetNumeric {
 
     Log3($hash->{NAME}, 5, "handleIntentSetNumeric called");
 
-    if (!defined $device || !isValidData($data)) {
+    if (!defined $device && !isValidData($data)) {
         return if defined $data->{'.inBulk'};
         return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoValidData'));
     }
