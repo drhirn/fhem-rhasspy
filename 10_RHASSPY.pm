@@ -395,8 +395,8 @@ sub initialize_Language {
     #$hash->{helper}{lng} = $decoded;
     #my $lng = $hash->{helper}->{lng};
     #my $lngvars = _combineHashes( $lng, $decoded);
-
     $hash->{helper}->{lng} = _combineHashes( $hash->{helper}->{lng}, $decoded);
+
     return;
 }
 
@@ -965,7 +965,7 @@ sub _analyze_genDevType {
             SetOnOff => { SetOnOff => {cmdOff => 'off', type => 'SetOnOff', cmdOn => 'on'}},
             GetNumeric => { 'volume' => {currentVal => 'volume', type => 'volume' }},
             SetNumeric => {'volume' => { cmd => 'volume', currentVal => 'volume', maxVal => '100', minVal => '0', step => '2', type => 'volume'}, 'channel' => { cmd => 'channel', currentVal => 'channel', step => '1', type => 'channel'}}, 
-            MediaControls => {'cmdPlay' => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown'}};
+            MediaControls => { MediaControls => {'cmdPlay' => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown'} } };
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
     }
 
@@ -3025,7 +3025,7 @@ Die ganze Logik würde sich dann erweitern, indem erst geschaut wird, ob eines d
         #my $cmd = qq(defmod $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";;setreading $name $roomReading 0);
 
         #RHASSPY_runCmd($hash,'',$cmd);
-        CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";;setreading $name $roomReading 0");
+        CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";setreading $name $roomReading 0");
 
         readingsSingleUpdate($hash, $roomReading, 1, 1);
 
