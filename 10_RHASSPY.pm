@@ -1114,7 +1114,7 @@ sub _replace {
 sub _combineHashes {
     my ($hash1, $hash2, $parent) = @_;
     my $hash3 = {};
-    
+   
     for my $key (keys %{$hash1}) {
         $hash3->{$key} = $hash1->{$key};
         if (!exists $hash2->{$key}) {
@@ -1122,9 +1122,12 @@ sub _combineHashes {
         }
         if ( ref $hash3->{$key} eq 'HASH' and ref $hash2->{$key} eq 'HASH' ) {
             $hash3->{$key} = _combineHashes($hash3->{$key}, $hash2->{$key}, $key);
-        } elsif ( !ref $hash3->{$key} && !ref $hash2->{$key} ) { 
+        } elsif ( !ref $hash3->{$key} && !ref $hash2->{$key} ) {
             $hash3->{$key} = $hash2->{$key};
         }
+    }
+    for (qw(commaconversion mutated_vowels)) {
+        $hash3->{$_} = $hash2->{$_} if defined $hash2->{$_};
     }
     return $hash3;
 }
