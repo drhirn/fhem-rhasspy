@@ -26,8 +26,9 @@
 # You should have received a copy of the GNU General Public License
 # along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
+        
+ 
 ###########################################################################
-
 package MQTT::RHASSPY; ##no critic qw(Package)
 use strict;
 use warnings;
@@ -319,10 +320,10 @@ sub RHASSPY_Define {
 
     my $name = shift @{$anon};
     my $type = shift @{$anon};
-    my $Rhasspy  = $h->{IP_Port} // shift @{$anon} // q{localhost:12101};
+    my $Rhasspy  = $h->{IP_Port} // shift @{$anon} // q{http://localhost:12101};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     my $language = $h->{language} // shift @{$anon} // lc(AttrVal('global','language','en'));
-    $hash->{MODULE_VERSION} = "0.4.6a";
+    $hash->{MODULE_VERSION} = "0.4.7a";
     $hash->{IP_Port} = $Rhasspy;
     $hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
