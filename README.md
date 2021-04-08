@@ -1,12 +1,13 @@
-# Rhasspy-FHEM
+# FHEM-rhasspy
 [FHEM](https://fhem.de) module for [Rhasspy](https://github.com/rhasspy)
 
 Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://github.com/Thyraz/Snips-Fhem).
 
 ## Contents
+[Read First](#Read-First)\
 [About Rhasspy](#About-Rhasspy)\
-[About FHEM-Rhasspy](#About-FHEM-Rhasspy)\
-[Installation of Rhasspy-FHEM](#Installation-of-Rhasspy-FHEM)\
+[About FHEM-rhasspy](#About-FHEM-rhasspy)\
+[Installation of FHEM-rhasspy](#Installation-of-FHEM-rhasspy)\
 [Definition (DEF) in FHEM](#definition-def-in-fhem)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Set-Commands (SET)](#set-commands-set)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attributes (ATTR)](#attributes-attr)\
@@ -16,8 +17,9 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[Room *Rhasspy*](#room-rhasspy)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyName*](#attribute-rhasspyname)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyRoom*](#attribute-rhasspyroom)\
-&nbsp;&nbsp;&nbsp;&nbsp;[Assign intents with *rhasspyMapping*](#assign-intents-with-rhasspymapping)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyMapping*](#attribute-rhasspymapping)\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyChannels*](#attribute-rhasspychannels)\
 [Intents](#intents)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetOnOff](#setonoff)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetOnOff](#getonoff)\
@@ -37,17 +39,22 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[Rhasspy speaks actual state of device after switching it](#rhasspy-speaks-actual-state-of-device-after-switching-it)\
 [To-Do](#To-Do)
 
+## Read First
+In this documentation\
+**RHASSPY** refers to this FHEM-module or the FHEM-device\
+**Rhasspy** refers to the Rhasspy Voice Assistant
+
 ## About Rhasspy
 Rhasspy (pronounced RAH-SPEE) is an open source, fully offline set of voice assistant services for many human languages.
 
-## About FHEM-Rhasspy
+## About FHEM-rhasspy
 Rhasspy consist of multiple modules (Hot-Word Detection, Text to Speech, Speech to Text, Intent Recognition, ...). All of these communicate over MQTT.
 
-Rhasspy-FHEM evaluates these JSON-messages and converts them to commands. And it sends messages to Rhasspy to e.g. provide responses on commands to TextToSpeech.
+FHEM-rhasspy evaluates these JSON-messages and converts them to commands. And it sends messages to Rhasspy to e.g. provide responses on commands to TextToSpeech.
 
-Rhasspy-FHEM uses the 00_MQTT2_CLIENT.pm module to receive and send these messages. Therefore it is necessary to define an MQTT2_CLIENT device in FHEM before using Rhasspy-FHEM.
+FHEM-rhasspy uses the 00_MQTT2_CLIENT.pm module to receive and send these messages. Therefore it is necessary to define an MQTT2_CLIENT device in FHEM before using FHEM-rhasspy.
 
-## Installation of Rhasspy-FHEM
+## Installation of FHEM-rhasspy
 - Download a RAW-Copy of 10_RHASSPY.pm and copy it to `opt/fhem/FHEM`
 - Don't forget to change the ownership of the file to `fhem.dialout` (or whatever user/group FHEM is using).
 - Restart FHEM
@@ -56,29 +63,44 @@ Rhasspy-FHEM uses the 00_MQTT2_CLIENT.pm module to receive and send these messag
 define RhasspyMQTT2 MQTT2_CLIENT <ip-or-hostname-of-mqtt-server>:12183 
 ```
 - Change the `clientOrder` to set the right notification order:
-````
+```
 attr <DeviceName> clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE
-````
+```
 - Add MQTT-subscriptions needed for this module:
-````
+```
 attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded
-````
+```
 
 ## Definition (DEF) in FHEM
 You can define a new instance of this module with:
 
 ```
-define <name> RHASSPY <devspec> <defaultRoom> <language>
+define <name> RHASSPY <WebIF> <devspec> <defaultRoom> <language> <fhemId> <prefix> <useGenericAttrs> <encoding>
 ```
 
-* `devspec`: [devspec](https://commandref.fhem.de/commandref.html#devspec) of the device(s) that should be controlled with Rhasspy. Optional. Default is `room=Rhasspy`.
-* `defaultRoom`: Name of the default room which should be used if no room-name is present in the command. Optional. Default is `default`.
-* `language`: Language of the voice commands spoken to Rhasspy. Optional. Default is derived from global, which defaults to `language=en`.
+All parameters are optional but changing them later may result in confusing results. So it's recommended to add them when first defining the module.
 
-Example:
-````define Rhasspy RHASSPY devspec=room=Rhasspy,room=Music,Light1 defaultRoom=livingroom language=en````
+* `WebIF`: The url of the Rhasspy service web-interface. If using a base and multiple satellites, use the url of the base. Default is `WebIF=http://127.0.0.1:12101`. Make sure, this is set to correct values (IP and Port)!
+* `devspec`: [devspec](https://commandref.fhem.de/commandref.html#devspec) of the device(s) that should be controlled with Rhasspy. Default is `devspec=room=Rhasspy`.
+* `defaultRoom`: Name of the default room which should be used if no room-name is present in the command. Default is `defaultRoom=default`.
+* `language`: Language of the voice commands spoken to Rhasspy. Default is derived from global, which defaults to `language=en`.
+* `fhemId`: Used to differ between multiple instances of RHASSPY on the MQTT side. Also is a part of the topic tree the corresponding RHASSPY is listening to. Default is `fhemId=fhem`.
+* `prefix`: Used to differ between multiple instances of RHASSPY on the FHEM-internal side. Usefull, if you have several instances of RHASSPY in one FHEM running and want e.g. to use different identifier for groups and rooms (e.g. a different language). Default is `prefix=rhasspy`.
+* `useGenericAttrs`: By default, RHASSPY only uses it's own attributes (see list below) to identifiy options for the subordinated devices you want to control. Activating this with `useGenericAttrs=1` adds `genericDeviceType` to the global attribute list and activates RHASSPYs feature to estimate appropriate settings - similar to rhasspyMapping. Default is empty.
+
+Simple-Example:
+```
+define Rhasspy RHASSPY
+```
+
+Full-Example:
+```
+define Rhasspy RHASSPY WebIf=http://rhasspy:12101 devspec=room=Rhasspy defaultRoom=default language=en fhemId=fhem prefix=rhasspy useGenericAttrs=1
+```
 
 ### Set-Commands (SET)
+* **customSlot**\
+  Update a single Rhasspy-slot
 * **fetchSiteIds**\
   Fetch all available siteIds from Rhasspy-Base and create a reading _siteIds_. Used for e.g. to determine on which Rhasspy satellite the user gets informed that a timer has ended.\
   Has to be executed everytime a new satellite is installed or a new siteId is added to Rhasspy.
@@ -87,18 +109,6 @@ Example:
   Send a WAV file to Rhasspy.\
   Both arguments (siteId and path) are required!\
   Example: `set <rhasspyDevice> play siteId="default" path="/opt/fhem/test.wav"`
-* **reinit**\
-  * **language**\
-    Reinitialization of language file.\
-    Be sure to execute this command after changing something in the language-configuration files or the attribut `configFile`!\
-    Example: `set <rhasspyDevice> reinit language`
-  * **devicemap**\
-    Reinitialization of device controlled by this module.\
-	Has to be executed after changes to the attributes of a Rhasspy-controlled devices.\
-	Example: `set <rhasspyDevice> reinit devicemap`
-  * **all**\
-    Reinitialization of language file and devicemap.\
-	Example: `set <rhasspyDevice> reinit all`
 * **speak**\
   Voice output over TTS.\
   Both arguments (siteId and text) are required!\
@@ -107,8 +117,7 @@ Example:
   Send a text command to Rhasspy.\
   Example: `set <rhasspyDevice> textCommand turn the light on`
 * **trainRhasspy**\
-  Sends a train-command to the HTTP-API of the Rhasspy master.
-  The attribute `rhasspyMaster` has to be defined to work.\
+  Sends a train-command to the HTTP-API of the Rhasspy base.\
   Example: `set <rhasspyDevice> trainRhasspy`
 * **updateSlots**\
   Sends a command to the HTTP-API of the Rhasspy master to update all slots on Rhasspy with actual FHEM-devices, rooms, etc.\
@@ -120,44 +129,98 @@ Example:
   - de.fhem.MediaChannels
   - de.fhem.Color
   - de.fhem.NumericType
+* **update**\
+  * **devicemap**\
+    When the configuration work to RHASSPY and all subordinated devices is finished or there had been changes, issuing a devicemap-update is mandatory, to get the RHASSPY data structure updated, inform Rhasspy on changes that may have occured (update slots) and initiate a training on updated slot values etc.
+	Has to be executed after changes to the attributes of a Rhasspy-controlled devices or the RHASSPY device itself.\
+	Example: `set <rhasspyDevice> update devicemap`
+  * **devicemap_only**\
+    Used to check whether attribute changes have found their way to the data structure. This will neither update slots nor initiate any training towards Rhasspy.\
+	Example: `set <rhasspyDevice> update devicemap_only`
+  * **slots**\
+    May be helpful after checks on the FHEM side to update all Rhasspy slots and initiate training.\
+	Example: `set <rhasspyDevice> update slots`
+  * **slots_no_training**\
+	Same as `slots` without starting a training after updating.\
+	Example: `set <rhasspyDevice> update slots_no_training`
+  * **language**\
+    Reinitialization of language file.\
+    Be sure to execute this command after changing something in the language-configuration files or the attribut `configFile`!\
+    Example: `set <rhasspyDevice> update language`
+  * **all**\
+    Update devicemap and language.\
+	Example: `set <rhasspyDevice> update all`
+* **volume**\
+	Sets volume of given siteId between 0 and 1 (float)\
+    Both arguments (siteId and volume) are required!\
+    Example: `set <rhasspyDevice> siteId="default" volume="0.5"`
   
   
-  **Do not forget to train Rhasspy after updating slots!**
+  **Do not forget to issue an `update devicemap` after making any changes to Rhasspy-controlled devices, the language file or the RHASSPY-device itself!**
 
 ### Attributes (ATTR)
-* **rhasspyMaster**\
-  Defines the URL to the Rhasspy Master for sending requests to the HTTP-API.\
-  Has to be in Format `protocol://fqdn:port`.\
-  Example:
-  `http://rhasspy.example.com:12101`
+* **IODev**\
+  The MQTT2_CLIENT device FHEM-rhasspy is connected to.
+  Example: `attr <rhasspyDevice> IODev rhasspyMQTT2`
 * **configFile**\
   Path to the language-config file. If this attribute isn't set, english is used for voice responses.\
   Example: `attr <rhasspyDevice> configFile /opt/fhem/.config/rhasspy/rhasspy-de.cfg`
 * **forceNEXT**\
   If set to 1, RHASSPY will forward incoming messages also to further MQTT2-IO-client modules like MQTT2_DEVICE, even if the topic matches to one of it's own subscriptions. By default, these messages will not be forwarded for better compability with autocreate feature on MQTT2_DEVICE. See also [clientOrder](https://commandref.fhem.de/commandref.html#MQTT2_CLIENT) attribute in MQTT2 IO-type commandrefs. Setting this in one instance of RHASSPY might affect others, too.
 * **response**\
+  **Not recommended. Use the language-file instead**\
   Optionally define alternative default answers.\
   Available keywords are `DefaultError`, `NoActiveMediaDevice` and `DefaultConfirmation`.\
   Example:
-  ````
+  ```
   DefaultError=
   DefaultConfirmation=Master, it is a pleasure doing as you wish
-  ````
+  ```
 * **rhasspyIntents**\
-  Define custom intents created in 99_myUtils.pm.\
-  Example:
-  ````
-  Wikipedia=Wikipedia(term)
-  Respeak=Respeak()
-  ````
+  Define custom intents for functions in 99_myUtils.pm.\
+  One intent per line.\
+  Example: `attr <rhasspyDevice> rhasspyIntents SetCustomIntentsTest=SetCustomIntentsTest(siteId,Device)`\
+    together with the follwoing myUtils-Code should get a short impression of the possibilities:
+	```
+    sub SetCustomIntentsTest {
+        my $room = shift; 
+        my $type = shift;
+        Log3('rhasspy',3 , "RHASSPY: Room $room, Type $type");
+        return "RHASSPY: Room $room, Type $type";
+    }
+	```
+    The following arguments can be handed over:
+      * NAME => name of the RHASSPY device addressed
+      * DATA => entire JSON-$data (as parsed internally)
+      * siteId, Device etc. => any element out of the JSON-$data
 * **shortcuts**\
   Define custom sentences without editing Rhasspy sentences.ini.\
-  The shortcuts are uploaded to Rhasspy when using the `updateSlots` set-command.\
-  Example:
-  ````
-  mute on={fhem ("set receiver mute on")}
-  mute off={fhem ("set receiver mute off")}
-  ````
+  The shortcuts are uploaded to Rhasspy when using the `update devicemap` set-command.\
+  One shortcut per line, syntax is either a simple or an extended version.\
+  Examples:
+  ```mute on=set amplifier2 mute on
+lamp off={fhem("set lampe1 off")}
+i="you are so exciting" f="set $NAME speak siteId='livingroom' text='Thanks a lot, you are even more exciting!'"
+i="mute off" p={fhem ("set $NAME mute off")} n=amplifier2 c="Please confirm!"
+````
+
+  Abbreviations explanation:
+  * **i**: intent\
+    Lines starting with `i=` will be interpreted as extended version, so if you want to use that syntax style, starting with `i=` is mandatory.
+  * **f**: FHEM command\
+    Syntax as usual in FHEMWEB command field.
+  * **p**: perl command\
+    Syntax as usual in FHEMWEB command field, enclosed in {}; this has priority to `f=`.
+  * **n**: device name(s)\
+    Device name(s, comma separated) that will be handed over to fhem.pl as updated devices. Needed for triggering further actions and longpoll! If not set, the return value of the called function will be used.
+  * **r**: response\
+    Response to be set to the caller. If not set, the return value of the called function will be used.\
+	You may ask for confirmation as well using the following (optional) shorts:
+    * **c**: Either numeric or text. If numeric: Timeout to wait for automatic cancellation. If text: response to send to ask for confirmation.
+    * **ct**: Numeric value for timeout in seconds, default: 15
+* **rhasspyTweaks**
+  Not fully implemented yet.
+  Could be the place to configure additional things like additional siteId2room info or code links, allowed commands, duration of SetTimer sounds, confirmation requests etc.
 
 ### Readings / Events
 * **lastIntentPayload**\
@@ -192,27 +255,19 @@ Using a separate MQTT server (and not the internal MQTT2_SERVER) is highly recom
 Furthermore, you are highly encouraged to restrict subscriptions only to the relevant topics: `attr <m2client> subscriptions setByTheProgram`\
 
 In case you are using the MQTT server also for other purposes than Rhasspy, you have to set `subscriptions` manually to at least include the following topics additionally to the other subscriptions desired for other purposes:
-````
+```
 hermes/intent/+
 hermes/dialogueManager/sessionStarted
 hermes/dialogueManager/sessionEnded
-````
+```
 
 ## Configure FHEM-devices for use with Rhasspy
-To control a device with voice-commands, Rhasspy needs to now about the device. This works by adding the device to the FHEM-room *Rhasspy*. When using the set-command *updateSlots*, the module Rhasspy-FHEM then creates a list of all devices in this room and saves it to a Rhasspy-slot called *de.fhem.Device*. After training Rhasspy, the device is recognized and can be controlled.
+To control a device with voice-commands, Rhasspy needs to now some information about the device. It collects this information from the following attributes or from the *genericDeviceType*-attribute.\
+Except for *genericDeviceType*, all attribute-names are starting with the prefix used while defining the RHASSPY-device. The following uses the default value *rhasspy*.
 
 
-**Important**: Be sure to execute `updateSlots` and `trainRhasspy` after every change of the following attributes.
+**Important**: Be sure to execute `update devicemap` after every change of the following attributes.
 
-
-To use a FHEM-device with Rhasspy, some settings are needed:
-
-### Room Rhasspy
-Rhasspy-FHEM only searches for devices in room **Rhasspy**. Be sure to add this attribute to every device you want to control with Rhasspy.\
-Example:
-```
-attr Bulb room Rhasspy
-```
 
 ### Attribute *rhasspyName*
 Every controllable FHEM-device has to have an attribute **rhasspyName**. The content of this attribute is the name you want to call this device (e.g. *Bulb*). It's possible to use multiple names for the same device by separating them with comma.\
@@ -229,19 +284,24 @@ This is useful to speak commands without a room. If there is a device *Bulb* and
 Example:
 ```attr <device> rhasspyRoom Livingroom```
 
-### Assign intents with *rhasspyMapping*
-There is no automatic detection of the right intent for a particular type of device. That's why it's necessary to create a mapping of intents a device supports.\
-It's possible to assign multiple intents to a single device. Just add one line per mapping.
+### Attribute *rhasspyGroup*
+Comma-separated "labels" for the groups the device belongs to.
 
-A mapping has to look like:
-```
-IntentName:option1=value1,option2=value2,...
-```
+Example:
+`attr <device> rhasspyGroup lights
+
+### Attribute *rhasspyMapping*
+If automatic detection of the right intent for a particular type of device isn't working or is not desired, this attribute is used to inform RHASSPY which intents to use to control the device.\
+It's possible to assign multiple intents to a single device. Just add one line per mapping.
 
 Example:
 ```
-SetOnOff:cmdOn=on,cmdOff=off
+attr <device> rhasspyMapping SetOnOff:cmdOn=on,cmdOff=off,response="All right"
 GetOnOff:currentVal=state,valueOff=off
+GetNumeric:currentVal=pct,type=brightness
+SetNumeric:currentVal=pct,minVal=0,maxVal=100,map=percent,cmd=pct,step=1,type=brightness
+Status:response=The brightness in the kitchen is at [<device>:pct]
+MediaControls:cmdPlay=play,cmdPause=pause,cmdStop=stop,cmdBack=previous,cmdFwd=next
 ```
 
 #### Formatting Commands and Readings inside a *rhasspyMapping*
@@ -265,6 +325,15 @@ kann mit der Option `part` das Reading an Leerzeichen getrennt werden.\
 Über `part=1` bestimmt ihr, dass nur der erst Teil des Readings übernommen werden soll.\
 Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
 -->
+
+### Attribute rhasspyChannels
+Used by intent *MediaControls*. Tells the intent, which channels are available and which FHEM-command or perl-code to execute.\
+One line per channel.\
+
+Example:
+```attr <device> rhasspyChannels orf eins=set <device> channel 201
+orf zwei=set <device> channel 202
+```
 
 ## Intents
 Intents are used to tell FHEM what to do after receiving a voice-/text-command. This module has some build-in intents.
@@ -472,31 +541,20 @@ previous
 ```
 
 Example-Rhasspy-Sentences:
-````
+```
 [de.fhem:MediaControls]
 (start){Command:cmdPlay} the playback [$de.fhem.Device{Device}]
 (stop){Command:cmdStop} the playback [$de.fhem.Device{Device}]
 (pause){Command:cmdPause} the playback [$de.fhem.Device{Device}]
 (next){Command:Fwd} (song|title) [$de.fhem.Device{Device}]
 (previous){Command:Back} (song|title) [$de.fhem.Device{Device}] [$de.fhem.Room{Room}]
-````
+```
 
 ### MediaChannels
 
 Intent to change radio-/tv channels, favorites, playlists, lightscenes, ...
 
 Instead of using the attribute *rhasspyMapping*, this intent is configured with an own attribute **rhasspyChannels** in the respective device. Reason is the multiple-line-configuration.
-
-To add this new attribute, it's necessary to create/edit the attribute *userattr* and add:
-```
-attr <deviceName> userattr rhasspyChannels:textField-long
-```
-
-Afterwards write down the desired channels in the format `channelname=command`.
-
-Values:
-* **Channelname** The name you want to use in the voice-command.
-* **cmd** The FHEM-command to switch to the channel.
 
 Example-Mappings:
 ```
@@ -612,16 +670,16 @@ This intent creates an AT-command in FHEM with the given time and - currently - 
 No FHEM-settings needed
 
 Example-Sentences:
-````
+```
 Set timer in bedroom to five minutes
 Set countdown in the kitchen to two hours
-````
+```
 
 Example-Rhasspy-Sentence:
-````
+```
 [de.fhem:SetTimer]
 \[set] (timer|countdown) [in] [$de.fhem.Room{Room}] to (1..60){Value} [(minute|minutes|hour|hours|second|seconds){Unit}]
-````
+```
 Be sure to make the unit optional! Else there is always a random "unit" added to the sentence.
 
 ### SetMute
@@ -633,21 +691,21 @@ This intents creates a Reading __mute_siteId__ for every siteId it get's a voice
 No FHEM-settings needed
 
 Example-Sentences:
-````
+```
 good night
 be quiet
 good morning
 make noise
 start listening
 stop listening
-````
+```
 
 Example-Rhasspy-Sentences:
-````
+```
 [de.fhem:SetMute]
 (good night|be quiet){Value:on}
 (good morning|make noise){Value:off}
-````
+```
 Attention! The `{Value:on}` or `{Value:off}` is mandatory, case sensitive and has to be english!
 
 ### ReSpeak
@@ -657,19 +715,19 @@ Repeats the last sentence, Rhasspy has spoken. To be exactly: Speaks the content
 No FHEM-settings needed
 
 Expample-Sentences:
-````
+```
 what did you say
 can you repeat
 i did not understand you
-````
+```
 
 Example-Rhasspy-Sentences:
-````
+```
 [de.fhem:ReSpeak]
 what did you say
 excuse me
 can you repeat the last sentence
-````
+```
 
 
 ## Custom Intents
@@ -679,25 +737,25 @@ It's possible to create custom intents in FHEM's 99_myUtils.pm.
 As example an intent that repeats the last voice response Rhasspy has spoken.
 
 Add the following `sub` to your 99_myUtils.pm:
-````
+```
 sub Respeak(){
     #Credits to JensS
     my $name = "Rhasspy"; #Replace "Rhasspy" with the name of your RHASSPY-Device
     my $response = ReadingsVal($name,"voiceResponse","Sorry, I can not remember my last sentence");
     return $response;
 }
-````
+```
 
 Then create or edit the attribut `rhasspyIntents` and add the following text. One Intent per line.
-````
+```
 Respeak=Respeak()
-````
+```
 
 Last add a new sentence to sentence.ini of your Rhasspy base:
-````
+```
 [de.fhem:Respeak]
 what did you say
-````
+```
 
 ## Tips & Tricks
 
@@ -727,10 +785,10 @@ SetOnOff:cmdOn=on,cmdOff=off,response={ResponseOnOff($DEVICE)}
 
 
 ## To-Do
-- [ ] Move IP of Rhasspy-Master to DEF instead of ATTR
-- [ ] Add Custom intents functionality
-- [ ] Set-/GetNumeric-Intents multilingual
-- [ ] Check MediaControls-Intent. Doesn't look functional. And is german-only too.
-- [ ] Add play and volume SET-functions
+- [x] Move IP of Rhasspy-Master to DEF instead of ATTR
+- [x] Add Custom intents functionality
+- [x] Set-/GetNumeric-Intents multilingual
+- [x] Check MediaControls-Intent. Doesn't look functional. And is german-only too.
+- [x] Add play and volume SET-functions
 - [x] Add timer intent
 - [ ] Upgrade timer intent to play WAV file, stop existing timer, use times like "one hour and 15 minutes"
