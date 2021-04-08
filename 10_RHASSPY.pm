@@ -300,7 +300,7 @@ sub RHASSPY_Initialize {
     $hash->{DeleteFn}    = \&RHASSPY_Delete;
     $hash->{SetFn}       = \&RHASSPY_Set;
     $hash->{AttrFn}      = \&RHASSPY_Attr;
-    $hash->{AttrList}    = "IODev defaultRoom rhasspyIntents:textField-long shortcuts:textField-long rhasspyTweaks:textField-long rhasspyMaster response:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals configFile " . $readingFnAttributes;
+    $hash->{AttrList}    = "IODev defaultRoom rhasspyIntents:textField-long shortcuts:textField-long rhasspyTweaks:textField-long response:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals configFile " . $readingFnAttributes;
     $hash->{Match}       = q{.*};
     $hash->{ParseFn}     = \&RHASSPY_Parse;
     $hash->{parseParams} = 1;
@@ -323,7 +323,7 @@ sub RHASSPY_Define {
     my $Rhasspy  = $h->{WebIF} // shift @{$anon} // q{http://127.0.0.1:12101};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     my $language = $h->{language} // shift @{$anon} // lc(AttrVal('global','language','en'));
-    $hash->{MODULE_VERSION} = "0.4.7a";
+    $hash->{MODULE_VERSION} = "0.4.7b";
     $hash->{WebIF} = $Rhasspy;
     $hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
@@ -779,11 +779,13 @@ sub _analyze_rhassypAttr {
     my $attrv = AttrVal($device,"${prefix}Room",undef);
     @rooms = split m{,}x, lc $attrv if defined $attrv;
     #for (@rooms) { $_ = lc };
-    @rooms = @{$hash->{helper}{devicemap}{devices}{$device}->{rooms}} if !@rooms && defined $hash->{helper}{devicemap}{devices}{$device}->{rooms};
+    #@rooms = @{$hash->{helper}{devicemap}{devices}{$device}->{rooms}} if !@rooms && defined $hash->{helper}{devicemap}{devices}{$device}->{rooms};
+    @rooms = split m{,}xi, $hash->{helper}{devicemap}{devices}{$device}->{rooms} if !@rooms && defined $hash->{helper}{devicemap}{devices}{$device}->{rooms};
     if (!@rooms) {
         $rooms[0] = $hash->{helper}{defaultRoom};
     }
-    @{$hash->{helper}{devicemap}{devices}{$device}{rooms}} = @rooms;
+    #@{$hash->{helper}{devicemap}{devices}{$device}{rooms}} = @rooms;
+    $hash->{helper}{devicemap}{devices}{$device}->{rooms} = join q{,}, @rooms;
 
     #rhasspyNames ermitteln
     my @names;
@@ -858,7 +860,8 @@ sub _analyze_rhassypAttr {
     $attrv = AttrVal($device,"${prefix}Group", undef);
     $attrv = $attrv // AttrVal($device,'group', undef);
     #$attrv = lc $attrv if $attrv;
-    @{$hash->{helper}{devicemap}{devices}{$device}{groups}} = split m{,}x, lc $attrv if $attrv;
+    #@{$hash->{helper}{devicemap}{devices}{$device}{groups}} = split m{,}x, lc $attrv if $attrv;
+    $hash->{helper}{devicemap}{devices}{$device}{groups} = lc $attrv if $attrv;
 
     return;
 }
@@ -913,10 +916,12 @@ sub _analyze_genDevType {
            $hash->{helper}{devicemap}{rhasspyRooms}{$_}{$dn} = $device;
        }
     }
-    push @{$hash->{helper}{devicemap}{devices}{$device}{rooms}}, @rooms;
+    #push @{$hash->{helper}{devicemap}{devices}{$device}{rooms}}, @rooms;
+    $hash->{helper}{devicemap}{devices}{$device}->{rooms} = join q{,}, @rooms;
     
-    $attrv = AttrVal($device,'group', undef);
-    @{$hash->{helper}{devicemap}{devices}{$device}{groups}} = split m{,}x, lc $attrv if $attrv;
+    $attrv = AttrVal($device,'group', undef); #gggg
+    #@{$hash->{helper}{devicemap}{devices}{$device}{groups}} = split m{,}x, lc $attrv if $attrv;
+    $hash->{helper}{devicemap}{devices}{$device}{groups} = lc $attrv if $attrv;
 
     my $hbmap  = AttrVal($device, 'homeBridgeMapping', q{}); 
     my $allset = getAllSets($device);
@@ -1252,7 +1257,8 @@ sub RHASSPY_allRhasspyGroups {
     
     for my $device (keys %{$hash->{helper}{devicemap}{devices}}) {
         my $devgroups = $hash->{helper}{devicemap}{devices}{$device}->{groups};
-        for (@{$devgroups}) {
+        #for (@{$devgroups}) {
+        for (split m{,}xi, $devgroups ) {
             push @groups, $_;
         }
     }
@@ -1323,7 +1329,8 @@ sub RHASSPY_getDevicesByIntentAndType {
     for my $devs (keys %{$hash->{helper}{devicemap}{devices}}) {
         my $mapping = RHASSPY_getMapping($hash, $devs, $intent, $type, 1, 1) // next;
         my $mappingType = $mapping->{type};
-        my $rooms = join q{,}, $hash->{helper}{devicemap}{devices}{$devs}->{rooms};
+        #my $rooms = join q{,}, $hash->{helper}{devicemap}{devices}{$devs}->{rooms};
+        my $rooms = $hash->{helper}{devicemap}{devices}{$devs}->{rooms};
 
         # Geräte sammeln
         if ( !defined $type ) {
@@ -1446,10 +1453,12 @@ sub RHASSPY_getDevicesByGroup {
     for my $dev (keys %{$hash->{helper}{devicemap}{devices}}) {
         my $allrooms = $hash->{helper}{devicemap}{devices}{$dev}->{rooms};
         #next if $room ne 'global' && !grep { m{\A$room\z}ix } @{$allrooms};
-        next if $room ne 'global' && !any { $_ eq $room } @{$allrooms};
+        #next if $room ne 'global' && !any { $_ eq $room } @{$allrooms};
+        next if $room ne 'global' && $allrooms !~ m{\b$room\b}x;
         my $allgroups = $hash->{helper}{devicemap}{devices}{$dev}->{groups};
         #next if !grep { m{\A$group\z}ix } @{$allgroups};
-        next if !any { $_ eq $group } @{$allgroups};
+        #next if !any { $_ eq $group } @{$allgroups};
+        next if $allgroups =~ m{\b$group\b}x;
         my $specials = $hash->{helper}{devicemap}{devices}{$dev}{group_specials};
         my $label = $specials->{partOf} // $dev;
         next if defined $devices->{$label};
@@ -2369,7 +2378,6 @@ sub RHASSPY_handleIntentSetOnOffGroup {
         $devices->{$a}{delay} <=> $devices->{$b}{delay}
         }  keys %{$devices};
         
-    #$hash->{helper}->{groups2} = \@devlist;
     Log3($hash, 5, 'sorted devices list is: ' . join q{ }, @devlist);
     return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoDeviceFound')) if !keys %{$devices}; 
 
@@ -2484,10 +2492,9 @@ sub RHASSPY_handleIntentSetNumericGroup {
     my $data = shift // return;
 
     Log3($hash->{NAME}, 5, "handleIntentSetNumericGroup called");
-    #{"Group":"licht","Room":"wohnzimmer","Value":"on", ...
-    
+
     return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoValidData')) if !exists $data->{Value} && !exists $data->{Change}; 
-    
+
     my $devices = RHASSPY_getDevicesByGroup($hash, $data);
 
     #see https://perlmaven.com/how-to-sort-a-hash-of-hashes-by-value for reference
@@ -2497,7 +2504,6 @@ sub RHASSPY_handleIntentSetNumericGroup {
         $devices->{$a}{delay} <=> $devices->{$b}{delay}
         }  keys %{$devices};
         
-    #$hash->{helper}->{groups2} = \@devlist;
     Log3($hash, 5, 'sorted devices list is: ' . join q{ }, @devlist);
     return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoDeviceFound')) if !keys %{$devices}; 
 
@@ -2725,9 +2731,10 @@ sub RHASSPY_handleIntentGetNumeric {
 
     my $location = $data->{Device};
     if ( !defined $location ) {
-        my $rooms = join q{,}, $hash->{helper}{devicemap}{devices}{$device}->{rooms};
+        #my $rooms = join q{,}, $hash->{helper}{devicemap}{devices}{$device}->{rooms};
+        my $rooms = $hash->{helper}{devicemap}{devices}{$device}->{rooms};
         $location = $data->{Room} if $rooms =~ m{\b$data->{Room}\b}ix;
-        $location = ${$hash->{helper}{devicemap}{devices}{$device}->{rooms}}[0] if !defined $location;
+        ($location, my $nn) = split m{,}, $rooms if !defined $location;
     }
     my $deviceName = $hash->{helper}{devicemap}{devices}{$device}->{alias} // $device;
 
