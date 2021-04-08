@@ -179,19 +179,21 @@ define Rhasspy RHASSPY WebIf=http://rhasspy:12101 devspec=room=Rhasspy defaultRo
   Define custom intents for functions in 99_myUtils.pm.\
   One intent per line.\
   Example: `attr <rhasspyDevice> rhasspyIntents SetCustomIntentsTest=SetCustomIntentsTest(siteId,Device)`\
-    together with the follwoing myUtils-Code should get a short impression of the possibilities:
-	```
-    sub SetCustomIntentsTest {
-        my $room = shift; 
-        my $type = shift;
-        Log3('rhasspy',3 , "RHASSPY: Room $room, Type $type");
-        return "RHASSPY: Room $room, Type $type";
-    }
-	```
-    The following arguments can be handed over:
-      * NAME => name of the RHASSPY device addressed
-      * DATA => entire JSON-$data (as parsed internally)
-      * siteId, Device etc. => any element out of the JSON-$data
+  together with the follwoing myUtils-Code should get a short impression of the possibilities:
+  ```
+  sub SetCustomIntentsTest {
+      my $room = shift; 
+      my $type = shift;
+      Log3('rhasspy',3 , "RHASSPY: Room $room, Type $type");
+      return "RHASSPY: Room $room, Type $type";
+  }
+  ```
+
+  The following arguments can be handed over:
+  * NAME => name of the RHASSPY device addressed
+  * DATA => entire JSON-$data (as parsed internally)
+  * siteId, Device etc. => any element out of the JSON-$data
+
 * **shortcuts**\
   Define custom sentences without editing Rhasspy sentences.ini.\
   The shortcuts are uploaded to Rhasspy when using the `update devicemap` set-command.\
@@ -218,8 +220,9 @@ define Rhasspy RHASSPY WebIf=http://rhasspy:12101 devspec=room=Rhasspy defaultRo
 	You may ask for confirmation as well using the following (optional) shorts:
     * **c**: Either numeric or text. If numeric: Timeout to wait for automatic cancellation. If text: response to send to ask for confirmation.
     * **ct**: Numeric value for timeout in seconds, default: 15
+
 * **rhasspyTweaks**
-  Not fully implemented yet.
+  Not fully implemented yet.\
   Could be the place to configure additional things like additional siteId2room info or code links, allowed commands, duration of SetTimer sounds, confirmation requests etc.
 
 ### Readings / Events
@@ -328,10 +331,11 @@ Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
 
 ### Attribute rhasspyChannels
 Used by intent *MediaControls*. Tells the intent, which channels are available and which FHEM-command or perl-code to execute.\
-One line per channel.\
+One line per channel.
 
 Example:
-```attr <device> rhasspyChannels orf eins=set <device> channel 201
+```
+attr <device> rhasspyChannels orf eins=set <device> channel 201
 orf zwei=set <device> channel 202
 ```
 
