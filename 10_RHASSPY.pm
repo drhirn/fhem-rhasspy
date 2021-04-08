@@ -320,11 +320,11 @@ sub RHASSPY_Define {
 
     my $name = shift @{$anon};
     my $type = shift @{$anon};
-    my $Rhasspy  = $h->{IP_Port} // shift @{$anon} // q{http://localhost:12101};
+    my $Rhasspy  = $h->{WebIF} // shift @{$anon} // q{http://127.0.0.1:12101};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     my $language = $h->{language} // shift @{$anon} // lc(AttrVal('global','language','en'));
     $hash->{MODULE_VERSION} = "0.4.7a";
-    $hash->{IP_Port} = $Rhasspy;
+    $hash->{WebIF} = $Rhasspy;
     $hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -777,26 +777,27 @@ sub _analyze_rhassypAttr {
     #rhasspyRooms ermitteln
     my @rooms;
     my $attrv = AttrVal($device,"${prefix}Room",undef);
-    @rooms = split m{,}x, $attrv if defined $attrv;
-    for (@rooms) { $_ = lc };
+    @rooms = split m{,}x, lc $attrv if defined $attrv;
+    #for (@rooms) { $_ = lc };
     @rooms = @{$hash->{helper}{devicemap}{devices}{$device}->{rooms}} if !@rooms && defined $hash->{helper}{devicemap}{devices}{$device}->{rooms};
     if (!@rooms) {
         $rooms[0] = $hash->{helper}{defaultRoom};
     }
-    
+    @{$hash->{helper}{devicemap}{devices}{$device}{rooms}} = @rooms;
+
     #rhasspyNames ermitteln
     my @names;
     $attrv = AttrVal($device,"${prefix}Name",undef);
-    push @names, split m{,}x, $attrv if $attrv;
-    for (@names) { $_ = lc };
+    push @names, split m{,}x, lc $attrv if $attrv;
+    #for (@names) { $_ = lc };
+    $hash->{helper}{devicemap}{devices}{$device}->{alias} = $names[0] if $attrv;
     
     for my $dn (@names) {
        for (@rooms) {
            $hash->{helper}{devicemap}{rhasspyRooms}{$_}{$dn} = $device;
        }
     }
-    @{$hash->{helper}{devicemap}{devices}{$device}{rooms}} = @rooms;
-    
+
     for my $item ('Channels', 'Colors') {
         my @rows = split m{\n}x, AttrVal($device, "${prefix}${item}", q{});
 
@@ -847,16 +848,17 @@ sub _analyze_rhassypAttr {
         $hash->{helper}{devicemap}{devices}{$device}{intents}{$key}->{$currentMapping{type}} = \%currentMapping;
     }
 
-    my $allrooms = $hash->{helper}{devicemap}{devices}{$device}->{rooms};
-    for (@rooms) {
-        push @{$allrooms}, $_ if !grep { m{\A$_\z}ix } @{$allrooms};
-    }
+    #my $allrooms = $hash->{helper}{devicemap}{devices}{$device}->{rooms};
+    #for (@rooms) {
+        #push @{$allrooms}, $_ if !grep { m{\A$_\z}ix } @{$allrooms};
+    #    push @{$allrooms}, $_ if !grep { m{\A$_\z}ix } @{$allrooms};
+    #}
 
     my @groups;
     $attrv = AttrVal($device,"${prefix}Group", undef);
     $attrv = $attrv // AttrVal($device,'group', undef);
-    $attrv = lc $attrv if $attrv;
-    @{$hash->{helper}{devicemap}{devices}{$device}{groups}} = split m{,}x, $attrv if $attrv;
+    #$attrv = lc $attrv if $attrv;
+    @{$hash->{helper}{devicemap}{devices}{$device}{groups}} = split m{,}x, lc $attrv if $attrv;
 
     return;
 }
@@ -886,6 +888,7 @@ sub _analyze_genDevType {
         $names[0] = $alias if !@names && $alias;
         $names[0] = $device if !@names;
     }
+    $hash->{helper}{devicemap}{devices}{$device}->{alias} = $names[0] if $names[0];
 
     #convert to lower case
     for (@names) { $_ = lc; }
@@ -912,8 +915,8 @@ sub _analyze_genDevType {
     }
     push @{$hash->{helper}{devicemap}{devices}{$device}{rooms}}, @rooms;
     
-    $attrv = lc AttrVal($device,'group', undef);
-    @{$hash->{helper}{devicemap}{devices}{$device}{groups}} = split m{,}x, $attrv if $attrv;
+    $attrv = AttrVal($device,'group', undef);
+    @{$hash->{helper}{devicemap}{devices}{$device}{groups}} = split m{,}x, lc $attrv if $attrv;
 
     my $hbmap  = AttrVal($device, 'homeBridgeMapping', q{}); 
     my $allset = getAllSets($device);
@@ -1320,18 +1323,16 @@ sub RHASSPY_getDevicesByIntentAndType {
     for my $devs (keys %{$hash->{helper}{devicemap}{devices}}) {
         my $mapping = RHASSPY_getMapping($hash, $devs, $intent, $type, 1, 1) // next;
         my $mappingType = $mapping->{type};
-        my @rooms = $hash->{helper}{devicemap}{devices}{$devs}{rooms};
+        my $rooms = join q{,}, $hash->{helper}{devicemap}{devices}{$devs}->{rooms};
 
         # Geräte sammeln
         if ( !defined $type ) {
-            #any { m{\A$room\z}ix } @rooms
-            any { $_ eq $room } @rooms
-                ? push @matchesInRoom, $devs 
-                : push @matchesOutsideRoom, $devs;
+            $rooms =~ m{\b$room\b}ix
+            ? push @matchesInRoom, $devs 
+            : push @matchesOutsideRoom, $devs;
         }
         elsif ( defined $type && $mappingType && $type =~ m{\A$mappingType\z}ix ) {
-            #any { m{\A$room\z}ix } @rooms
-            any { $_ eq $room } @rooms
+            $rooms =~ m{\b$room\b}ix
             ? push @matchesInRoom, $devs
             : push @matchesOutsideRoom, $devs;
         }
@@ -1351,7 +1352,8 @@ sub RHASSPY_getDeviceByIntentAndType {
 
     # Devices sammeln
     my ($matchesInRoom, $matchesOutsideRoom) = RHASSPY_getDevicesByIntentAndType($hash, $room, $intent, $type);
-
+    Log3($hash->{NAME}, 5, "matches in room: @{$matchesInRoom}, matches outside: @{$matchesOutsideRoom}");
+    
     # Erstes Device im passenden Raum zurückliefern falls vorhanden, sonst erstes Device außerhalb
     $device = (@{$matchesInRoom}) ? shift @{$matchesInRoom} : shift @{$matchesOutsideRoom};
 
@@ -2119,7 +2121,7 @@ sub RHASSPY_sendToApi {
     my $url    = shift;
     my $method = shift;
     my $data   = shift;
-    my $base   = $hash->{IP_Port}; #AttrVal($hash->{NAME}, 'rhasspyMaster', undef) // return;
+    my $base   = $hash->{WebIF}; #AttrVal($hash->{NAME}, 'rhasspyMaster', undef) // return;
 
     #Retrieve URL of Rhasspy-Master from attribute
     $url = $base.$url;
@@ -2147,7 +2149,7 @@ sub RHASSPY_ParseHttpResponse {
     my $url   = lc($param->{url});
 
     my $name  = $hash->{NAME};
-    my $base  = $hash->{IP_Port}; #AttrVal($name, 'rhasspyMaster', undef) // return;
+    my $base  = $hash->{WebIF}; #AttrVal($name, 'rhasspyMaster', undef) // return;
     my $cp    = $hash->{encoding} // q{UTF-8};
     
     readingsBeginUpdate($hash);
@@ -2721,7 +2723,13 @@ sub RHASSPY_handleIntentGetNumeric {
     # Punkt durch Komma ersetzen in Dezimalzahlen
     $value =~ s{\.}{\,}gx if $hash->{helper}{lng}->{commaconversion};
 
-    my $location = $data->{Device} // $data->{Room};
+    my $location = $data->{Device};
+    if ( !defined $location ) {
+        my $rooms = join q{,}, $hash->{helper}{devicemap}{devices}{$device}->{rooms};
+        $location = $data->{Room} if $rooms =~ m{\b$data->{Room}\b}ix;
+        $location = ${$hash->{helper}{devicemap}{devices}{$device}->{rooms}}[0] if !defined $location;
+    }
+    my $deviceName = $hash->{helper}{devicemap}{devices}{$device}->{alias} // $device;
 
     # Antwort falls Custom Response definiert ist
     if ( defined $mapping->{response} ) { 
@@ -3324,11 +3332,12 @@ https://forum.fhem.de/index.php/topic,113180.msg1130754.html#msg1130754
 </p>
 <a id="RHASSPY-define"></a>
 <p><b>Define</b></p>
-<p><code>define &lt;name&gt; RHASSPY &lt;devspec&gt; &lt;defaultRoom&gt; &lt;language&gt; &lt;fhemId&gt; &lt;prefix&gt; &lt;useGenericAttrs&gt; &lt;encoding&gt;</code></p>
+<p><code>define &lt;name&gt; RHASSPY &lt;WebIF&gt; &lt;devspec&gt; &lt;defaultRoom&gt; &lt;language&gt; &lt;fhemId&gt; &lt;prefix&gt; &lt;useGenericAttrs&gt; &lt;encoding&gt;</code></p>
     <a id="RHASSPY-parseParams"></a><b>General Remark:</b> RHASSPY uses <a href="https://wiki.fhem.de/wiki/DevelopmentModuleAPI#parseParams"><b>parseParams</b></a> at quite a lot places, not only in define, but also to parse attribute values. <p>
     So all parameters in define should be provided in the <i><b>key=value</i></b> form. In other places you may have to start e.g. a single line in an attribute with <code>option:key="value xy shall be z"</code> or <code>identifier:yourCode={fhem("set device off")} anotherOption=blabla</code> form. <br>
     <b>All parameters in define are optional, but changing them later might lead to confusing results*)!</b>
 <ul>
+  <li><b>WebIF</b>: http-address of the Rhasspy service web-interface. Optional. Default is <code>WebIF=http://127.0.0.1:12101</code>.<br>Make sure, this is set to correct values (IP and Port!</li>
   <li><b>devspec</b>: A description of devices that should be controlled by Rhasspy. Optional. Default is <code>devspec=room=Rhasspy</code>, see <a href="#devspec"> as a reference</a>, how to e.g. use a comma-separated list of devices or combinations like <code>devspec=room=livingroom,room=bathroom,bedroomlamp</code>.</li>
   <li><b>defaultRoom</b>: Default room name. Used to speak commands without a room name (e.g. &quot;turn lights on&quot; to turn on the lights in the &quot;default room&quot;). Optional. Default is <code>defaultRoom=default</code>.<br>
   <a id="RHASSPY-genericDeviceType"></a>Note: Additionaly, either one of the "special" attributes provided by RHASSPY or a known <i>genericDeviceType</i> (atm: switch, light, thermostat, blind and *)media are supported).</li>
