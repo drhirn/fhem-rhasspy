@@ -221,7 +221,7 @@ define Rhasspy RHASSPY WebIf=http://rhasspy:12101 devspec=room=Rhasspy defaultRo
     * **c**: Either numeric or text. If numeric: Timeout to wait for automatic cancellation. If text: response to send to ask for confirmation.
     * **ct**: Numeric value for timeout in seconds, default: 15
 
-* **rhasspyTweaks**
+* **rhasspyTweaks**\
   Not fully implemented yet.\
   Could be the place to configure additional things like additional siteId2room info or code links, allowed commands, duration of SetTimer sounds, confirmation requests etc.
 
