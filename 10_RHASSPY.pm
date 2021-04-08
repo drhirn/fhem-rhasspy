@@ -300,7 +300,7 @@ sub RHASSPY_Initialize {
     $hash->{DeleteFn}    = \&RHASSPY_Delete;
     $hash->{SetFn}       = \&RHASSPY_Set;
     $hash->{AttrFn}      = \&RHASSPY_Attr;
-    $hash->{AttrList}    = "IODev defaultRoom rhasspyIntents:textField-long shortcuts:textField-long rhasspyTweaks:textField-long response:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals configFile " . $readingFnAttributes;
+    $hash->{AttrList}    = "IODev rhasspyIntents:textField-long shortcuts:textField-long rhasspyTweaks:textField-long response:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals configFile " . $readingFnAttributes;
     $hash->{Match}       = q{.*};
     $hash->{ParseFn}     = \&RHASSPY_Parse;
     $hash->{parseParams} = 1;
@@ -323,7 +323,7 @@ sub RHASSPY_Define {
     my $Rhasspy  = $h->{WebIF} // shift @{$anon} // q{http://127.0.0.1:12101};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     my $language = $h->{language} // shift @{$anon} // lc(AttrVal('global','language','en'));
-    $hash->{MODULE_VERSION} = "0.4.7b";
+    $hash->{MODULE_VERSION} = "0.4.7c";
     $hash->{WebIF} = $Rhasspy;
     $hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
@@ -1755,8 +1755,8 @@ sub RHASSPY_parseJSON {
 
 # Call von IODev-Dispatch (e.g.MQTT2)
 sub RHASSPY_Parse {
-    my $iodev = shift // carp q[No IODev provided!] && return;;
-    my $msg   = shift // carp q[No message to analyze!] && return;;
+    my $iodev = shift // carp q[No IODev provided!] && return;
+    my $msg   = shift // carp q[No message to analyze!] && return;
 
     my $ioname = $iodev->{NAME};
     $msg =~ s{\Aautocreate=([^\0]+)\0(.*)\z}{$2}sx;
@@ -1776,6 +1776,8 @@ sub RHASSPY_Parse {
         # Name mit IODev vergleichen
         next if $ioname ne AttrVal($hash->{NAME}, 'IODev', undef);
         next if IsDisabled( $hash->{NAME} );
+        my $topicpart = qq{/$hash->{LANGUAGE}\.$hash->{fhemId}\[._]};
+        next if $topic !~ m{$topicpart}x;
 
         Log3($hash,5,"RHASSPY: [$hash->{NAME}] Parse (IO: ${ioname}): Msg: $topic => $value");
 
