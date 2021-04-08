@@ -14,7 +14,6 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[Readings/Events](#readings--events)\
 [Additionals remarks on MQTT2-IOs](#additionals-remarks-on-mqtt2-ios)\
 [Configure FHEM-devices for use with Rhasspy](#configure-fhem-devices-for-use-with-rhasspy)\
-&nbsp;&nbsp;&nbsp;&nbsp;[Room *Rhasspy*](#room-rhasspy)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyName*](#attribute-rhasspyname)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyRoom*](#attribute-rhasspyroom)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyMapping*](#attribute-rhasspymapping)\
@@ -129,7 +128,7 @@ define Rhasspy RHASSPY WebIf=http://rhasspy:12101 devspec=room=Rhasspy defaultRo
   - de.fhem.MediaChannels
   - de.fhem.Color
   - de.fhem.NumericType
-* **update**\
+* **update**
   * **devicemap**\
     When the configuration work to RHASSPY and all subordinated devices is finished or there had been changes, issuing a devicemap-update is mandatory, to get the RHASSPY data structure updated, inform Rhasspy on changes that may have occured (update slots) and initiate a training on updated slot values etc.
 	Has to be executed after changes to the attributes of a Rhasspy-controlled devices or the RHASSPY device itself.\
@@ -198,11 +197,12 @@ define Rhasspy RHASSPY WebIf=http://rhasspy:12101 devspec=room=Rhasspy defaultRo
   The shortcuts are uploaded to Rhasspy when using the `update devicemap` set-command.\
   One shortcut per line, syntax is either a simple or an extended version.\
   Examples:
-  ```mute on=set amplifier2 mute on
-lamp off={fhem("set lampe1 off")}
-i="you are so exciting" f="set $NAME speak siteId='livingroom' text='Thanks a lot, you are even more exciting!'"
-i="mute off" p={fhem ("set $NAME mute off")} n=amplifier2 c="Please confirm!"
-````
+  ```
+  mute on=set amplifier2 mute on
+  lamp off={fhem("set lampe1 off")}
+  i="you are so exciting" f="set $NAME speak siteId='livingroom' text='Thanks a lot, you are even more exciting!'"
+  i="mute off" p={fhem ("set $NAME mute off")} n=amplifier2 c="Please confirm!"
+  ```
 
   Abbreviations explanation:
   * **i**: intent\
@@ -288,7 +288,7 @@ Example:
 Comma-separated "labels" for the groups the device belongs to.
 
 Example:
-`attr <device> rhasspyGroup lights
+`attr <device> rhasspyGroup lights`
 
 ### Attribute *rhasspyMapping*
 If automatic detection of the right intent for a particular type of device isn't working or is not desired, this attribute is used to inform RHASSPY which intents to use to control the device.\
