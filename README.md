@@ -21,6 +21,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyChannels*](#attribute-rhasspychannels)\
 [Intents](#intents)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetOnOff](#setonoff)\
+&nbsp;&nbsp;&nbsp;&nbsp;[SetOnOffGroup](#setonoffgroup)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetOnOff](#getonoff)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetNumeric](#setnumeric)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetNumeric](#getnumeric)\
@@ -358,17 +359,33 @@ Arguments:
 Optional Arguments:
   * **response** Define a custom response for this mapping
 
-Example-Spoken-Sentences:
+Example-Sentences:
   > turn on the light\
   > close the shutter in the bedroom\
   > start the coffee maker
  
- Example-Rhasspy-Sentences:
+Example-Rhasspy-Sentences:
  ```
  [en.fhem:SetOnOff]
  (turn on|open|start){Value:on) $de.fhem.Device{Device} [$de.fhem.Room{Room}]
  (turn off|close|stop){Value:off} $de.fhem.Device{Device} [$de.fhem.Room{Room}]
  ```
+
+### SetOnOffGroup
+Intent to switch a group of devices.
+
+SetOnOff-Mapping needed and all desired devices have to have the attribut **rhasspyGroup** configured.
+
+Example-Sentence:
+  > turn off all light in the kitchen
+  > close all blinds in the sleeping room
+
+Example-Rhasspy-Sentences:
+```
+[en.fhem:SetOnOffGroup]
+(turn on|open){Value:on} all $en.fhem.Group{Group} in $en.fhem.Room{Room}
+(turn off|close){Value:off} all $en.fhem.Group{Group} in $en.fhem.Room{Room}
+```
  
 ### GetOnOff
 Intent to request the current state of a device.
