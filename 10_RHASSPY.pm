@@ -26,9 +26,8 @@
 # You should have received a copy of the GNU General Public License
 # along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-        
- 
 ###########################################################################
+
 package MQTT::RHASSPY; ##no critic qw(Package)
 use strict;
 use warnings;
@@ -2125,6 +2124,18 @@ sub RHASSPY_fetchSiteIds {
     return RHASSPY_sendToApi($hash, $url, $method, undef);
 }
     
+=pod
+# Check connection to HTTP-API
+# Seems useless, because fetchSiteIds is called after DEF
+sub RHASSPY_checkHttpApi {
+    my $hash   = shift // return;
+    my $url    = q{/api/unknown-words};
+    my $method = q{GET};
+
+    Log3($hash->{NAME}, 5, "check connection to Rhasspy HTTP-API");
+    return RHASSPY_sendToApi($hash, $url, $method, undef);
+}
+=cut
 
 # Send request to HTTP-API of Rhasspy
 sub RHASSPY_sendToApi {
@@ -2162,8 +2173,16 @@ sub RHASSPY_ParseHttpResponse {
     my $name  = $hash->{NAME};
     my $base  = $hash->{WebIF}; #AttrVal($name, 'rhasspyMaster', undef) // return;
     my $cp    = $hash->{encoding} // q{UTF-8};
-    
+
     readingsBeginUpdate($hash);
+
+    if ($err) {
+        readingsBulkUpdate($hash, 'state', $err);
+        readingsEndUpdate($hash, 1);
+        Log3($hash->{NAME}, 1, "Connection to Rhasspy base failed: $err");
+        return;
+    }
+
     my $urls = { 
         $base.'/api/train'                      => 'training',
         $base.'/api/sentences'                  => 'updateSentences',
@@ -2186,6 +2205,7 @@ sub RHASSPY_ParseHttpResponse {
     else {
         Log3($name, 3, qq(error while requesting $param->{url} - $data));
     }
+    readingsBulkUpdate($hash, 'state', "online");
     readingsEndUpdate($hash, 1);
     return;
 }
