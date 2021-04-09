@@ -74,12 +74,12 @@ attr <deviceName> subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
 You can define a new instance of this module with:
 
 ```
-define <name> RHASSPY <WebIF> <devspec> <defaultRoom> <language> <fhemId> <prefix> <useGenericAttrs> <encoding>
+define <name> RHASSPY <baseUrl> <devspec> <defaultRoom> <language> <fhemId> <prefix> <useGenericAttrs> <encoding>
 ```
 
 All parameters are optional but changing them later may result in confusing results. So it's recommended to add them when first defining the module.
 
-* `WebIF`: The url of the Rhasspy service web-interface. If using a base and multiple satellites, use the url of the base. Default is `WebIF=http://127.0.0.1:12101`. Make sure, this is set to correct values (IP and Port)!
+* `baseUrl`: The url of the Rhasspy service web-interface. If using a base and multiple satellites, use the url of the base. Default is `baseUrl=http://127.0.0.1:12101`. Make sure, this is set to correct values (IP and Port)!
 * `devspec`: [devspec](https://commandref.fhem.de/commandref.html#devspec) of the device(s) that should be controlled with Rhasspy. Default is `devspec=room=Rhasspy`.
 * `defaultRoom`: Name of the default room which should be used if no room-name is present in the command. Default is `defaultRoom=default`.
 * `language`: Language of the voice commands spoken to Rhasspy. Default is derived from global, which defaults to `language=en`.
@@ -94,7 +94,7 @@ define Rhasspy RHASSPY
 
 Full-Example:
 ```
-define Rhasspy RHASSPY WebIf=http://rhasspy:12101 devspec=room=Rhasspy defaultRoom=default language=en fhemId=fhem prefix=rhasspy useGenericAttrs=1
+define Rhasspy RHASSPY baseUrl=http://rhasspy:12101 devspec=room=Rhasspy defaultRoom=default language=en fhemId=fhem prefix=rhasspy useGenericAttrs=1
 ```
 
 ### Set-Commands (SET)

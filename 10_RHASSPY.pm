@@ -319,11 +319,11 @@ sub RHASSPY_Define {
 
     my $name = shift @{$anon};
     my $type = shift @{$anon};
-    my $Rhasspy  = $h->{WebIF} // shift @{$anon} // q{http://127.0.0.1:12101};
+    my $Rhasspy  = $h->{baseUrl} // shift @{$anon} // q{http://127.0.0.1:12101};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     my $language = $h->{language} // shift @{$anon} // lc(AttrVal('global','language','en'));
     $hash->{MODULE_VERSION} = "0.4.7c";
-    $hash->{WebIF} = $Rhasspy;
+    $hash->{baseUrl} = $Rhasspy;
     $hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -2143,7 +2143,7 @@ sub RHASSPY_sendToApi {
     my $url    = shift;
     my $method = shift;
     my $data   = shift;
-    my $base   = $hash->{WebIF}; #AttrVal($hash->{NAME}, 'rhasspyMaster', undef) // return;
+    my $base   = $hash->{baseUrl}; #AttrVal($hash->{NAME}, 'rhasspyMaster', undef) // return;
 
     #Retrieve URL of Rhasspy-Master from attribute
     $url = $base.$url;
@@ -2171,7 +2171,7 @@ sub RHASSPY_ParseHttpResponse {
     my $url   = lc($param->{url});
 
     my $name  = $hash->{NAME};
-    my $base  = $hash->{WebIF}; #AttrVal($name, 'rhasspyMaster', undef) // return;
+    my $base  = $hash->{baseUrl}; #AttrVal($name, 'rhasspyMaster', undef) // return;
     my $cp    = $hash->{encoding} // q{UTF-8};
 
     readingsBeginUpdate($hash);
@@ -3361,12 +3361,12 @@ https://forum.fhem.de/index.php/topic,113180.msg1130754.html#msg1130754
 </p>
 <a id="RHASSPY-define"></a>
 <p><b>Define</b></p>
-<p><code>define &lt;name&gt; RHASSPY &lt;WebIF&gt; &lt;devspec&gt; &lt;defaultRoom&gt; &lt;language&gt; &lt;fhemId&gt; &lt;prefix&gt; &lt;useGenericAttrs&gt; &lt;encoding&gt;</code></p>
+<p><code>define &lt;name&gt; RHASSPY &lt;baseUrl&gt; &lt;devspec&gt; &lt;defaultRoom&gt; &lt;language&gt; &lt;fhemId&gt; &lt;prefix&gt; &lt;useGenericAttrs&gt; &lt;encoding&gt;</code></p>
     <a id="RHASSPY-parseParams"></a><b>General Remark:</b> RHASSPY uses <a href="https://wiki.fhem.de/wiki/DevelopmentModuleAPI#parseParams"><b>parseParams</b></a> at quite a lot places, not only in define, but also to parse attribute values. <p>
     So all parameters in define should be provided in the <i><b>key=value</i></b> form. In other places you may have to start e.g. a single line in an attribute with <code>option:key="value xy shall be z"</code> or <code>identifier:yourCode={fhem("set device off")} anotherOption=blabla</code> form. <br>
     <b>All parameters in define are optional, but changing them later might lead to confusing results*)!</b>
 <ul>
-  <li><b>WebIF</b>: http-address of the Rhasspy service web-interface. Optional. Default is <code>WebIF=http://127.0.0.1:12101</code>.<br>Make sure, this is set to correct values (IP and Port!</li>
+  <li><b>baseUrl</b>: http-address of the Rhasspy service web-interface. Optional. Default is <code>baseUrl=http://127.0.0.1:12101</code>.<br>Make sure, this is set to correct values (IP and Port!</li>
   <li><b>devspec</b>: A description of devices that should be controlled by Rhasspy. Optional. Default is <code>devspec=room=Rhasspy</code>, see <a href="#devspec"> as a reference</a>, how to e.g. use a comma-separated list of devices or combinations like <code>devspec=room=livingroom,room=bathroom,bedroomlamp</code>.</li>
   <li><b>defaultRoom</b>: Default room name. Used to speak commands without a room name (e.g. &quot;turn lights on&quot; to turn on the lights in the &quot;default room&quot;). Optional. Default is <code>defaultRoom=default</code>.<br>
   <a id="RHASSPY-genericDeviceType"></a>Note: Additionaly, either one of the "special" attributes provided by RHASSPY or a known <i>genericDeviceType</i> (atm: switch, light, thermostat, blind and *)media are supported).</li>
