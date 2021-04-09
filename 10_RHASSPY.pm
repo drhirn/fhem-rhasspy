@@ -28,6 +28,12 @@
 #
 ###########################################################################
 
+###########################################################################
+# ToDo:
+#
+# SetOnOffGroup: sorted devices list is empty
+###########################################################################
+
 package MQTT::RHASSPY; ##no critic qw(Package)
 use strict;
 use warnings;
@@ -322,7 +328,7 @@ sub RHASSPY_Define {
     my $Rhasspy  = $h->{baseUrl} // shift @{$anon} // q{http://127.0.0.1:12101};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     my $language = $h->{language} // shift @{$anon} // lc(AttrVal('global','language','en'));
-    $hash->{MODULE_VERSION} = "0.4.7c";
+    $hash->{MODULE_VERSION} = "0.4.7b";
     $hash->{baseUrl} = $Rhasspy;
     $hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
@@ -2761,8 +2767,8 @@ sub RHASSPY_handleIntentGetNumeric {
     my $deviceName = $hash->{helper}{devicemap}{devices}{$device}->{alias} // $device;
 
     # Antwort falls Custom Response definiert ist
-    if ( defined $mapping->{response} ) { 
-        return RHASSPY_getValue($hash, $device, $mapping->{response}, $value, $location);
+    if ( defined $mapping->{response} ) {
+        return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getValue($hash, $device, $mapping->{response}, $value, $location));
     }
     my $responses = $hash->{helper}{lng}->{responses}->{Change};
     #elsif ($mappingType =~ m/^(Helligkeit|Lautstärke|Sollwert)$/i) { $response = $data->{Device} . " ist auf $value gestellt."; }
