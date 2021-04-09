@@ -1464,7 +1464,7 @@ sub RHASSPY_getDevicesByGroup {
         my $allgroups = $hash->{helper}{devicemap}{devices}{$dev}->{groups};
         #next if !grep { m{\A$group\z}ix } @{$allgroups};
         #next if !any { $_ eq $group } @{$allgroups};
-        next if $allgroups =~ m{\b$group\b}x;
+        next if $allgroups !~ m{\b$group\b}x;
         my $specials = $hash->{helper}{devicemap}{devices}{$dev}{group_specials};
         my $label = $specials->{partOf} // $dev;
         next if defined $devices->{$label};
@@ -2398,8 +2398,6 @@ sub RHASSPY_handleIntentSetOnOffGroup {
     return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoValidData')) if !defined $data->{Value}; 
     
     my $devices = RHASSPY_getDevicesByGroup($hash, $data);
-
-#print Dumper($devices);
 
     #see https://perlmaven.com/how-to-sort-a-hash-of-hashes-by-value for reference
     my @devlist = sort {
