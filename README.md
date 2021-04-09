@@ -59,15 +59,15 @@ FHEM-rhasspy uses the 00_MQTT2_CLIENT.pm module to receive and send these messag
 - Restart FHEM
 - Define a MQTT2_CLIENT device which connects to the MQTT-server Rhasspy is using. E.g.:
 ```
-define RhasspyMQTT2 MQTT2_CLIENT <ip-or-hostname-of-mqtt-server>:12183 
+define <deviceName> MQTT2_CLIENT <ip-or-hostname-of-mqtt-server>:12183 
 ```
 - Change the `clientOrder` to set the right notification order:
 ```
-attr <DeviceName> clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE
+attr <deviceName> clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE
 ```
 - Add MQTT-subscriptions needed for this module:
 ```
-attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded
+attr <deviceName> subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded
 ```
 
 ## Definition (DEF) in FHEM
