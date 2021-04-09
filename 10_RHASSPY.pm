@@ -31,7 +31,7 @@
 ###########################################################################
 # ToDo:
 #
-# SetOnOffGroup: sorted devices list is empty
+# Find a better way to delay training of Rhasspy after updating slots
 ###########################################################################
 
 package MQTT::RHASSPY; ##no critic qw(Package)
@@ -519,7 +519,7 @@ sub RHASSPY_Set {
     my $params = join q{ }, @values; #error case: playWav => PERL WARNING: Use of uninitialized value within @values in join or string
     $params = $h if defined $h->{text} || defined $h->{path} || defined $h->{volume};
     return $dispatch->{$command}->($hash, $params) if ref $dispatch->{$command} eq 'CODE';
-    
+
     if ($command eq 'update') {
         if ($values[0] eq 'language') {
             return initialize_Language($hash, $hash->{LANGUAGE});
@@ -547,6 +547,40 @@ sub RHASSPY_Set {
             return RHASSPY_trainRhasspy($hash);
         }
     }
+    
+=pod
+    # Could happen, that training start before all slots are written to Rhasspy
+    # Therfore we included a delay
+    # Unhappy with fixed 10s. Should find a better way to do this.
+    if ($command eq 'update') {
+        if ($values[0] eq 'language') {
+            return initialize_Language($hash, $hash->{LANGUAGE});
+        }
+        if ($values[0] eq 'devicemap') {
+            initialize_devicemap($hash);
+            RHASSPY_updateSlots($hash);
+            return InternalTimer(time + 10,\&RHASSPY_trainRhasspy,$hash,0);
+        }
+        if ($values[0] eq 'devicemap_only') {
+            return initialize_devicemap($hash);
+        }
+        if ($values[0] eq 'slots') {
+            RHASSPY_updateSlots($hash);
+            return InternalTimer(time + 10,\&RHASSPY_trainRhasspy,$hash,0);
+        }
+        if ($values[0] eq 'slots_no_training') {
+            initialize_devicemap($hash);
+            return RHASSPY_updateSlots($hash);
+        }
+        if ($values[0] eq 'all') {
+            initialize_Language($hash, $hash->{LANGUAGE});
+            initialize_devicemap($hash);
+            RHASSPY_updateSlots($hash);
+            return InternalTimer(time + 10,\&RHASSPY_trainRhasspy,$hash,0);
+        }
+    }
+=cut
+
     if ($command eq 'customSlot') {
         my $slotname = $h->{slotname}  // shift @values;
         my $slotdata = $h->{slotdata}  // shift @values;
@@ -2116,7 +2150,8 @@ sub RHASSPY_trainRhasspy {
     my $url         = q{/api/train};
     my $method      = q{POST};
     my $contenttype = q{application/json};
-    
+
+    Log3($hash->{NAME}, 5, "Starting training on Rhasspy");
     return RHASSPY_sendToApi($hash, $url, $method, undef);
 }
 
