@@ -1283,7 +1283,8 @@ sub RHASSPY_roomName {
     #Beat-User: This might be the right place to check, if there's additional logic implemented...
     
     my $rreading = makeReadingName("siteId2room_$data->{siteId}");
-    $room = ReadingsVal($hash->{NAME}, $rreading, $data->{siteId});
+    #$room = ReadingsVal($hash->{NAME}, $rreading, $data->{siteId});
+    $room = ReadingsVal($hash->{NAME}, $rreading, lc $data->{siteId});
     $room = $hash->{helper}{defaultRoom} if ($room eq 'default' || !(length $room));
 
     return $room;
@@ -1469,7 +1470,6 @@ sub RHASSPY_getDevicesByGroup {
         next if defined $devices->{$label};
         my $delay = $specials->{async_delay} // 0;
         my $prio  = $specials->{prio} // 0;
-
         $devices->{$label} = { delay => $delay, prio => $prio };
     }
     return $devices;
@@ -2398,6 +2398,8 @@ sub RHASSPY_handleIntentSetOnOffGroup {
     return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoValidData')) if !defined $data->{Value}; 
     
     my $devices = RHASSPY_getDevicesByGroup($hash, $data);
+
+#print Dumper($devices);
 
     #see https://perlmaven.com/how-to-sort-a-hash-of-hashes-by-value for reference
     my @devlist = sort {
