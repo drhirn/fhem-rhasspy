@@ -308,6 +308,13 @@ Status:response=The brightness in the kitchen is at [<device>:pct]
 MediaControls:cmdPlay=play,cmdPause=pause,cmdStop=stop,cmdBack=previous,cmdFwd=next
 ```
 
+<!--
+Gibt man bei der Option `currentVal` das Reading im Format *reading* oder *Device:reading* an,\
+kann mit der Option `part` das Reading an Leerzeichen getrennt werden.\
+Über `part=1` bestimmt ihr, dass nur der erst Teil des Readings übernommen werden soll.\
+Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
+-->
+
 #### Formatting Commands and Readings inside a *rhasspyMapping*
 Some intents can use FHEM-commands or -readings to get or set values.\
 There are three ways to write them:
@@ -322,13 +329,6 @@ There are three ways to write them:
   or\
   `cmd={fhem("set $DEVICE dim $VALUE")}`\
   `$DEVICE` is the current FHEM-device. The *SetNumeric* intent can use `$VALUE` for the value which has to be set.
-
-<!--
-Gibt man bei der Option `currentVal` das Reading im Format *reading* oder *Device:reading* an,\
-kann mit der Option `part` das Reading an Leerzeichen getrennt werden.\
-Über `part=1` bestimmt ihr, dass nur der erst Teil des Readings übernommen werden soll.\
-Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
--->
 
 ### Attribute rhasspyChannels
 Used by intent *MediaControls*. Tells the intent, which channels are available and which FHEM-command or perl-code to execute.\
@@ -350,7 +350,9 @@ Example-Mappings:
 
 `SetOnOff:cmdOn=on,cmdOff=off`\
 `SetOnOff:cmdOn=on,cmdOff=off,response="Sir yes Sir"`\
+<!--
 `SetOnOff:cmdOn=on,cmdOff=off,response="$DEVICE now [$DEVICE:state]"`
+-->
 
 Arguments:
   * **cmdOn** Command to turn the device on. See [Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping).
@@ -365,11 +367,11 @@ Example-Sentences:
   > start the coffee maker
  
 Example-Rhasspy-Sentences:
- ```
- [en.fhem:SetOnOff]
- (turn on|open|start){Value:on) $de.fhem.Device{Device} [$de.fhem.Room{Room}]
- (turn off|close|stop){Value:off} $de.fhem.Device{Device} [$de.fhem.Room{Room}]
- ```
+```
+[en.fhem:SetOnOff]
+(turn on|open|start){Value:on) $de.fhem.Device{Device} [$de.fhem.Room{Room}]
+(turn off|close|stop){Value:off} $de.fhem.Device{Device} [$de.fhem.Room{Room}]
+```
 
 ### SetOnOffGroup
 Intent to switch a group of devices.
@@ -377,22 +379,25 @@ Intent to switch a group of devices.
 SetOnOff-Mapping needed and all desired devices have to have the attribut **rhasspyGroup** configured.
 
 Example-Sentence:
-  > turn off all light in the kitchen
+  > turn off all lights in the kitchen
   > close all blinds in the sleeping room
+  > turn on all lights
 
 Example-Rhasspy-Sentences:
 ```
 [en.fhem:SetOnOffGroup]
-(turn on|open){Value:on} all $en.fhem.Group{Group} in $en.fhem.Room{Room}
-(turn off|close){Value:off} all $en.fhem.Group{Group} in $en.fhem.Room{Room}
+(turn on|open){Value:on} all $de.fhem.Group{Group} (:){Room:global}([$en.fhem.Room{Room}])
+(turn off|close){Value:off} all $de.fhem.Group{Group} (:){Room:global}([$de.fhem.Room{Room}])
 ```
  
 ### GetOnOff
 Intent to request the current state of a device.
 
-Example-Mapping:
+Example-Mappings:
 
 `GetOnOff:currentVal=state,valueOff=closed`
+`GetOnOff:currentVal=state,valueOn=on`
+`GetOnOff:currentVal=pct,valueOff=0`
 
 Arguments:\
 *Hint: only valueOn OR valueOff need to be set. All other values are assigned the other state.*
@@ -662,24 +667,17 @@ Example-Rhasspy-Sentences:
 
 Intent to let Rhasspy speak the actual day
 
-German only. No FHEM-settings needed.
+No FHEM-settings needed.
 
 Example-Sentences:
 ```
-welcher wochentag ist heute
-weißt du welcher tag heute ist
-kannst du mir bitte den wochentag sagen
+which weekday is today
 ```
 
 Example-Rhasspy-Sentences:
 ```
-[de.fhem:GetWeekday]
-\[bitte] weißt du [bitte] welcher Tag heute ist [bitte]
-\[bitte] kannst du mir [bitte] sagen welcher Tag heute ist [bitte]
-\[bitte] könntest du mir [bitte] sagen welcher Tag heute ist [bitte]
-\[bitte] kannst du mir [bitte] den [heutigen] Tag sagen [bitte]
-welcher [wochentag|tag] ist heute [bitte]
-welchen [wochentag|tag] haben wir heute [bitte]
+[en.fhem:GetWeekday]
+which weekday is today
 ```
 
 ### SetTimer
@@ -747,7 +745,7 @@ Example-Rhasspy-Sentences:
 [de.fhem:ReSpeak]
 what did you say
 excuse me
-can you repeat the last sentence
+can you [please] repeat the last sentence
 ```
 
 
@@ -806,10 +804,12 @@ SetOnOff:cmdOn=on,cmdOff=off,response={ResponseOnOff($DEVICE)}
 
 
 ## To-Do
+- [ ] Upgrade timer intent to play WAV file, stop existing timer, use times like "one hour and 15 minutes"
+- [ ] Check possibilites of *response* in mappings
+- [ ] As soon as rhasspyName is defined, FHEM-room is ignored?
 - [x] Move IP of Rhasspy-Master to DEF instead of ATTR
 - [x] Add Custom intents functionality
 - [x] Set-/GetNumeric-Intents multilingual
 - [x] Check MediaControls-Intent. Doesn't look functional. And is german-only too.
 - [x] Add play and volume SET-functions
 - [x] Add timer intent
-- [ ] Upgrade timer intent to play WAV file, stop existing timer, use times like "one hour and 15 minutes"
