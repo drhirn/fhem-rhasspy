@@ -541,6 +541,12 @@ Example-Rhasspy-Sentences:
 \[how is the] (state) $de.fhem.Device{Device} [$de.fhem.Room{Room}]
 ```
 
+Required tags:
+* Device
+
+Optional tags:
+* Room
+
 ### MediaControls
 
 Intent to control media devices
@@ -590,8 +596,8 @@ Example-Mappings:
 ```
 SWR3=favorite s_w_r_3
 SWR1=favorite s_w_r_1
-ARD=set tv channel 204
-Netflix=set tv launchApp Netflix
+ARD=channel 204
+Netflix=launchApp Netflix
 Leselicht=set lightSceneWz scene Leselicht
 ```
 
@@ -607,9 +613,16 @@ change channel on radio to BBC news
 
 Example-Rhasspy-Sentences:
 ```
-[de.fhem:MediaChannels]
+[en.fhem:MediaChannels]
 \[(play|switch to|change to)] ($de.fhem.MediaChannels){Channel} [($de.fhem.Device){Device}] [($de.fhem.Room){Room}]
 ```
+
+Required tags:
+* Channel
+
+Optional tags:
+* Device
+* Room
 
 ### SetColor
 
