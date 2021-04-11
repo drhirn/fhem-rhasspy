@@ -32,6 +32,14 @@
 # ToDo:
 #
 # Find a better way to delay training of Rhasspy after updating slots
+# rhasspyGroup - FHEM UI - use textField instead textField-long
+# getOnOff - use "State" instead of "Status"
+# rename intent "Status" to "GetState"
+# Shortcuts:
+#    rename "n" to "d" (device)
+#    c always runs into timeout
+#    when using c, first response is a Hash and shouldn't be written to reading "voiceResponse"
+# 
 ###########################################################################
 
 package MQTT::RHASSPY; ##no critic qw(Package)
@@ -520,6 +528,7 @@ sub RHASSPY_Set {
     $params = $h if defined $h->{text} || defined $h->{path} || defined $h->{volume};
     return $dispatch->{$command}->($hash, $params) if ref $dispatch->{$command} eq 'CODE';
 
+=pod
     if ($command eq 'update') {
         if ($values[0] eq 'language') {
             return initialize_Language($hash, $hash->{LANGUAGE});
@@ -547,8 +556,7 @@ sub RHASSPY_Set {
             return RHASSPY_trainRhasspy($hash);
         }
     }
-    
-=pod
+=cut
     # Could happen, that training start before all slots are written to Rhasspy
     # Therfore we included a delay
     # Unhappy with fixed 10s. Should find a better way to do this.
@@ -559,14 +567,14 @@ sub RHASSPY_Set {
         if ($values[0] eq 'devicemap') {
             initialize_devicemap($hash);
             RHASSPY_updateSlots($hash);
-            return InternalTimer(time + 10,\&RHASSPY_trainRhasspy,$hash,0);
+            return InternalTimer(time + 3,\&RHASSPY_trainRhasspy,$hash,0);
         }
         if ($values[0] eq 'devicemap_only') {
             return initialize_devicemap($hash);
         }
         if ($values[0] eq 'slots') {
             RHASSPY_updateSlots($hash);
-            return InternalTimer(time + 10,\&RHASSPY_trainRhasspy,$hash,0);
+            return InternalTimer(time + 3,\&RHASSPY_trainRhasspy,$hash,0);
         }
         if ($values[0] eq 'slots_no_training') {
             initialize_devicemap($hash);
@@ -576,10 +584,9 @@ sub RHASSPY_Set {
             initialize_Language($hash, $hash->{LANGUAGE});
             initialize_devicemap($hash);
             RHASSPY_updateSlots($hash);
-            return InternalTimer(time + 10,\&RHASSPY_trainRhasspy,$hash,0);
+            return InternalTimer(time + 3,\&RHASSPY_trainRhasspy,$hash,0);
         }
     }
-=cut
 
     if ($command eq 'customSlot') {
         my $slotname = $h->{slotname}  // shift @values;
@@ -1997,6 +2004,7 @@ sub RHASSPY_respond {
     readingsBulkUpdate($hash, 'responseType', $type);
     readingsEndUpdate($hash,1);
     IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
+    Log3($hash->{NAME}, 5, "Response is: $response");
     return;
 }
 

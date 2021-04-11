@@ -284,6 +284,7 @@ It's also possible to have the same name for different FHEM-devices. Just make s
 ### Attribute *rhasspyRoom*
 You can add an attribute `rhasspyRoom` to the device to tell Rhasspy in which physical room the device is. Otherwise it belongs to the "default room" you used when defining the Rhasspy-device.\
 This is useful to speak commands without a room. If there is a device *Bulb* and it's *rhasspyRoom*-attribute is equal to the siteId of your satellite, it's enough to say "Bulb on" and the Bulb in the room the command is spoken will be turned on.
+`rhasspyRoom` accepts a comma-separated list of rooms.
 
 Example:
 ```attr <device> rhasspyRoom Livingroom```
@@ -416,8 +417,11 @@ Example-Sentences:
 Example-Rhasspy-Sentences:
 ```
 [en.fhem:GetOnOff]
-(is) $de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched on|running|opened){Status}
+(is) $de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched on|running|opened){Status:on}
+(is) $de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched off|stopped|closed){Status:off}
 ```
+
+Be sure to split on- and off-states into different sentences including *{Status:on}* and *{Status:off}*
 
 ### SetNumeric
 
