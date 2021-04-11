@@ -97,6 +97,7 @@ my $languagevars = {
     'DefaultConfirmation' => "OK",
     'DefaultConfirmationTimeout' => "Sorry too late to confirm",
     'DefaultCancelConfirmation' => "Thanks aborted",
+    'SilentCancelConfirmation' => "",
     'DefaultConfirmationReceived' => "ok will do it",
     'DefaultConfirmationNoOutstanding' => "no command is awaiting confirmation",
     'timerSet'   => {
@@ -336,7 +337,7 @@ sub RHASSPY_Define {
     my $Rhasspy  = $h->{baseUrl} // shift @{$anon} // q{http://127.0.0.1:12101};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     my $language = $h->{language} // shift @{$anon} // lc(AttrVal('global','language','en'));
-    $hash->{MODULE_VERSION} = "0.4.7b";
+    $hash->{MODULE_VERSION} = "0.4.7c";
     $hash->{baseUrl} = $Rhasspy;
     $hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
@@ -764,7 +765,7 @@ sub initialize_devicemap {
     my @devices = devspec2array($devspec);
 
     # when called with just one keyword, devspec2array may return the keyword, even if the device doesn't exist...
-    return if (@devices == 1 && $devices[0] eq $devspec);
+    return if !@devices;
     
     for (@devices) {
         _analyze_genDevType($hash, $_) if $hash->{useGenericAttrs};
@@ -1106,7 +1107,7 @@ sub RHASSPY_confirm_timer {
     #cancellation Case
     if ( $mode == 1 ) {
         RemoveInternalTimer( $hash, \&RHASSPY_confirm_timer );
-        $response = $hash->{helper}{lng}->{responses}->{DefaultCancelConfirmation};
+        $response = $hash->{helper}{lng}->{responses}->{ defined $hash->{helper}{'.delayed'} ? 'DefaultCancelConfirmation' : 'SilentCancelConfirmation' };
         RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
         delete $hash->{helper}{'.delayed'};
         return $hash->{NAME};
@@ -1302,7 +1303,7 @@ sub RHASSPY_allRhasspyGroups {
     my @groups;
     
     for my $device (keys %{$hash->{helper}{devicemap}{devices}}) {
-        my $devgroups = $hash->{helper}{devicemap}{devices}{$device}->{groups};
+        my $devgroups = $hash->{helper}{devicemap}{devices}{$device}->{groups} // q{};;
         #for (@{$devgroups}) {
         for (split m{,}xi, $devgroups ) {
             push @groups, $_;
@@ -1325,8 +1326,9 @@ sub RHASSPY_roomName {
     
     my $rreading = makeReadingName("siteId2room_$data->{siteId}");
     #$room = ReadingsVal($hash->{NAME}, $rreading, $data->{siteId});
-    $room = ReadingsVal($hash->{NAME}, $rreading, lc $data->{siteId});
-    $room = $hash->{helper}{defaultRoom} if ($room eq 'default' || !(length $room));
+    my @fromSiteId = split m{\.}x, lc $data->{siteId};
+    $room = ReadingsVal($hash->{NAME}, $rreading, $fromSiteId[0]);
+    $room = $hash->{helper}{defaultRoom} if $room eq 'default' || !(length $room);
 
     return $room;
 }
@@ -3178,7 +3180,7 @@ sub RHASSPY_handleIntentConfirmAction {
     Log3($hash->{NAME}, 5, 'RHASSPY_handleIntentConfirmAction called');
     
     #cancellation case
-    return RHASSPY_confirm_timer($hash, 1) if $data->{Mode} ne 'OK';
+    return RHASSPY_confirm_timer($hash, 1, $data) if $data->{Mode} ne 'OK';
     
     #confirmed case
     my $data_old = $hash->{helper}{'.delayed'};
