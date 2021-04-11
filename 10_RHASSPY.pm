@@ -39,6 +39,12 @@
 #    rename "n" to "d" (device)
 #    c always runs into timeout
 #    when using c, first response is a Hash and shouldn't be written to reading "voiceResponse"
+#    Perl-command results in warning after reboot: PERL WARNING: Use of uninitialized value $ret in pattern match (m//) at ./FHEM/10_RHASSPY.pm line 2377.
+#    Perl-command: "Longpoll" not working
+# MediaChannels:
+#    Respond with "channel not found" instead of "da ist etwas schiefgegangen" if channel is not found
+# GetNumeric:
+#    Two devices with temperature mapping. If spoken "wie warm ist es draußen", I get the temp from living room 
 # 
 ###########################################################################
 

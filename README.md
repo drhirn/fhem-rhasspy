@@ -483,8 +483,8 @@ Intent to question values like actual temperature, brightness, volume, ...
 
 Example-Mappings:
 ```
-GetNumeric:currentVal=temperature,part=1
-GetNumeric:currentVal=brightness,type=Helligkeit
+GetNumeric:currentVal=temperature,part=1,type=temperature
+GetNumeric:currentVal=pct,type=brightness
 ```
 
 Optionen:
@@ -517,7 +517,7 @@ Intent to get specific information of a device. The respone can be defined.
 
 Example-Mappings:
 ```
-Status:response="Temperature is [Thermo:temp] degree at [Thermo:hum] percent humidity"
+Status:response="Temperature is [$DEVICE:temp] degree at [Thermo:hum] percent humidity"
 Status:response={my $value=ReadingsVal("$DEVICE","brightness",""); return "Brightness is $value";}
 ```
 
@@ -585,6 +585,13 @@ Example-Rhasspy-Sentences:
 (next){Command:Fwd} (song|title) [$de.fhem.Device{Device}]
 (previous){Command:Back} (song|title) [$de.fhem.Device{Device}] [$de.fhem.Room{Room}]
 ```
+
+Required tags:
+* Command
+
+Optional tags:
+* Device
+* Room
 
 ### MediaChannels
 
