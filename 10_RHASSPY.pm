@@ -44,7 +44,9 @@
 # MediaChannels:
 #    Respond with "channel not found" instead of "da ist etwas schiefgegangen" if channel is not found
 # GetNumeric:
-#    Two devices with temperature mapping. If spoken "wie warm ist es draußen", I get the temp from living room 
+#    Two devices with temperature mapping. If spoken "wie warm ist es draußen", I get the temp from living room
+# Timer:
+#    Timer im Wohnzimer auf 10:15 -> correctly set but response is "Timer in Raum Wohnzimmer gesetzt auf 57 Sekunden"
 # 
 ###########################################################################
 
@@ -107,18 +109,18 @@ my $languagevars = {
     'DefaultConfirmationReceived' => "ok will do it",
     'DefaultConfirmationNoOutstanding' => "no command is awaiting confirmation",
     'timerSet'   => {
-        '0' => 'Timer $label in room $room has been set to $seconds seconds',
-        '1' => 'Timer $label in room $room has been set to $minutes minutes $seconds',
-        '2' => 'Timer $label in room $room has been set to $minutes minutes',
-        '3' => 'Timer $label in room $room has been set to $hours hours $minutetext',
-        '4' => 'Timer $label in room $room has been set to $hour o clock $minutes',
-        '5' => 'Timer $label in room $room has been set to tomorrow $hour o clock $minutes'
+        '0' => '$label in room $room has been set to $seconds seconds',
+        '1' => '$label in room $room has been set to $minutes minutes $seconds',
+        '2' => '$label in room $room has been set to $minutes minutes',
+        '3' => '$label in room $room has been set to $hours hours $minutetext',
+        '4' => '$label in room $room has been set to $hour o clock $minutes',
+        '5' => '$label in room $room has been set to tomorrow $hour o clock $minutes'
     },
     'timerEnd'   => {
-        '0' => 'Timer $label expired',
-        '1' =>  'Timer $label in room $room expired'
+        '0' => '$label expired',
+        '1' =>  '$label in room $room expired'
     },
-    'timerCancellation' => 'timer $label for $room deleted',
+    'timerCancellation' => '$label for $room deleted',
     'timeRequest' => 'it is $hour o clock $min minutes',
     'weekdayRequest' => 'today it is $weekDay',
     'duration_not_understood'   => "Sorry I could not understand the desired duration",
@@ -260,6 +262,7 @@ BEGIN {
     readingsBeginUpdate
     readingsBulkUpdate
     readingsEndUpdate
+    readingsDelete
     Log3
     defs
     attr
@@ -3075,7 +3078,7 @@ Die ganze Logik würde sich dann erweitern, indem erst geschaut wird, ob eines d
     Log3($name, 5, 'handleIntentSetTimer called');
 
     return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $hash->{helper}{lng}->{responses}->{duration_not_understood}) 
-    if !defined $data->{hourabs} && !defined $data->{hour} && !defined $data->{min} && !defined $data->{sec} && !defined $data->{Cancel};
+    if !defined $data->{Hourabs} && !defined $data->{Hour} && !defined $data->{Min} && !defined $data->{Sec} && !defined $data->{CancelTimer};
 
     my $room = RHASSPY_roomName($hash, $data); #$data->{Room} // $siteId
 
@@ -3083,17 +3086,17 @@ Die ganze Logik würde sich dann erweitern, indem erst geschaut wird, ob eines d
     my $value = time;
     my $now = $value;
     my @time = localtime($now);
-    if ( defined $data->{hourabs} ) {
-        $hour  = $data->{hourabs};
+    if ( defined $data->{Hourabs} ) {
+        $hour  = $data->{Hourabs};
         $value = $value - ($time[2] * HOURSECONDS) - ($time[1] * MINUTESECONDS) - $time[0]; #last midnight
     }
-    elsif ($data->{hour}) {
-        $hour = $data->{hour};
+    elsif ($data->{Hour}) {
+        $hour = $data->{Hour};
     }
     $value += HOURSECONDS * $hour;
-    $value += MINUTESECONDS * $data->{min} if $data->{min};
-    $value += $data->{sec} if $data->{sec};
-    
+    $value += MINUTESECONDS * $data->{Min} if $data->{Min};
+    $value += $data->{Sec} if $data->{Sec};
+
     my $tomorrow = 0;
     if ( $value < $now ) {
         $tomorrow = 1;
@@ -3113,12 +3116,13 @@ Die ganze Logik würde sich dann erweitern, indem erst geschaut wird, ob eines d
     }
     
     my $roomReading = "timer_".makeReadingName($room);
-    my $label = $data->{label} // q{};
+    my $label = $data->{Label} // q{};
     $roomReading .= "_$label" if $label ne ''; 
 
-    if (defined $data->{Cancel}) {
+    if (defined $data->{CancelTimer}) {
         CommandDelete($hash, $roomReading);
-        readingsSingleUpdate( $hash,$roomReading, 0, 1 );
+        #readingsSingleUpdate( $hash,$roomReading, 0, 1 );
+        readingsDelete($hash, $roomReading);
         Log3($name, 5, "deleted timer: $roomReading");
         $response = RHASSPY_getResponse($hash, 'timerCancellation');
         $response =~ s{(\$\w+)}{$1}eegx;
@@ -3128,22 +3132,26 @@ Die ganze Logik würde sich dann erweitern, indem erst geschaut wird, ob eines d
 
 
     if( $value && $timerRoom ) {
-        my $seconds = $value - $now; 
+        my $seconds = $value - $now;
         my $diff = $seconds;
         my $attime = strftime('%H', gmtime $diff);
         $attime += 24 if $tomorrow;
         $attime .= strftime(':%M:%S', gmtime $diff);
+        my $readingTime = strftime "%T", localtime (time + $seconds);
 
         $responseEnd =~ s{(\$\w+)}{$1}eegx;
 
         #my $cmd = qq(defmod $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";;setreading $name $roomReading 0);
 
         #RHASSPY_runCmd($hash,'',$cmd);
-        CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";setreading $name $roomReading 0");
+        #CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";setreading $name $roomReading 0");
+        CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";deletereading $name $roomReading");
 
-        readingsSingleUpdate($hash, $roomReading, 1, 1);
+        #readingsSingleUpdate($hash, $roomReading, 1, 1);
+        readingsSingleUpdate($hash, $roomReading, $readingTime, 1);
 
-        Log3($name, 5, "Created timer: $roomReading at +$attime");
+        #Log3($name, 5, "Created timer: $roomReading at +$attime");
+        Log3($name, 5, "Created timer: $roomReading at $readingTime");
 
         my ($range, $minutes, $hours, $minutetext);
         @time = localtime($value);

@@ -19,6 +19,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyMapping*](#attribute-rhasspymapping)\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyChannels*](#attribute-rhasspychannels)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Attribute *genericDeviceType*](#attribute-genericdevicetype)\
 [Intents](#intents)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetOnOff](#setonoff)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetOnOffGroup](#setonoffgroup)\
@@ -340,6 +341,18 @@ Example:
 attr <device> rhasspyChannels orf eins=set <device> channel 201
 orf zwei=set <device> channel 202
 ```
+
+### Attribute genericDeviceType
+
+**Work in progress - do not use in production**
+
+There are:
+* switch
+* light
+* thermostat
+* blind
+* media
+
 
 ## Intents
 Intents are used to tell FHEM what to do after receiving a voice-/text-command. This module has some build-in intents.
@@ -706,9 +719,9 @@ which weekday is today
 
 ### SetTimer
 
-Intent to create a timer/countdown
+Intent to create a timer/countdown/alarm
 
-This intent creates an AT-command in FHEM with the given time and - currently - speaks the sentences "Timer abgelaufen" when it has expired.
+This intent creates an AT-command in FHEM with the given time and - currently - speaks the sentences "timer expired" when it has expired.
 
 No FHEM-settings needed
 
@@ -716,14 +729,31 @@ Example-Sentences:
 ```
 Set timer in bedroom to five minutes
 Set countdown in the kitchen to two hours
+set timer to five and a half hours
+set alarm to 5 o' clock
+set timer to 3 hours and 20 minutes
+set timer to 1 hour, 30 minutes and 15 seconds
+stop the timer in bedroom
 ```
 
 Example-Rhasspy-Sentence:
 ```
-[de.fhem:SetTimer]
-\[set] (timer|countdown) [in] [$de.fhem.Room{Room}] to (1..60){Value} [(minute|minutes|hour|hours|second|seconds){Unit}]
+[en.fhem:SetTimer]
+labels=(alarm|teetimer|countdown|timer)
+\[<labels>{Label}] [$en.fhem.Room{Room}] (to|in) [((1..60){Hour!int} (hour|hours))] [and] [((1..60){Min!int} (minute|minutes))] [and] [((1..60){Sec!int} (second|seconds))]
+\[<labels>{Label}] [$en.fhem.Room{Room}] (to|in) (1..60){Hour!int} and (a quarter{Min:15}|a half{Min:30}|three quarters{Min:45}) (hour|hours)
+\[<labels>{Label}] [$en.fhem.Room{Room}] (to|in) (1..60){Min!int} and (a quarter{Sec:15}|a half{Sec:30}|three quarters{Sec:45}) (minute|minutes)
+\[<labels>{Label}] [$en.fhem.Room{Room}] (to|in|at) (1..24){Hourabs!int} [(1..60){Min!int}] o clock
+
+(cancel|remove|stop|delete){CancelTimer} [<labels>{Label}] [$en.fhem.Room{Room}]
 ```
-Be sure to make the unit optional! Else there is always a random "unit" added to the sentence.
+
+Required tags to set a timer:
+* Label
+* On of Hour, Hourabs, Min, Sec
+
+Required tags to cancel a timer:
+* Label
 
 ### SetMute
 
