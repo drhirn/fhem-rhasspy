@@ -1964,7 +1964,6 @@ sub RHASSPY_onmessage {
     }
 
     my $command = $data->{input};
-
     $type = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
     $data->{requestType} = $type;
     my $intent = $data->{intent};
@@ -2015,6 +2014,7 @@ sub RHASSPY_respond {
         for my $key (keys %{$response}) {
             $sendData->{$key} = $response->{$key};
         }
+        $response = $response->{text} // q{};
     } else {
         $sendData->{text} = $response
     }
