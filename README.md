@@ -26,7 +26,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[GetOnOff](#getonoff)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetNumeric](#setnumeric)\
 &nbsp;&nbsp;&nbsp;&nbsp;[GetNumeric](#getnumeric)\
-&nbsp;&nbsp;&nbsp;&nbsp;[Status](#status)\
+&nbsp;&nbsp;&nbsp;&nbsp;[GetState](#getstate)\
 &nbsp;&nbsp;&nbsp;&nbsp;[MediaControls](#mediacontrols)\
 &nbsp;&nbsp;&nbsp;&nbsp;[MediaChannels](#mediachannels)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetColor](#setcolor)\
@@ -497,34 +497,57 @@ Intent to question values like actual temperature, brightness, volume, ...
 Example-Mappings:
 ```
 GetNumeric:currentVal=temperature,part=1,type=temperature
-GetNumeric:currentVal=pct,type=brightness
+GetNumeric:currentVal=pct,map=percent,minVal=0,maxVal=100,type=brightness
+GetNumeric:currentVal=volume,type=volume
 ```
 
-Optionen:
+Arguments:
 * **currentVal** Reading which contains the value.
 * **part** Used to split *currentVal* into separate values. Separator is a blank. E.g. if *currentVal* is *23 C*, part=1 results in *23*
 * **map** See Explanation in [SetNumeric Intent](#setnumeric). Converts the given value back to a percent-value.
 * **minVal** Lowest possible value. Only needed if *map* is used.
 * **maxVal** Highest possible value. Only needed if *map* is used.
-* **type** To differentiate between multiple possible SetNumeric-Intents for the same device. Currently supports only the german hard-coded values **Helligkeit**, **Temperatur**, **Sollwert**, **Lautstärke**, **Luftfeuchtigkeit**, **Batterie**, **Wasserstand**, **Bodenfeuchte**
+* **type** To differentiate between multiple possible SetNumeric-Intents for the same device.
+
+Possible **type**s:
+* **airHumidity**
+* **battery**
+* **brightness**
+* **desired-temp**
+* **setTarget**
+* **soilMoisture**
+* **temperature**
+* **volume**
+* **waterLevel**
 
 Example-Sentences:
 ```
-Wie ist die Temperatur vom Thermometer im Büro?
-Auf was ist das Thermostat im Bad gestellt?
-Wie hell ist die Deckenlampe?
-Wie laut ist das Radio im Wohnzimmer?
+what is the temperature in the living room
+how bright is the floor lamp
+what is the volume of the tv
 ```
 
 Example-Rhasspy-Sentences:
 ```
-[de.fhem:GetNumeric]
-(wie laut|wie ist die lautstärke){Type:Lautstärke} $de.fhem.Device{Device} [$de.fhem.Room{Room}]
-(wie ist die|wie warm ist es){Type:Temperatur} [temperatur] [$de.fhem.Device{Device} ] [$de.fhem.Room{Room}]
-\[(wie|wie ist die)] (hell|helligkeit){Type:Helligkeit} $de.fhem.Device{Device} [$de.fhem.Room{Room}]
+[en.fhem:GetNumeric]
+#actual temperature
+(what is|how high is) the temperature{Type:temperature} [$en.fhem.Device{Device}] [$en.fhem.Room{Room}]
+
+#desired-temperature
+\[what is the|how high is the] (desired temperature){Type:desired-temp} [($en.fhem.Device){Device}] [$en.fhem.Room{Room}]
+
+#volume
+(what is the|how high is the) volume{Type:volume} $en.fhem.Device{Device} [$en.fhem.Room{Room}]
 ```
 
-### Status
+Required tags:
+* Device
+* Type
+
+Optional tags
+* Room
+
+### GetState
 
 Intent to get specific information of a device. The respone can be defined.
 
@@ -743,6 +766,8 @@ labels=(alarm|teetimer|countdown|timer)
 \[<labels>{Label}] [$en.fhem.Room{Room}] (to|in) [((1..60){Hour!int} (hour|hours))] [and] [((1..60){Min!int} (minute|minutes))] [and] [((1..60){Sec!int} (second|seconds))]
 \[<labels>{Label}] [$en.fhem.Room{Room}] (to|in) (1..60){Hour!int} and (a quarter{Min:15}|a half{Min:30}|three quarters{Min:45}) (hour|hours)
 \[<labels>{Label}] [$en.fhem.Room{Room}] (to|in) (1..60){Min!int} and (a quarter{Sec:15}|a half{Sec:30}|three quarters{Sec:45}) (minute|minutes)
+\[<labels>{Label}] [$en.fhem.Room{Room}] (to|in) ((the fourth){Min:15}|(half a){Min:30}|(three fourth){Min:45}) (hour)
+\[<labels>{Label}] [$en.fhem.Room{Room}] (to|in) ((the fourth){Min:15}|(half a){Min:30}|(three fourth){Min:45}) (minute)
 \[<labels>{Label}] [$en.fhem.Room{Room}] (to|in|at) (1..24){Hourabs!int} [(1..60){Min!int}] o clock
 
 (cancel|remove|stop|delete){CancelTimer} [<labels>{Label}] [$en.fhem.Room{Room}]
