@@ -459,12 +459,22 @@ Arguments:
 
 Explanation for `map=percent` or `{Unit:percent}`:
 If this option is set, all numeric control values are taken as percentage between *minVal* and *maxVal*.\
-If there is a light-device with the setting *minVal=0* and *maxVal=255*, then "turn the light to 50" means the same as "turn the light to 50 percent". The light is then set to 127 instead of 50.-->
+If there is a light-device with the setting *minVal=0* and *maxVal=255*, then "turn the light to 50" means the same as "turn the light to 50 percent". The light is then set to 127 instead of 50.
 
 Specifics with `type=volume`:
 To use the commands *louder* or *lower* without the need to speak a device-name, the module has to know which device is currently playing. Thus it uses the *GetOnOff-Mappings* to search a turned on device with `type=volume`. First it searches in the actual *rhasspyRoom* (the *siteId* or - if missing - the default rhasspyRoom), next in all other *rhasspyRoom*s.\
-That's why it's advisable to also set a *GetOnOff*-Mapping if using a *SetNumeric*-Mapping.-->
+That's why it's advisable to also set a *GetOnOff*-Mapping if using a *SetNumeric*-Mapping.
 
+Possible **type**s:
+* **airHumidity**
+* **battery**
+* **brightness**
+* **desired-temp**
+* **setTarget**
+* **soilMoisture**
+* **temperature**
+* **volume**
+* **waterLevel**
 
 Example-sentences:
 ```
@@ -484,7 +494,7 @@ Example-Rhasspy-Sentences:
 (turn down|decrease){Change:lightDown} [the light] [of] $en.fhem.Device{Device} [by] [(0..100){Value}] [percent{Unit:percent}]
 ```
 
-Currently there are four possible types for `{Change}`:
+Currently there are this possible types for `{Change}`:
 * tempUp / tempDown
 * volUp / volDown
 * lightUp / lightDown
@@ -499,6 +509,8 @@ Example-Mappings:
 GetNumeric:currentVal=temperature,part=1,type=temperature
 GetNumeric:currentVal=pct,map=percent,minVal=0,maxVal=100,type=brightness
 GetNumeric:currentVal=volume,type=volume
+GetNumeric:currentVal=humidity,part=0,type=airHumidity
+GetNumeric:currentVal=batteryPercent,type=battery
 ```
 
 Arguments:
@@ -553,8 +565,8 @@ Intent to get specific information of a device. The respone can be defined.
 
 Example-Mappings:
 ```
-Status:response="Temperature is [$DEVICE:temp] degree at [Thermo:hum] percent humidity"
-Status:response={my $value=ReadingsVal("$DEVICE","brightness",""); return "Brightness is $value";}
+GetState:response="Temperature is [$DEVICE:temp] degree at [Thermo:hum] percent humidity"
+GetState:response={my $value=ReadingsVal("$DEVICE","brightness",""); return "Brightness is $value";}
 ```
 
 Options:
@@ -573,7 +585,7 @@ state washer
 
 Example-Rhasspy-Sentences:
 ```
-[de.fhem:Status]
+[de.fhem:GetState]
 \[how is the] (state) $de.fhem.Device{Device} [$de.fhem.Room{Room}]
 ```
 
