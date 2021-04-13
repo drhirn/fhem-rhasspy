@@ -138,8 +138,8 @@ my $languagevars = {
         '0' => 'temperature in $location is $value',
         '1' => 'temperature in $location is $value degrees',
       },
-      'desired-temp' => 'target temperature for $device is set to $value degrees',
-      'volume'  => '$device set to $value',
+      'desired-temp' => 'target temperature for $location is set to $value degrees',
+      'volume'       => '$device set to $value',
       'waterLevel'   => 'water level in $location is $value percent',
       'knownType'    => '$mappingType in $location is $value percent',
       'unknownType'  => 'value in $location is $value percent'
@@ -1964,8 +1964,8 @@ sub RHASSPY_onmessage {
     }
 
     my $command = $data->{input};
-    $type = $message =~ m{${fhemId}
-.textCommand}x ? 'text' : 'voice';
+
+    $type = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
     $data->{requestType} = $type;
     my $intent = $data->{intent};
 
@@ -1982,8 +1982,9 @@ sub RHASSPY_onmessage {
     #Beta-User: In welchem Fall kam es dazu, den folgenden Code-Teil anzufahren?
     #else {RHASSPY_respond ($hash, $data->{'requestType'}, $data->{sessionId}, $data->{siteId}, " ");}
     #Beta-User: return value should be reviewed. If there's an option to return the name of the devices triggered by Rhasspy, then this could be a better option than just RHASSPY's own name.
-    
-    $device = $device // $hash->{NAME};
+    my $name = $hash->{NAME};
+    $device = $device // $name;
+    $device .= ",$name" if $device !~ m{$name}x;
     my @candidates = split m{,}x, $device;
     for (@candidates) {
         push @updatedList, $_ if $defs{$_}; 
@@ -2376,7 +2377,7 @@ sub RHASSPY_handleIntentShortcuts {
     }
     $response = $shortcut->{response} // RHASSPY_getResponse($hash, 'DefaultConfirmation');
     my $ret;
-    my $device = $shortcut->{NAME};;
+    my $device = $shortcut->{NAME};
     my $cmd    = $shortcut->{perl};
 
     my $self   = $hash->{NAME};
@@ -3093,7 +3094,7 @@ Die ganze Logik würde sich dann erweitern, indem erst geschaut wird, ob eines d
     return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $hash->{helper}{lng}->{responses}->{duration_not_understood}) 
     if !defined $data->{Hourabs} && !defined $data->{Hour} && !defined $data->{Min} && !defined $data->{Sec} && !defined $data->{CancelTimer};
 
-    my $room = RHASSPY_roomName($hash, $data); #$data->{Room} // $siteId
+    my $room = RHASSPY_roomName($hash, $data);
 
     my $hour = 0;
     my $value = time;
@@ -3142,7 +3143,6 @@ Die ganze Logik würde sich dann erweitern, indem erst geschaut wird, ob eines d
         RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
         return $name;
     }
-
 
     if( $value && $timerRoom ) {
         my $seconds = $value - $now;
@@ -3221,7 +3221,7 @@ sub RHASSPY_handleIntentConfirmAction {
     $data_old->{Confirmation} = 1;
     
     my $intent = $data_old->{intent};
-    my $device;
+    my $device = $hash->{NAME};
 
     # Passenden Intent-Handler aufrufen
     if (ref $dispatchFns->{$intent} eq 'CODE') {
