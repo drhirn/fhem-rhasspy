@@ -138,6 +138,7 @@ my $languagevars = {
         '0' => 'temperature in $location is $value',
         '1' => 'temperature in $location is $value degrees',
       },
+      'desired-temp' => 'target temperature for $device is set to $value degrees',
       'volume'  => '$device set to $value',
       'waterLevel'   => 'water level in $location is $value percent',
       'knownType'    => '$mappingType in $location is $value percent',
@@ -346,7 +347,7 @@ sub RHASSPY_Define {
     my $Rhasspy  = $h->{baseUrl} // shift @{$anon} // q{http://127.0.0.1:12101};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     my $language = $h->{language} // shift @{$anon} // lc(AttrVal('global','language','en'));
-    $hash->{MODULE_VERSION} = "0.4.7c";
+    $hash->{MODULE_VERSION} = "0.4.7d";
     $hash->{baseUrl} = $Rhasspy;
     $hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
@@ -356,7 +357,7 @@ sub RHASSPY_Define {
     initialize_prefix($hash, $h->{prefix}) if !defined $hash->{prefix} || $hash->{prefix} ne $h->{prefix};
     $hash->{prefix} = $h->{prefix} // q{rhasspy};
     $hash->{encoding} = $h->{encoding};
-    $hash->{useGenericAttrs} = $h->{useGenericAttrs};
+    $hash->{useGenericAttrs} = $h->{useGenericAttrs} // 1;
     $hash->{'.asyncQueue'} = [];
     #Beta-User: Für's Ändern von defaultRoom oder prefix vielleicht (!?!) hilfreich: https://forum.fhem.de/index.php/topic,119150.msg1135838.html#msg1135838 (Rudi zu resolveAttrRename) 
 
@@ -1009,7 +1010,7 @@ sub _analyze_genDevType {
         my $desTemp = $allset =~ m{\b(desiredTemp)[\b:\s]}xms ? $1 : 'desired-temp';
         my $measTemp = InternalVal($device, 'TYPE', 'unknown') eq 'CUL_HM' ? 'measured-temp' : 'temperature';
         $currentMapping = 
-            { GetNumeric => { 'desired-temp' => {currentVal => $desTemp, type => 'temperature'},
+            { GetNumeric => { 'desired-temp' => {currentVal => $desTemp, type => 'desired-temp'},
             temperature => {currentVal => $measTemp, type => 'temperature'}}, 
             SetNumeric => {'desired-temp' => { cmd => $desTemp, currentVal => $desTemp, maxVal => '28', minVal => '10', step => '0.5', type => 'temperature'}}
             };
@@ -1110,6 +1111,7 @@ sub RHASSPY_confirm_timer {
         #Beta-User: we may need to start a new session first?
         RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
         delete $hash->{helper}{'.delayed'};
+        initialize_DialogManager($hash);
         return;
     }
 
@@ -1119,6 +1121,7 @@ sub RHASSPY_confirm_timer {
         $response = $hash->{helper}{lng}->{responses}->{ defined $hash->{helper}{'.delayed'} ? 'DefaultCancelConfirmation' : 'SilentCancelConfirmation' };
         RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
         delete $hash->{helper}{'.delayed'};
+        initialize_DialogManager($hash);
         return $hash->{NAME};
     }
     if ( $mode == 2 ) {
@@ -1131,10 +1134,12 @@ sub RHASSPY_confirm_timer {
         InternalTimer(time + $timeout, \&RHASSPY_confirm_timer, $hash, 0);
 
         #interactive dialogue as described in https://rhasspy.readthedocs.io/en/latest/reference/#dialoguemanager_continuesession and https://docs.snips.ai/articles/platform/dialog/multi-turn-dialog
-        my $reaction = { text => $response, intentFilter => [qw(ConfirmAction)]
-            };
+        my $ca_string = qq{$hash->{LANGUAGE}.$hash->{fhemId}:ConfirmAction};
+        my $reaction = { text         => $response, 
+                         intentFilter => ["$ca_string"] };
 
         RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $reaction);
+        initialize_DialogManager($hash);
 
         return $hash->{NAME};
     }
@@ -1380,12 +1385,13 @@ sub RHASSPY_getDevicesByIntentAndType {
     my $room   = shift;
     my $intent = shift;
     my $type   = shift; #Beta-User: any necessary parameters...?
+    my $subType = shift // $type;
 
     my @matchesInRoom; my @matchesOutsideRoom;
 
     return if !defined $hash->{helper}{devicemap};
     for my $devs (keys %{$hash->{helper}{devicemap}{devices}}) {
-        my $mapping = RHASSPY_getMapping($hash, $devs, $intent, $type, 1, 1) // next;
+        my $mapping = RHASSPY_getMapping($hash, $devs, $intent, { type => $type, subType => $subType }, 1, 1) // next;
         my $mappingType = $mapping->{type};
         #my $rooms = join q{,}, $hash->{helper}{devicemap}{devices}{$devs}->{rooms};
         my $rooms = $hash->{helper}{devicemap}{devices}{$devs}->{rooms};
@@ -1575,11 +1581,17 @@ sub RHASSPY_getMapping { #($$$$;$)
     my $type       = shift // $intent; #Beta-User: seems first three parameters are obligatory...?
     my $fromHash   = shift // 0;
     my $disableLog = shift // 0;
-    
+
+    my $subType = $type;
+    if (ref $type eq 'HASH') {
+        $subType = $type->{subType};
+        $type = $type->{type};
+    }
+
     my $matchedMapping;
 
     if ($fromHash) {
-        $matchedMapping = $hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}{type};
+        $matchedMapping = $hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}{$subType};
         return $matchedMapping if $matchedMapping;
         
         for (sort keys %{$hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}}) {
@@ -2776,6 +2788,7 @@ sub RHASSPY_handleIntentGetNumeric {
     return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'DefaultError')) if !exists $data->{Type} && !exists $data->{Device};
 
     my $type = $data->{Type};
+    my $subType = $data->{subType} // $type;
     my $room = RHASSPY_roomName($hash, $data);
 
     # Passendes Gerät suchen
@@ -2789,7 +2802,7 @@ sub RHASSPY_handleIntentGetNumeric {
         : RHASSPY_getDeviceByIntentAndType($hash, $room, 'GetNumeric', $type)
         // return RHASSPY_respond($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoDeviceFound'));
 
-    my $mapping = RHASSPY_getMapping($hash, $device, 'GetNumeric', $type, defined $hash->{helper}{devicemap}, 0) 
+    my $mapping = RHASSPY_getMapping($hash, $device, 'GetNumeric', { type => $type, subType => $subType }, defined $hash->{helper}{devicemap}, 0)
         // return RHASSPY_respond($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoMappingFound'));
 
     # Mapping gefunden
