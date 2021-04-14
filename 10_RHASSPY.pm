@@ -32,25 +32,11 @@
 # ToDo:
 #
 # Find a better way to delay training of Rhasspy after updating slots
-# rhasspyGroup - FHEM UI - use textField instead textField-long #Beta-User: done?
-# getOnOff - use "State" instead of "Status" #Beta-User: done?
-# rename intent "Status" to "GetState" #Beta-User: done?
-# Shortcuts: #Beta-User: done?
-#    rename "n" to "d" (device)
-#    c always runs into timeout
-#    when using c, first response is a Hash and shouldn't be written to reading "voiceResponse"
-#    Perl-command results in warning after reboot: PERL WARNING: Use of uninitialized value $ret in pattern match (m//) at ./FHEM/10_RHASSPY.pm line 2377. (Beta-User: also solved?)
-#    Perl-command: "Longpoll" not working (still open?)
 # MediaChannels:
 #    Respond with "channel not found" instead of "da ist etwas schiefgegangen" if channel is not found #Beta-User: done?
-# GetNumeric:
-#    Two devices with temperature mapping. If spoken "wie warm ist es draußen", I get the temp from living room
-# Timer:
-#    Timer im Wohnzimer auf 10:15 -> correctly set but response is "Timer in Raum Wohnzimmer gesetzt auf 57 Sekunden"
-# 
 ###########################################################################
 
-package MQTT::RHASSPY; ##no critic qw(Package)
+package RHASSPY; ##no critic qw(Package)
 use strict;
 use warnings;
 use Carp qw(carp);
@@ -386,7 +372,7 @@ sub firstInit {
     IOWrite($hash, 'subscriptions', join q{ }, @topics) if InternalVal($IODev,'TYPE',undef) eq 'MQTT2_CLIENT';
 
     RHASSPY_fetchSiteIds($hash) if !ReadingsVal( $hash->{NAME}, 'siteIds', 0 );
-    initialize_rhasspyTweaks($hash);
+    initialize_rhasspyTweaks($hash, AttrVal($hash->{NAME},'rhasspyTweaks', undef ));
     initialize_DialogManager($hash);
     initialize_devicemap($hash); # if defined $hash->{useHash};
 
@@ -439,7 +425,6 @@ sub initialize_prefix {
     addToAttrList("${prefix}Mapping:textField-long");
     addToAttrList("${prefix}Channels:textField-long");
     addToAttrList("${prefix}Colors:textField-long");
-    addToAttrList("${prefix}Group:textField-long");
     addToAttrList("${prefix}Group:textField");
     addToAttrList("${prefix}Specials:textField-long");
 
@@ -541,35 +526,6 @@ sub RHASSPY_Set {
     $params = $h if defined $h->{text} || defined $h->{path} || defined $h->{volume};
     return $dispatch->{$command}->($hash, $params) if ref $dispatch->{$command} eq 'CODE';
 
-=pod
-    if ($command eq 'update') {
-        if ($values[0] eq 'language') {
-            return initialize_Language($hash, $hash->{LANGUAGE});
-        }
-        if ($values[0] eq 'devicemap') {
-            initialize_devicemap($hash);
-            RHASSPY_updateSlots($hash);
-            return RHASSPY_trainRhasspy($hash);
-        }
-        if ($values[0] eq 'devicemap_only') {
-            return initialize_devicemap($hash);
-        }
-        if ($values[0] eq 'slots') {
-            RHASSPY_updateSlots($hash);
-            return RHASSPY_trainRhasspy($hash);
-        }
-        if ($values[0] eq 'slots_no_training') {
-            initialize_devicemap($hash);
-            return RHASSPY_updateSlots($hash);
-        }
-        if ($values[0] eq 'all') {
-            initialize_Language($hash, $hash->{LANGUAGE});
-            initialize_devicemap($hash);
-            RHASSPY_updateSlots($hash);
-            return RHASSPY_trainRhasspy($hash);
-        }
-    }
-=cut
     # Could happen, that training start before all slots are written to Rhasspy
     # Therfore we included a delay
     # Unhappy with fixed 10s. Should find a better way to do this.
@@ -579,15 +535,17 @@ sub RHASSPY_Set {
         }
         if ($values[0] eq 'devicemap') {
             initialize_devicemap($hash);
-            RHASSPY_updateSlots($hash);
-            return InternalTimer(time + 3,\&RHASSPY_trainRhasspy,$hash,0);
+            $hash->{'.needTraining'} = 1;
+            return RHASSPY_updateSlots($hash);
+            #return InternalTimer(time + 3,\&RHASSPY_trainRhasspy,$hash,0);
         }
         if ($values[0] eq 'devicemap_only') {
             return initialize_devicemap($hash);
         }
         if ($values[0] eq 'slots') {
-            RHASSPY_updateSlots($hash);
-            return InternalTimer(time + 3,\&RHASSPY_trainRhasspy,$hash,0);
+            $hash->{'.needTraining'} = 1;
+            return RHASSPY_updateSlots($hash);
+            #return InternalTimer(time + 3,\&RHASSPY_trainRhasspy,$hash,0);
         }
         if ($values[0] eq 'slots_no_training') {
             initialize_devicemap($hash);
@@ -596,8 +554,9 @@ sub RHASSPY_Set {
         if ($values[0] eq 'all') {
             initialize_Language($hash, $hash->{LANGUAGE});
             initialize_devicemap($hash);
-            RHASSPY_updateSlots($hash);
-            return InternalTimer(time + 3,\&RHASSPY_trainRhasspy,$hash,0);
+            $hash->{'.needTraining'} = 1;
+            return RHASSPY_updateSlots($hash);
+            #return InternalTimer(time + 3,\&RHASSPY_trainRhasspy,$hash,0);
         }
     }
 
@@ -642,6 +601,14 @@ sub RHASSPY_Attr {
         } 
     }
     
+    if ( $attribute eq 'rhasspyTweaks' ) {
+        for ( keys %{ $hash->{helper}{tweaks} } ) {
+            delete $hash->{helper}{tweaks}{$_};
+        }
+        if ($command eq 'set') {
+            return initialize_rhasspyTweaks($hash, $value); 
+        } 
+    } 
     if ( $attribute eq 'configFile' ) {
         if ($command ne 'set') {
             delete $hash->{CONFIGFILE};
@@ -699,7 +666,21 @@ sub RHASSPY_init_shortcuts {
 
 sub initialize_rhasspyTweaks {
     my $hash    = shift // return;
+    my $attrVal = shift // return;
     
+    my ($tweak, $values, $device, $err );
+    for my $line (split m{\n}x, $attrVal) {
+        next if !length $line;
+        if ($line =~ m{\A[\s]*timerLimits=}x) {
+            ($tweak, $values) = split m{=}x, $line, 2;
+            return "$err in $line, 5 comma separated values have to be provided" if !length $values && $init_done;
+            my @test = split m{,}x, $values;
+            return "$err in $line, 5 comma separated values have to be provided" if @test != 5 && $init_done;
+            #$values = qq{($values)} if $values !~ m{\A([^()]*)\z}x;
+            $hash->{helper}{tweaks}{$tweak} = [@test];
+            next;
+        }
+    }
     return;
 }
 
@@ -1568,7 +1549,7 @@ sub RHASSPY_splitMappingString {
     push @tokens, $token if length $token;
 
     # Tokens in Keys/Values trennen
-    %parsedMapping = map {split m{=}x, $_, 2} @tokens;
+    %parsedMapping = map {split m{=}x, $_, 2} @tokens; #Beta-User: Odd number of elements in hash assignment
 
     return %parsedMapping;
 }
@@ -2016,7 +1997,6 @@ sub RHASSPY_respond {
         for my $key (keys %{$response}) {
             $sendData->{$key} = $response->{$key};
         }
-        $response = $response->{text} // q{};
     } else {
         $sendData->{text} = $response
     }
@@ -2266,6 +2246,10 @@ sub RHASSPY_ParseHttpResponse {
 
     if ( defined $urls->{$url} ) {
         readingsBulkUpdate($hash, $urls->{$url}, $data);
+        if ($urls->{$url} eq 'updateSlots' && $hash->{'.needTraining'}) {
+            RHASSPY_trainRhasspy($hash);
+            delete $hash->{'.needTraining'};
+        }
     }
     elsif ( $url =~ m{api/profile}ix ) {
         my $ref; 
@@ -2833,7 +2817,7 @@ sub RHASSPY_handleIntentGetNumeric {
         my $rooms = $hash->{helper}{devicemap}{devices}{$device}->{rooms};
         $location = $data->{Room} if $rooms =~ m{\b$data->{Room}\b}ix;
 
-        #Beta-User: this might be the place to implement the "no device in room" branch                   
+        #Beta-User: this might be the place to implement the "no device in room" branch
         ($location, my $nn) = split m{,}, $rooms if !defined $location;
     }
     my $deviceName = $hash->{helper}{devicemap}{devices}{$device}->{alias} // $device;
@@ -3171,17 +3155,18 @@ Die ganze Logik würde sich dann erweitern, indem erst geschaut wird, ob eines d
         Log3($name, 5, "Created timer: $roomReading at $readingTime");
 
         my ($range, $minutes, $hours, $minutetext);
+        my @timerlimits = $hash->{helper}->{tweaks}->{timerLimits} // (101, 9*MINUTESECONDS, HOURSECONDS, 3*HOURSECONDS,3*HOURSECONDS );
         @time = localtime($value);
-        if ( $seconds < 101 ) { 
+        if ( $seconds < $timerlimits[0] && ( !defined $data->{Hourabs} || defined $data->{Hourabs} && $seconds < $timerlimits[4] ) ) { 
             $range = 0;
-        } elsif ( $seconds < HOURSECONDS ) {
+        } elsif (  $seconds < $timerlimits[2] && ( !defined $data->{Hourabs} || defined $data->{Hourabs} && $seconds < $timerlimits[4] ) ) {
             $minutes = int ($seconds/MINUTESECONDS);
-            $range = $seconds < 9*MINUTESECONDS ? 1 : 2;
+            $range = $seconds < $timerlimits[1] ? 1 : 2;
             $seconds = $seconds % MINUTESECONDS;
             $range = 2 if !$seconds;
             $minutetext =  $hash->{helper}{lng}->{units}->{unitMinutes}->{$minutes > 1 ? 0 : 1};
             $minutetext = qq{$minutes $minutetext} if $minutes > 1;
-        } elsif ( $seconds < 3 * HOURSECONDS ) {
+        } elsif (  $seconds < $timerlimits[3] && ( !defined $data->{Hourabs} || defined $data->{Hourabs} && $seconds < $timerlimits[4] ) ) {
             $hours = int ($seconds/HOURSECONDS);
             $seconds = $seconds % HOURSECONDS;
             $minutes = int ($seconds/MINUTESECONDS);
@@ -3384,11 +3369,6 @@ __END__
 =pod
 
 =begin ToDo
-
-# Timer:
-- Sollte als Wecker ergänzt werden, so dass man auch absolute Uhrzeiten angeben kann.
-- Die Antwort sollte sich danach richten, wann der Timer abläuft, z.B. bis 100 Sekunden => "auf ... Sekunden gestellt", bis 15/20 Minuten => "auf ... Minuten gestellt", sonst: "auf [morgen] ... Uhr ... (Sekunden) gestellt" 
-- "Benannten Timer" als Option ergänzen
 
 # "rhasspySpecials" als weiteres Attribut?
 Denkbare Verwendung:
@@ -3635,6 +3615,9 @@ i="mute off" p={fhem ("set $NAME mute off")} n=amplifier2 c="Please confirm!"
   <li>
   <a id="RHASSPY-attr-rhasspyTweaks"></a><b>rhasspyTweaks</b><br>
     *) placeholder...<br>
+    Atm, timerLimits may be set here:<br>
+    <code>timerLimits=90,300,3000,2*HOURSECONDS,50</code><br>
+    5 values have to be set, corresponding with the limits to <i>timerSet</i> responses. so above example will lead to seconds response for less then 90 seconds, minute+seconds response for less than 300 seconds etc.. Last value is the limit in seconds, if timer is set in time of day format.<br>
     Might be the place to configure additional things like additional siteId2room info or code links, allowed commands, duration of SetTimer sounds, confirmation requests etc.     
   </li>
   <li>
