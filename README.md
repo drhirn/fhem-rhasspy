@@ -795,7 +795,9 @@ Required tags to cancel a timer:
 * Label
 
 **rhasspyTweaks**\
-```timerLimits=90,300,3000,2*HOURSECONDS,50```
+```
+timerLimits=90,300,3000,2*HOURSECONDS,50
+```
 All five values have to be set, corresponding with the limits to *timerSet* responses.\
 Above example will lead to seconds response for less then 90 seconds, minute+seconds response for less than 300 seconds etc.. Last value is the limit in seconds, if timer is set in time of day format.
 
