@@ -448,39 +448,34 @@ Intent to dim, change volume, set temperature, ...
 
 Example-Mappings:
 ```
-SetNumeric:currentVal=pct,cmd=dim,minVal=0,maxVal=99,step=25
+SetNumeric:currentVal=pct,cmd=dim,minVal=0,maxVal=99,step=25,type=brightness
 SetNumeric:currentVal=volume,cmd=volume,minVal=0,maxVal=99,step=10,type=volume
+SetNumeric:currentVal=brightness,cmd=brightness,minVal=0,maxVal=255,map=percent,step=1,type=brightness
 ```
-<!--SetNumeric:currentVal=brightness,minVal=0,maxVal=255,map=percent,cmd=brightness,step=1,type=Helligkeit-->
 
 Arguments:
-  * **currentVal** Reading which contains the acual value.
-  * **part** Used to split *currentVal* into separate values. Separator is a blank. E.g. if *currentVal* is *23 C*, part=1 results in *23*
-  * **cmd** Set-command of the device that should be called after analysing the voice-command.
-  * **minVal** Lowest possible value
-  * **maxVal** Highest possible value
-  * **step** Step-size for changes (e.g. *turn the volume up*)
-  * **map** Currently only one possible value: percent. See below.
-  * **type** To differentiate between multiple possible SetNumeric-Intents for the same device. Currently supports only the following hard-coded values **brightness**, **temperature**, **setTarget**, **volume**, **airHumidity**, **battery**, **waterLevel**, **soilMoisture**
+  * **currentVal** Reading which contains the acual value. Required.
+  * **part** Used to split *currentVal* into separate values. Separator is a blank. E.g. if *currentVal* is *23 C*, part=1 results in *23*. Optional.
+  * **cmd** Set-command of the device that should be called after analysing the voice-command. Required.
+  * **minVal** Lowest possible value. Optional.
+  * **maxVal** Highest possible value. Optional.
+  * **step** Step-size for changes (e.g. *turn the volume up*). Optional. Default 10.
+  * **map** Currently only one possible value: percent. See below. Optional.
+  * **type** To differentiate between multiple possible SetNumeric-Intents for the same device. Recommended.
 
 Explanation for `map=percent` or `{Unit:percent}`:
-If this option is set, all numeric control values are taken as percentage between *minVal* and *maxVal*.\
+If on of these options is set, all numeric control values are taken as percentage between *minVal* and *maxVal*.\
 If there is a light-device with the setting *minVal=0* and *maxVal=255*, then "turn the light to 50" means the same as "turn the light to 50 percent". The light is then set to 127 instead of 50.
 
-Specifics with `type=volume`:
-To use the commands *louder* or *lower* without the need to speak a device-name, the module has to know which device is currently playing. Thus it uses the *GetOnOff-Mappings* to search a turned on device with `type=volume`. First it searches in the actual *rhasspyRoom* (the *siteId* or - if missing - the default rhasspyRoom), next in all other *rhasspyRoom*s.\
+Good to know:\
+To use the commands like *louder* or *lower* without the need to speak a device-name, the module has to know which device is currently playing. Thus it uses the *GetOnOff-Mappings* to search a turned on device with e.g. `type=volume`. First it searches in the actual *rhasspyRoom* (the *siteId* or - if missing - the default rhasspyRoom), next in all other *rhasspyRoom*s.\
 That's why it's advisable to also set a *GetOnOff*-Mapping if using a *SetNumeric*-Mapping.
 
 Possible **type**s:
-* **airHumidity**
-* **battery**
 * **brightness**
-* **desired-temp**
 * **setTarget**
-* **soilMoisture**
 * **temperature**
 * **volume**
-* **waterLevel**
 
 Example-sentences:
 ```
@@ -492,6 +487,7 @@ Set the temperature in the living room 2 degree warmer
 Example-Rhasspy-Sentences:
 ```
 [en.fhem:SetNumeric]
+(change) $de.fhem.Device{Device} [$de.fhem.Room{Room}] to (0..100){Value!int} [percent{Unit:percent}]
 (turn up|increase){Change:volUp} [the volume] [of] $en.fhem.Device{Device} [by] [(0..10){Value!float}] [decibel{Unit}]
 (turn down|lower){Change:volDown} [the volume] [of] $en.fhem.Device{Device} [by] [(0..10){Value!float}] [decibel{Unit}]
 (turn up|increase){Change:tempUp} [the heating|the temperature] [of] $en.fhem.Device{Device} [by] [(0..10){Value!float}] [degree{Unit}]
@@ -691,10 +687,7 @@ Intent to change light colors
 
 Because of the multi-line settings, instead of configuring this intent with the attribute *rhasspyMapping*, a separate attribute *rhasspyColors* is used.
 
-To add this new attribute to the device, create/edit the attribute *userattr*:\
-`attr <deviceName> userattr rhasspyColors:textField-long`
-
-Afterwards it's possible to add entries the *rhasspyColors* using following format:\
+The content of the *rhasspyColors* uses the following format:\
 `Colorname=cmd`
 
 Settings:
@@ -722,6 +715,13 @@ Example-Rhasspy-Sentences:
 [en.fhem:SetColor]
 \[change|color] $de.fhem.Device{Device} [$de.fhem.Room{Room}] $de.fhem.Color{Color}
 ```
+
+Required tags:
+* Color
+* Device
+
+Optional tags
+* Room
 
 ### GetTime
 
