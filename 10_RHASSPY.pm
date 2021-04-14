@@ -3617,7 +3617,7 @@ i="mute off" p={fhem ("set $NAME mute off")} n=amplifier2 c="Please confirm!"
     You may ask for confirmation as well using the following (optional) shorts:
     <li>c => either numeric or text. If numeric: Timeout to wait for automatic cancellation. If text: response to send to ask for confirmation.</li>
     <li>ct => numeric value for timeout in seconds, default: 15.</li>
-    Response sentence will be parsed to do "set magic"-like replacements, so also a line like <code>i="what's the time for sunrise" r="at [Astro:sunRise] o'clock"</code> is valid.
+    Response sentence will be parsed to do "set magic"-like replacements, so also a line like <code>i="what's the time for sunrise" r="at [Astro:SunRise] o'clock"</code> is valid.
     </ul>
   </li>
   <li>
