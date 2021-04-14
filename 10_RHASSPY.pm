@@ -2570,9 +2570,9 @@ sub RHASSPY_handleIntentSetNumeric {
         if ( defined $data->{'.inBulk'} ) {
             #Beta-User: long forms to later add options to check upper/lower limits for pure on/off devices
             return;
-        } else { 
-            RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoMappingFound'));
-        }
+        } #else { 
+        #   RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoMappingFound'));
+        #}
     }
 
     # Mapping and device found -> execute command
