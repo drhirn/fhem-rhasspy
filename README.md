@@ -496,11 +496,20 @@ Example-Rhasspy-Sentences:
 (turn down|decrease){Change:lightDown} [the light] [of] $en.fhem.Device{Device} [by] [(0..100){Value}] [percent{Unit:percent}]
 ```
 
-Currently there are this possible types for `{Change}`:
+Currently there are this possible types for tag `{Change}`:
 * tempUp / tempDown
 * volUp / volDown
 * lightUp / lightDown
 * setUp / setDown
+
+Required tags:
+* Change or Type
+* Value or Change
+
+Optional tags:
+* Device
+* Room
+* Unit
 
 ### GetNumeric
 
