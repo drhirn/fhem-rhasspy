@@ -608,7 +608,7 @@ sub RHASSPY_Attr {
         if ($command eq 'set') {
             return initialize_rhasspyTweaks($hash, $value); 
         } 
-    } 
+    }
     if ( $attribute eq 'configFile' ) {
         if ($command ne 'set') {
             delete $hash->{CONFIGFILE};
@@ -647,8 +647,8 @@ sub RHASSPY_init_shortcuts {
             $err = perlSyntaxCheck( $perlcommand );
             return "$err in $line" if $err && $init_done;
             $hash->{helper}{shortcuts}{$intent}{perl} = $named->{p};
-        } elsif ($init_done) {
-            return "Either a fhem or perl command have to be provided!";
+        } elsif ($init_done && !defined $named->{r}) {
+            return "Either a fhem or perl command or a response have to be provided!";
         }
         $hash->{helper}{shortcuts}{$intent}{NAME} = $named->{d} if defined $named->{d};
         $hash->{helper}{shortcuts}{$intent}{response} = $named->{r} if defined $named->{r};
@@ -2385,14 +2385,14 @@ sub RHASSPY_handleIntentShortcuts {
         $device = $ret if $ret && $ret !~ m{Please.define.*first}x;
 
         $response = $ret // _replace($hash, $response, \%specials);
-    } else {
+    } elsif ( defined $shortcut->{fhem} ) {
         $cmd = $shortcut->{fhem} // return;
         Log3($hash->{NAME}, 5, "FHEM shortcut identified: $cmd, device name is $name");
         $cmd      = _replace($hash, $cmd, \%specials);
         $response = _replace($hash, $response, \%specials);
         AnalyzeCommand($hash, $cmd);
     }
-    
+    $response = RHASSPY_ReplaceReadingsVal( $hash, $response );
     RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
     # update Readings
     #RHASSPY_updateLastIntentReadings($hash, $topic,$data);
@@ -3376,6 +3376,13 @@ Denkbare Verwendung:
 - Ansteuerung von Lamellenpositionen (auch an anderem Device?)
 - Bestätigungs-Mapping
 
+# Sonstiges, siehe insbes. https://forum.fhem.de/index.php/topic,119447.msg1148832.html#msg1148832
+- kein "match in room" bei GetNumeric
+- "kind" und wie man es füllen könnte (mehr Dialoge)
+- Bestätigungsdialoge - weitere Anwendungsfelder
+- gDT: mehr und bessere mappings?
+- Farbe und Farbtemperatur 
+- Audiowiedergabe für Timer-Ende
 =end ToDo
 
 =begin ToClarify
@@ -3570,7 +3577,7 @@ DefaultConfirmation=Klaro, mach ich</code></pre><p>
     <a id="RHASSPY-attr-rhasspyIntents"></a><b>rhasspyIntents</b><br>
     Optional, defines custom intents. See <a href="https://github.com/Thyraz/Snips-Fhem#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren" hreflang="de">Custom Intent erstellen</a>.<br>
     One intent per line.<br>
-    Example: <code>attr &lt;rhasspyDevice&gt; rhasspyIntents SetCustomIntentsTest=SetCustomIntentsTest(siteId,Device)</code>
+    Example: <code>attr &lt;rhasspyDevice&gt; rhasspyIntents SetCustomIntentsTest=SetCustomIntentsTest(siteId,Type)</code>
     together with the follwoing myUtils-Code should get a short impression of the possibilities:
     <code><pre>sub SetCustomIntentsTest {
         my $room = shift; 
@@ -3610,6 +3617,7 @@ i="mute off" p={fhem ("set $NAME mute off")} n=amplifier2 c="Please confirm!"
     You may ask for confirmation as well using the following (optional) shorts:
     <li>c => either numeric or text. If numeric: Timeout to wait for automatic cancellation. If text: response to send to ask for confirmation.</li>
     <li>ct => numeric value for timeout in seconds, default: 15.</li>
+    Response sentence will be parsed to do "set magic"-like replacements, so also a line like <code>i="what's the time for sunrise" r="at [Astro:sunRise] o'clock"</code> is valid.
     </ul>
   </li>
   <li>

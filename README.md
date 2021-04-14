@@ -202,10 +202,14 @@ define Rhasspy RHASSPY baseUrl=http://rhasspy:12101 devspec=room=Rhasspy default
   One shortcut per line, syntax is either a simple or an extended version.\
   Examples:
   ```
-  mute on=set amplifier2 mute on
-  lamp off={fhem("set lampe1 off")}
-  i="you are so exciting" f="set $NAME speak siteId='livingroom' text='Thanks a lot, you are even more exciting!'"
-  i="mute off" p={fhem ("set $NAME mute off")} n=amplifier2 c="Please confirm!"
+  i="turn dark" f="set bulb1 off" d="bulb1"
+  i="turn bright" f="set bulb1 on" d="bulb1"
+  i="let it be day" p={fhem ("set $NAME on")} d="bulb01"
+  i="let it be night" p={fhem ("set $NAME off")} d="bulb01"
+  i="make noise" f="set Rhasspy speak siteId='livingroom' text='wuff wuff'" r=""
+  i="do the cooking" f="set bulb01 on" d="blub01" c="do you want pizza?"
+  i="when does the sun rise" r="um [Astro:SunRise] uhr"
+  i="when does the sun set" r="um [Astro:SunSet] uhr"
   ```
 
   Abbreviations explanation:
@@ -215,7 +219,7 @@ define Rhasspy RHASSPY baseUrl=http://rhasspy:12101 devspec=room=Rhasspy default
     Syntax as usual in FHEMWEB command field.
   * **p**: perl command\
     Syntax as usual in FHEMWEB command field, enclosed in {}; this has priority to `f=`.
-  * **n**: device name(s)\
+  * **d**: device name(s)\
     Device name(s, comma separated) that will be handed over to fhem.pl as updated devices. Needed for triggering further actions and longpoll! If not set, the return value of the called function will be used.
   * **r**: response\
     Response to be set to the caller. If not set, the return value of the called function will be used.\
@@ -794,7 +798,7 @@ Required tags to set a timer:
 Required tags to cancel a timer:
 * Label
 
-**rhasspyTweaks**\
+**rhasspyTweaks**
 ```
 timerLimits=90,300,3000,2*HOURSECONDS,50
 ```
