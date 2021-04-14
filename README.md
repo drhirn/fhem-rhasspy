@@ -225,7 +225,9 @@ define Rhasspy RHASSPY baseUrl=http://rhasspy:12101 devspec=room=Rhasspy default
 
 * **rhasspyTweaks**\
   Not fully implemented yet.\
-  Could be the place to configure additional things like additional siteId2room info or code links, allowed commands, duration of SetTimer sounds, confirmation requests etc.
+  Could be the place to configure additional things like additional siteId2room info or code links, allowed commands, duration of SetTimer sounds, confirmation requests etc.\
+  * **timerLimits**\
+    See intent [SetTimer](#settimer)
 
 ### Readings / Events
 * **lastIntentPayload**\
@@ -791,6 +793,11 @@ Required tags to set a timer:
 
 Required tags to cancel a timer:
 * Label
+
+**rhasspyTweaks**\
+`timerLimits=90,300,3000,2*HOURSECONDS,50`\
+All five values have to be set, corresponding with the limits to *timerSet* responses.\
+Above example will lead to seconds response for less then 90 seconds, minute+seconds response for less than 300 seconds etc.. Last value is the limit in seconds, if timer is set in time of day format.
 
 ### SetMute
 
