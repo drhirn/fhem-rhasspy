@@ -644,8 +644,9 @@ sub initialize_rhasspyTweaks {
     my ($tweak, $values, $device, $err );
     for my $line (split m{\n}x, $attrVal) {
         next if !length $line;
-        if ($line =~ m{\A[\s]*timerLimits=}x) {
+        if ($line =~ m{\A[\s]*timerLimits[\s]*=}x) {
             ($tweak, $values) = split m{=}x, $line, 2;
+            $tweak = trim($tweak);
             return "Error in $line! Provide 5 comma separated numeric values!" if !length $values && $init_done;
             my @test = split m{,}x, $values;
             return "Error in $line! Provide 5 comma separated numeric values!" if @test != 5 && $init_done;
@@ -654,12 +655,23 @@ sub initialize_rhasspyTweaks {
             next;
         }
 
-        if ($line =~ m{\A[\s]*timerSounds=}x) {
+        if ($line =~ m{\A[\s]*timerSounds[\s]*=}x) {
             ($tweak, $values) = split m{=}x, $line, 2;
+            $tweak = trim($tweak);
             return "Error in $line! No content provided!" if !length $values && $init_done;
             my($unnamedParams, $namedParams) = parseParams($values);
             return "Error in $line! Provide at least one key-value pair!" if ( @{$unnamedParams} || !keys %{$namedParams} ) && $init_done;
             $hash->{helper}{tweaks}{$tweak} = $namedParams;
+            next;
+        }
+
+        if ($line =~ m{\A[\s]*timerTrigger[\s]*=}x) {
+            ($tweak, $values) = split m{=}x, $line, 2;
+            $tweak = trim($tweak);
+            return "Error in $line! No content provided!" if !length $values && $init_done;
+            my($unnamedParams, $namedParams) = parseParams($values);
+            return "Error in $line! Only unnamed parameters are allowed" if ( keys %{$namedParams} ) && $init_done;
+            $hash->{helper}{tweaks}{$tweak} = join q{,}, @{$unnamedParams};
             next;
         }
     }
@@ -1301,7 +1313,6 @@ sub RHASSPY_getDevicesByIntentAndType {
     for my $devs (keys %{$hash->{helper}{devicemap}{devices}}) {
         my $mapping = RHASSPY_getMapping($hash, $devs, $intent, { type => $type, subType => $subType }, 1, 1) // next;
         my $mappingType = $mapping->{type};
-        #my $rooms = join q{,}, $hash->{helper}{devicemap}{devices}{$devs}->{rooms};
         my $rooms = $hash->{helper}{devicemap}{devices}{$devs}->{rooms};
 
         # get lists of devices that may fit to requirements
@@ -3011,15 +3022,20 @@ sub RHASSPY_handleIntentSetTimer {
         $responseEnd =~ s{(\$\w+)}{$1}eegx;
 
         my $soundoption = $hash->{helper}{tweaks}{timerSounds}->{$label} // $hash->{helper}{tweaks}{timerSounds}->{default};
+        my $timerTrigger = $hash->{helper}{tweaks}->{timerTrigger};
+        #my $addtrigger = defined $timerTrigger  && ( $timerTrigger eq 'default' || $timerTrigger =~ m{\b$label\b}x ) ? 
+        my $addtrigger = defined $timerTrigger && $label ne '' && $timerTrigger =~ m{\bdefault|$label\b}x ? 
+            qq{; trigger $name timerEnd $siteId $room $label}
+            : q{};
 
         if ( !defined $soundoption ) {
-            CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";deletereading $name $roomReading");
+            CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";deletereading $name ${roomReading}$addtrigger");
         } else {
-            $soundoption =~ m{((?<repeats>[0-9]*):){0,1}((?<duration>[0-9.]*):){0,1}(?<file>(.+))}x;
+            $soundoption =~ m{((?<repeats>[0-9]*)[:]){0,1}((?<duration>[0-9.]*)[:]){0,1}(?<file>(.+))}x;
             my $file = $+{file} // Log3($hash->{NAME}, 2, "no WAV file for $label provided, check attribute rhasspyTweaks (item timerSounds)!") && return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'DefaultError'));
             my $repeats = $+{repeats} // 5;
             my $duration = $+{duration} // 15;
-            CommandDefMod($hash, "-temporary $roomReading at +$attime set $name play siteId=\"$timerRoom\" path=\"$file\" repeats=$repeats wait=$duration id=$roomReading");
+            CommandDefMod($hash, "-temporary $roomReading at +$attime set $name play siteId=\"$timerRoom\" path=\"$file\" repeats=$repeats wait=$duration id=${roomReading}$addtrigger");
         }
 
         #readingsSingleUpdate($hash, $roomReading, 1, 1);
@@ -3131,17 +3147,17 @@ sub RHASSPY_playWav {
         }
         close $handle;
     }
-    return if !$repeats;
 
+    return if !$repeats;
     my $name = $hash->{NAME};
     my $wait     = $cmd->{wait} // 15;
     my $id       = $cmd->{id}; #   // Log3($name, 2, "for repeated play commands, an id has to be provided!") && return RHASSPY_speak($hash, RHASSPY_getResponse($hash, 'DefaultError'));
 
     $repeats--;
     my $attime = strftime( '%H:%M:%S', gmtime $wait );
-    return CommandDefMod($hash, "-temporary $id at +$attime set $name play siteId=\"$siteId\" path=\"$filename\" repeats=$repeats wait=$wait id=$id") if $repeats;
-    return CommandDefMod($hash, "-temporary $id at +$attime set $name play siteId=\"$siteId\" path=\"$filename\" repeats=$repeats wait=$wait") if !$id;
-    return CommandDefMod($hash, "-temporary $id at +$attime set $name play siteId=\"$siteId\" path=\"$filename\" repeats=$repeats wait=$wait; deletereading $name $id");
+    return InternalTimer(time, sub (){CommandDefMod($hash, "-temporary $id at +$attime set $name play siteId=\"$siteId\" path=\"$filename\" repeats=$repeats wait=$wait id=$id")}, $hash ) if $repeats;
+    return InternalTimer(time, sub (){CommandDefMod($hash, "-temporary $id at +$attime set $name play siteId=\"$siteId\" path=\"$filename\" repeats=$repeats wait=$wait")}, $hash ) if !$id;
+    return InternalTimer(time, sub (){CommandDefMod($hash, "-temporary $id at +$attime set $name play siteId=\"$siteId\" path=\"$filename\" repeats=$repeats wait=$wait; deletereading $name $id")}, $hash );
 }
 
 # Set volume on specific siteId
@@ -3492,8 +3508,13 @@ i="mute off" p={fhem ("set $NAME mute off")} n=amplifier2 c="Please confirm!"</p
       5 values have to be set, corresponding with the limits to <i>timerSet</i> responses. so above example will lead to seconds response for less then 90 seconds, minute+seconds response for less than 300 seconds etc.. Last value is the limit in seconds, if timer is set in time of day format..
       </li>
       <li><b>timerSounds</b><br>
-      <code>timerSounds=default="./yourfile1.wav" eggs="3:20:./yourfile2.wav" potatoes="5:./yourfile3.wav"</code><br>
+      <code>timerSounds= default=./yourfile1.wav eggs=3:20:./yourfile2.wav potatoes=5:./yourfile3.wav</code><br>
       Above keys are some examples and neet to match "Label" values provided by Rhasspy. "default" is optional. If set, this file will be used for all labeled timer without match to other keywords. Numbers are optional, first is numer of repeats, second is waiting time between two repeats. 5 <i>repeats</i> defaults to 5, <i>wait</i> to 15. If only one number is set, this will be taken as <i>repeats</i>.
+      </li>
+      <li><b>timerTrigger</b><br>
+      <code>timerTrigger= default</code> or <code>timerTrigger= eggs potatoes</code><br>
+      Above keys are some examples and neet to match "Label" values provided by Rhasspy. "default" is optional. If set, all labeled timers will cause your RHASSPY device to issue a trigger command at timer end time. Trigger event is 
+      <code>&lt;rhasspyDevice&gt; timerEnd &lt;siteId&gt; &lt;room&gt; &lt;label&gt;</code>
       </li>
       </ul>
       *) <i>rhasspyTweaks</i> in the future might be the place to configure additional things like additional siteId2room info or code links, allowed commands, confirmation requests etc.     
