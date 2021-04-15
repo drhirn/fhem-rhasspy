@@ -317,16 +317,13 @@ sub RHASSPY_Define {
     my $anon = shift;
     my $h    = shift;
     #parseParams: my ( $hash, $a, $h ) = @_;
-    
-    # Minimale Anzahl der nötigen Argumente vorhanden?
-    #return "Invalid number of arguments: define <name> RHASSPY DefaultRoom" if (int(@args) < 3);
 
     my $name = shift @{$anon};
     my $type = shift @{$anon};
     my $Rhasspy  = $h->{baseUrl} // shift @{$anon} // q{http://127.0.0.1:12101};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
-    my $language = $h->{language} // shift @{$anon} // lc(AttrVal('global','language','en'));
-    $hash->{MODULE_VERSION} = "0.4.8";
+    my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
+    $hash->{MODULE_VERSION} = "0.4.8a";
     $hash->{baseUrl} = $Rhasspy;
     $hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
@@ -344,9 +341,6 @@ sub RHASSPY_Define {
         addToAttrList(q{genericDeviceType});
         #addToAttrList(q{homebridgeMapping});
     }
-
-    # IODev setzen und als MQTT Client registrieren
-    #$attr{$name}{IODev} = $IODev;
 
     return $init_done ? firstInit($hash) : InternalTimer(time+1, \&firstInit, $hash );
 }
@@ -366,7 +360,7 @@ sub firstInit {
     RHASSPY_fetchSiteIds($hash) if !ReadingsVal( $hash->{NAME}, 'siteIds', 0 );
     initialize_rhasspyTweaks($hash, AttrVal($hash->{NAME},'rhasspyTweaks', undef ));
     initialize_DialogManager($hash);
-    initialize_devicemap($hash); # if defined $hash->{useHash};
+    initialize_devicemap($hash);
 
     return;
 }
@@ -375,11 +369,9 @@ sub initialize_Language {
     my $hash = shift // return;
     my $lang = shift // return;
     my $cfg  = shift // AttrVal($hash->{NAME},'configFile',undef);
-    
-                                            
+
     my $cp = q{UTF-8};
-                                
-    
+
     #default to english first
     $hash->{helper}->{lng} = $languagevars if !defined $hash->{helper}->{lng} || !$init_done;
 
@@ -388,19 +380,14 @@ sub initialize_Language {
 
     my $decoded;
     if ( !eval { $decoded  = decode_json(encode($cp,$content)) ; 1 } ) {
-             
         Log3($hash->{NAME}, 1, "JSON decoding error in languagefile $cfg:  $@");
         return "languagefile $cfg seems not to contain valid JSON!";
     }
-    
+
     if ( defined $decoded->{default} ) {
         $decoded = _combineHashes( $decoded->{default}, $decoded->{user} );
         Log3($hash->{NAME}, 4, "try to use user specific sentences and defaults in languagefile $cfg");
     }
-
-    #$hash->{helper}{lng} = $decoded;
-    #my $lng = $hash->{helper}->{lng};
-    #my $lngvars = _combineHashes( $lng, $decoded);
     $hash->{helper}->{lng} = _combineHashes( $hash->{helper}->{lng}, $decoded);
 
     return;
@@ -488,7 +475,6 @@ sub RHASSPY_Set {
 
     Log3($name, 5, "set $command - value: " . join q{ }, @values);
 
-    
     my $dispatch = {
         updateSlots  => \&RHASSPY_updateSlots,
         trainRhasspy => \&RHASSPY_trainRhasspy,
@@ -511,16 +497,13 @@ sub RHASSPY_Set {
         play        => \&RHASSPY_playWav,
         volume      => \&RHASSPY_setVolume
     };
-    
+
     return Log3($name, 3, "set $name $command requires at least one argument!") if !@values;
-    
+
     my $params = join q{ }, @values; #error case: playWav => PERL WARNING: Use of uninitialized value within @values in join or string
     $params = $h if defined $h->{text} || defined $h->{path} || defined $h->{volume};
     return $dispatch->{$command}->($hash, $params) if ref $dispatch->{$command} eq 'CODE';
 
-    # Could happen, that training start before all slots are written to Rhasspy
-    # Therfore we included a delay
-    # Unhappy with fixed 10s. Should find a better way to do this.
     if ($command eq 'update') {
         if ($values[0] eq 'language') {
             return initialize_Language($hash, $hash->{LANGUAGE});
@@ -529,7 +512,6 @@ sub RHASSPY_Set {
             initialize_devicemap($hash);
             $hash->{'.needTraining'} = 1;
             return RHASSPY_updateSlots($hash);
-            #return InternalTimer(time + 3,\&RHASSPY_trainRhasspy,$hash,0);
         }
         if ($values[0] eq 'devicemap_only') {
             return initialize_devicemap($hash);
@@ -537,7 +519,6 @@ sub RHASSPY_Set {
         if ($values[0] eq 'slots') {
             $hash->{'.needTraining'} = 1;
             return RHASSPY_updateSlots($hash);
-            #return InternalTimer(time + 3,\&RHASSPY_trainRhasspy,$hash,0);
         }
         if ($values[0] eq 'slots_no_training') {
             initialize_devicemap($hash);
@@ -548,7 +529,6 @@ sub RHASSPY_Set {
             initialize_devicemap($hash);
             $hash->{'.needTraining'} = 1;
             return RHASSPY_updateSlots($hash);
-            #return InternalTimer(time + 3,\&RHASSPY_trainRhasspy,$hash,0);
         }
     }
 
@@ -572,9 +552,9 @@ sub RHASSPY_Attr {
 
     # IODev Attribut gesetzt
     if ($attribute eq 'IODev') {
-
         return;
     }
+
     if ( $attribute eq 'shortcuts' ) {
         for ( keys %{ $hash->{helper}{shortcuts} } ) {
             delete $hash->{helper}{shortcuts}{$_};
@@ -583,7 +563,7 @@ sub RHASSPY_Attr {
             return RHASSPY_init_shortcuts($hash, $value); 
         } 
     }
-    
+
     if ( $attribute eq 'rhasspyIntents' ) {
         for ( keys %{ $hash->{helper}{custom} } ) {
             delete $hash->{helper}{custom}{$_};
@@ -592,7 +572,7 @@ sub RHASSPY_Attr {
             return RHASSPY_init_custom_intents($hash, $value); 
         } 
     }
-    
+
     if ( $attribute eq 'rhasspyTweaks' ) {
         for ( keys %{ $hash->{helper}{tweaks} } ) {
             delete $hash->{helper}{tweaks}{$_};
@@ -601,6 +581,7 @@ sub RHASSPY_Attr {
             return initialize_rhasspyTweaks($hash, $value); 
         } 
     }
+
     if ( $attribute eq 'configFile' ) {
         if ($command ne 'set') {
             delete $hash->{CONFIGFILE};
@@ -610,14 +591,14 @@ sub RHASSPY_Attr {
         }
         return initialize_Language($hash, $hash->{LANGUAGE}, $value); 
     }
-    
+
     return;
 }
 
 sub RHASSPY_init_shortcuts {
     my $hash    = shift // return;
     my $attrVal = shift // return;
-    
+
     my ($intent, $perlcommand, $device, $err );
     for my $line (split m{\n}x, $attrVal) {
         #old syntax
@@ -659,17 +640,26 @@ sub RHASSPY_init_shortcuts {
 sub initialize_rhasspyTweaks {
     my $hash    = shift // return;
     my $attrVal = shift // return;
-    
+
     my ($tweak, $values, $device, $err );
     for my $line (split m{\n}x, $attrVal) {
         next if !length $line;
         if ($line =~ m{\A[\s]*timerLimits=}x) {
             ($tweak, $values) = split m{=}x, $line, 2;
-            return "$err in $line, 5 comma separated values have to be provided" if !length $values && $init_done;
+            return "Error in $line! Provide 5 comma separated numeric values!" if !length $values && $init_done;
             my @test = split m{,}x, $values;
-            return "$err in $line, 5 comma separated values have to be provided" if @test != 5 && $init_done;
+            return "Error in $line! Provide 5 comma separated numeric values!" if @test != 5 && $init_done;
             #$values = qq{($values)} if $values !~ m{\A([^()]*)\z}x;
             $hash->{helper}{tweaks}{$tweak} = [@test];
+            next;
+        }
+
+        if ($line =~ m{\A[\s]*timerSounds=}x) {
+            ($tweak, $values) = split m{=}x, $line, 2;
+            return "Error in $line! No content provided!" if !length $values && $init_done;
+            my($unnamedParams, $namedParams) = parseParams($values);
+            return "Error in $line! Provide at least one key-value pair!" if ( @{$unnamedParams} || !keys %{$namedParams} ) && $init_done;
+            $hash->{helper}{tweaks}{$tweak} = $namedParams;
             next;
         }
     }
@@ -2570,9 +2560,9 @@ sub RHASSPY_handleIntentSetNumeric {
         if ( defined $data->{'.inBulk'} ) {
             #Beta-User: long forms to later add options to check upper/lower limits for pure on/off devices
             return;
-        } #else { 
-        #   RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoMappingFound'));
-        #}
+        } else { 
+           return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoMappingFound'));
+        }
     }
 
     # Mapping and device found -> execute command
@@ -3036,7 +3026,17 @@ Die ganze Logik würde sich dann erweitern, indem erst geschaut wird, ob eines d
 
         $responseEnd =~ s{(\$\w+)}{$1}eegx;
 
-        CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";deletereading $name $roomReading");
+        my $soundoption = $hash->{helper}{tweaks}{timerSounds}->{$label} // $hash->{helper}{tweaks}{timerSounds}->{default};
+
+        if ( !defined $soundoption ) {
+            CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";deletereading $name $roomReading");
+        } else {
+            $soundoption =~ m{((?<repeats>[0-9]*):){0,1}((?<duration>[0-9.]*)){0,1}(?<file>(.+))}x;
+            my $file = $+{file} // Log3($hash->{NAME}, 2, "no WAV file for $label provided, check attribute rhasspyTweaks (item timerSounds)!") && return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'DefaultError'));
+            my $repeats = $+{repeats} // 5;
+            my $duration = $+{duration} // 15;
+            CommandDefMod($hash, "-temporary $roomReading at +$attime set $name play siteId=\"$timerRoom\" path=\"$file\" repeats=$repeats wait=$duration id=$roomReading");
+        }
 
         #readingsSingleUpdate($hash, $roomReading, 1, 1);
         readingsSingleUpdate($hash, $roomReading, $readingTime, 1);
@@ -3131,8 +3131,9 @@ sub RHASSPY_playWav {
 
     return 'playWav needs siteId and path to file as parameters!' if !defined $cmd->{siteId} || !defined $cmd->{path};
 
-    my $siteId = $cmd->{siteId};
+    my $siteId   = $cmd->{siteId};
     my $filename = $cmd->{path};
+    my $repeats  = $cmd->{repeats};
     my $encoding = q{:raw :bytes};
     my $handle   = undef;
     my $topic = "hermes/audioServer/$siteId/playBytes/999";
@@ -3146,7 +3147,17 @@ sub RHASSPY_playWav {
         }
         close $handle;
     }
-    return $hash->{NAME};
+    return if !$repeats;
+
+    my $name = $hash->{NAME};
+    my $wait     = $cmd->{wait} // 15;
+    my $id       = $cmd->{id}; #   // Log3($name, 2, "for repeated play commands, an id has to be provided!") && return RHASSPY_speak($hash, RHASSPY_getResponse($hash, 'DefaultError'));
+
+    $repeats--;
+    my $attime = time + $wait;
+    return CommandDefMod($hash, "-temporary $id at +$attime set $name play siteId=\"$siteId\" path=\"$filename\" repeats=$repeats wait=$wait id=$id") if $repeats;
+    return CommandDefMod($hash, "-temporary $id at +$attime set $name play siteId=\"$siteId\" path=\"$filename\" repeats=$repeats wait=$wait") if !$id;
+    return CommandDefMod($hash, "-temporary $id at +$attime set $name play siteId=\"$siteId\" path=\"$filename\" repeats=$repeats wait=$wait; deletereading $name $id");
 }
 
 # Set volume on specific siteId
