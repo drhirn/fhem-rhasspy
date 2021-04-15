@@ -2849,7 +2849,7 @@ sub RHASSPY_handleIntentGetWeekday {
 
     Log3($hash->{NAME}, 5, "handleIntentGetWeekday called");
 
-    my $weekDay  = strftime "%A", localtime;
+    my $weekDay  = strftime( '%A', localtime );
     my $response = $hash->{helper}{lng}->{responses}->{weekdayRequest};
     $response =~ s{(\$\w+)}{$1}eegx;
     
@@ -2943,23 +2943,6 @@ sub RHASSPY_handleIntentSetTimer {
     my $data = shift // return;
     my $siteId = $data->{siteId} // return;
     my $name = $hash->{NAME};
-    
-=pod
-
-https://forum.fhem.de/index.php/topic,119447.msg1143029.html#msg1143029
-
- WAV abspielen lassen, so lange, bis man sie mit "stopp(e den Timer)" stoppt.
- 
-Übergangsweise: Die "Flasche" von JensS => https://forum.fhem.de/index.php/topic,113180.msg1130450.html#msg1130450? (Für die "finale Fassung" müßte man was copyright-unverdächtiges suchen, evtl. irgendeinen (konvertierten) Linux-Systemsound?)
-
-Das mit dem "Stop" bringt mich auf einen weiteren Ast:
-- Das Default-Abspielen könnte man in eine at-Schleife packen, wobei ich die Zahl der Wiederholungen nicht bei Unendlich sehe.
-- "Stop" sollte eine Anweisung unterhalb des SetTimer-intents sein, dann kann man das at gezielt "abschießen"; das wäre sowieso ein Thema, denn- "Cancel" könnte noch ein weiterer Zweig in SetTimer darstellen, mit dem man den Timer löscht.
-
-Die ganze Logik würde sich dann erweitern, indem erst geschaut wird, ob eines der beiden "Keywords" in $data drin ist (siehe den Shortcuts-Code zu "confirm"). Das sollte dann auch direkt mit "$label" "spielen" können...
-
-=cut
-    my $response;
 
     Log3($name, 5, 'handleIntentSetTimer called');
 
@@ -3005,6 +2988,7 @@ Die ganze Logik würde sich dann erweitern, indem erst geschaut wird, ob eines d
     my $label = $data->{Label} // q{};
     $roomReading .= "_$label" if $label ne ''; 
 
+    my $response;
     if (defined $data->{CancelTimer}) {
         CommandDelete($hash, $roomReading);
         #readingsSingleUpdate( $hash,$roomReading, 0, 1 );
@@ -3019,10 +3003,10 @@ Die ganze Logik würde sich dann erweitern, indem erst geschaut wird, ob eines d
     if( $value && $timerRoom ) {
         my $seconds = $value - $now;
         my $diff = $seconds;
-        my $attime = strftime('%H', gmtime $diff);
+        my $attime = strftime( '%H', gmtime $diff );
         $attime += 24 if $tomorrow;
-        $attime .= strftime(':%M:%S', gmtime $diff);
-        my $readingTime = strftime '%T', localtime (time + $seconds);
+        $attime .= strftime( ':%M:%S', gmtime $diff );
+        my $readingTime = strftime( '%H:%M:%S', localtime (time + $seconds));
 
         $responseEnd =~ s{(\$\w+)}{$1}eegx;
 
@@ -3031,7 +3015,7 @@ Die ganze Logik würde sich dann erweitern, indem erst geschaut wird, ob eines d
         if ( !defined $soundoption ) {
             CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";deletereading $name $roomReading");
         } else {
-            $soundoption =~ m{((?<repeats>[0-9]*):){0,1}((?<duration>[0-9.]*)){0,1}(?<file>(.+))}x;
+            $soundoption =~ m{((?<repeats>[0-9]*):){0,1}((?<duration>[0-9.]*):){0,1}(?<file>(.+))}x;
             my $file = $+{file} // Log3($hash->{NAME}, 2, "no WAV file for $label provided, check attribute rhasspyTweaks (item timerSounds)!") && return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'DefaultError'));
             my $repeats = $+{repeats} // 5;
             my $duration = $+{duration} // 15;
@@ -3154,7 +3138,7 @@ sub RHASSPY_playWav {
     my $id       = $cmd->{id}; #   // Log3($name, 2, "for repeated play commands, an id has to be provided!") && return RHASSPY_speak($hash, RHASSPY_getResponse($hash, 'DefaultError'));
 
     $repeats--;
-    my $attime = time + $wait;
+    my $attime = strftime( '%H:%M:%S', gmtime $wait );
     return CommandDefMod($hash, "-temporary $id at +$attime set $name play siteId=\"$siteId\" path=\"$filename\" repeats=$repeats wait=$wait id=$id") if $repeats;
     return CommandDefMod($hash, "-temporary $id at +$attime set $name play siteId=\"$siteId\" path=\"$filename\" repeats=$repeats wait=$wait") if !$id;
     return CommandDefMod($hash, "-temporary $id at +$attime set $name play siteId=\"$siteId\" path=\"$filename\" repeats=$repeats wait=$wait; deletereading $name $id");
@@ -3265,11 +3249,11 @@ __END__
 
 =begin ToDo
 
-# "rhasspySpecials" als weiteres Attribut?
+# "rhasspySpecials" bzw. rhasspyTweaks als weitere Attribute
 Denkbare Verwendung:
-- siteId2room für mobile Geräte (Denkbare Anwendungsfälle: Auswertung BT-RSSI per Perl, aktives Setzen über ein Reading? Oder einen intent?
-- Ansteuerung von Lamellenpositionen (auch an anderem Device?)
-- Bestätigungs-Mapping
+- siteId2room für mobile Geräte (Denkbare Anwendungsfälle: Auswertung BT-RSSI per Perl, aktives Setzen über ein Reading? Oder einen intent? (tweak)
+- Ansteuerung von Lamellenpositionen (auch an anderem Device?) (special)
+- Bestätigungs-Mapping (special)
 
 # Sonstiges, siehe insbes. https://forum.fhem.de/index.php/topic,119447.msg1148832.html#msg1148832
 - kein "match in room" bei GetNumeric
@@ -3277,7 +3261,6 @@ Denkbare Verwendung:
 - Bestätigungsdialoge - weitere Anwendungsfelder
 - gDT: mehr und bessere mappings?
 - Farbe und Farbtemperatur 
-- Audiowiedergabe für Timer-Ende
 =end ToDo
 
 =begin ToClarify
@@ -3289,10 +3272,6 @@ Denkbare Verwendung:
 # GetTimer implementieren?
 https://forum.fhem.de/index.php/topic,113180.msg1130139.html#msg1130139
 
-# Audiowiedergabe
-(Beispiel: "Flasche" mit Timer)
-https://forum.fhem.de/index.php/topic,113180.msg1130450.html#msg1130450
-
 # Kopfrechnen 
 ist eine Stärke von Rhasspy. Solch ein Intent benötigt wenig Code.
 https://forum.fhem.de/index.php/topic,113180.msg1130754.html#msg1130754
@@ -3300,7 +3279,6 @@ https://forum.fhem.de/index.php/topic,113180.msg1130754.html#msg1130754
 # Wetterdurchsage
 Ist möglich. Dazu hatte ich einen rudimentären Intent in diesem Thread erstellt. Müsste halt nur erweitert werden.
 https://forum.fhem.de/index.php/topic,113180.msg1130754.html#msg1130754
-
 
 =end ToClarify
 
@@ -3391,9 +3369,9 @@ attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
   <li>
     <b><a id="RHASSPY-set-play">play</a></b><br>
     Send WAV file to Rhasspy.<br>
-    <b>Not fully implemented yet</b><br>
     Both arguments (siteId and path) are required!<br>
-    Example: <code>set &lt;rhasspyDevice&gt play siteId="default" path="/opt/fhem/test.wav"</code>
+    Example: <code>set &lt;rhasspyDevice&gt play siteId="default" path="/opt/fhem/test.wav"</code><br>
+    You may (otionally) add number of repeats and wait time (in seconds) between repeats: <code>set &lt;rhasspyDevice&gt play siteId="default" path="./test.wav" repeats=3 wait=20</code>. <i>wait</i> defaults to 15, if only <i>repeats</i> is given.
   </li>
   <li>
     <b><a id="RHASSPY-set-speak">speak</a></b><br>
@@ -3424,14 +3402,7 @@ attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
     Both arguments (siteId and volume) are required!<br>
     Example: <code>set &lt;rhasspyDevice&gt; siteId="default" volume="0.5"</code>
   </li>
-    <li>
-    <s><b>updateSlots</b><br>
-    Sends a command to the HTTP-API of the Rhasspy master to update all slots on Rhasspy with actual FHEM-devices, rooms, etc.<br>
-    The attribute <i>rhasspyMaster</i> has to be defined to work.<br>
-    Example: <code>set &lt;rhasspyDevice&gt; updateSlots</code><br>
-    Do not forget to train Rhasspy afterwards!</s> (deprecated)
-  </li>
-    <li>
+  <li>
     <b><a id="RHASSPY-set-customSlot">customSlot</a></b><br>
     Provide slotname, slotdata and (optional) info, if existing data shall be overwritten and training shall be initialized immediately afterwards. 
     First two arguments are required, third and fourth are optional!<br>
@@ -3440,7 +3411,6 @@ attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
     <code>set &lt;rhasspyDevice&gt; customSlot slotname=mySlot slotdata=a,b,c overwrite=false</code>
   </li>
 
-  
 </ul>
 <a id="RHASSPY-attr"></a>
 <p><b>Attributes</b></p>
@@ -3492,12 +3462,10 @@ DefaultConfirmation=Klaro, mach ich</code></pre><p>
     Define custom sentences without editing Rhasspy sentences.ini<br>
     The shortcuts are uploaded to Rhasspy when using the updateSlots set-command.<br>
     One shortcut per line, syntax is either a simple and an extended version:<br>
-    
-    Examples:<pre><code>mute on=set amplifier2 mute on
+    Examples:<code><pre>mute on=set amplifier2 mute on
 lamp off={fhem("set lampe1 off")}
 i="you are so exciting" f="set $NAME speak siteId='livingroom' text='Thanks a lot, you are even more exciting!'"
-i="mute off" p={fhem ("set $NAME mute off")} n=amplifier2 c="Please confirm!"
-    </code></pre>
+i="mute off" p={fhem ("set $NAME mute off")} n=amplifier2 c="Please confirm!"</pre></code>
     Abbreviations explanation:
     <ul>
     <li>i => intent<br>
@@ -3514,14 +3482,21 @@ i="mute off" p={fhem ("set $NAME mute off")} n=amplifier2 c="Please confirm!"
     <li>ct => numeric value for timeout in seconds, default: 15.</li>
     Response sentence will be parsed to do "set magic"-like replacements, so also a line like <code>i="what's the time for sunrise" r="at [Astro:SunRise] o'clock"</code> is valid.
     </ul>
+    <br>
   </li>
   <li>
   <a id="RHASSPY-attr-rhasspyTweaks"></a><b>rhasspyTweaks</b><br>
-    *) placeholder...<br>
-    Atm, timerLimits may be set here:<br>
-    <code>timerLimits=90,300,3000,2*HOURSECONDS,50</code><br>
-    5 values have to be set, corresponding with the limits to <i>timerSet</i> responses. so above example will lead to seconds response for less then 90 seconds, minute+seconds response for less than 300 seconds etc.. Last value is the limit in seconds, if timer is set in time of day format.<br>
-    Might be the place to configure additional things like additional siteId2room info or code links, allowed commands, duration of SetTimer sounds, confirmation requests etc.     
+    <ul>
+    <li><b>timerLimits</b><br>
+      <code>timerLimits=90,300,3000,2*HOURSECONDS,50</code><br>
+      5 values have to be set, corresponding with the limits to <i>timerSet</i> responses. so above example will lead to seconds response for less then 90 seconds, minute+seconds response for less than 300 seconds etc.. Last value is the limit in seconds, if timer is set in time of day format..
+      </li>
+      <li><b>timerSounds</b><br>
+      <code>timerSounds=default="./yourfile1.wav" eggs="3:20:./yourfile2.wav" potatoes="5:./yourfile3.wav"</code><br>
+      Above keys are some examples and neet to match "Label" values provided by Rhasspy. "default" is optional. If set, this file will be used for all labeled timer without match to other keywords. Numbers are optional, first is numer of repeats, second is waiting time between two repeats. 5 <i>repeats</i> defaults to 5, <i>wait</i> to 15. If only one number is set, this will be taken as <i>repeats</i>.
+      </li>
+      </ul>
+      *) <i>rhasspyTweaks</i> in the future might be the place to configure additional things like additional siteId2room info or code links, allowed commands, confirmation requests etc.     
   </li>
   <li>
     <b>forceNEXT</b><br>
@@ -3556,11 +3531,11 @@ hermes/dialogueManager/sessionEnded</code></pre></p>
     Comma-separated "labels" for the "rooms" the subordineted device is located. Recommended to be unique.<br>
     For further details see <i>rhasspyName</i>.
     </li>
+    
     <li>
     <b><a id="RHASSPY-attr-rhasspyGroup">rhasspyGroup</a></b><br>
     Comma-separated "labels" for the "groups" the subordineted device makes part of. Recommended to be unique.<br> For further details see <i>rhasspyRoom</i>.
     </li>
-    
     
     <li>
     <b><a id="RHASSPY-attr-Mapping">rhasspyMapping</a></b><br>
@@ -3573,11 +3548,10 @@ GetState:response=The temperature in the kitchen is at [lamp:temparature] degree
 MediaControls:cmdPlay=play,cmdPause=pause,cmdStop=stop,cmdBack=previous,cmdFwd=next</pre></code>
     </li>
     
-    
     <li>
     <b><a id="RHASSPY-attr-rhasspyChannels">rhasspyChannels</a></b><br>
     key=value line by line arguments mapping command strings to fhem- or Perl commands.
-    Example: <pre><code>attr m2_wz_08_sw rhasspyChannels orf eins=set lampe1 on
+    Example: <code><pre>attr m2_wz_08_sw rhasspyChannels orf eins=set lampe1 on
 orf zwei=set lampe1 off
 orf drei=set lampe1 on
 </pre></code><br>
@@ -3585,10 +3559,10 @@ orf drei=set lampe1 on
     <li>
     <b><a id="RHASSPY-attr-rhasspyColors">rhasspyColors</a></b><br>
     key=value line by line arguments mapping keys to setter strings on the same device.
-    Example: <pre><code>attr lamp1 rhasspyColors red=rgb FF0000
+    Example: <code><pre>attr lamp1 rhasspyColors red=rgb FF0000
 green=rgb 00FF00
 blue=rgb 0000FF
-yellow=rgb 00F000</pre></code><br>
+yellow=rgb 00F000</pre></code>
     </li>
     <li>
     <b><a id="RHASSPY-attr-rhasspySpecials">rhasspySpecials</a></b><br>
