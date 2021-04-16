@@ -494,8 +494,8 @@ Example-Rhasspy-Sentences:\
 (turn down|lower){Change:volDown} [the volume] [of] $en.fhem.Device{Device} [by] [(0..10){Value!float}] [decibel{Unit}]
 (turn up|increase){Change:tempUp} [the heating|the temperature] [of] $en.fhem.Device{Device} [by] [(0..10){Value!float}] [degree{Unit}]
 (turn down|lower){Change:tempDown} [the heating|the temperature] [of] $en.fhem.Device{Device} [by] [(0..10){Value!float}] [degree{Unit}]
-(turn up|increase){Change:lightUp} [the light] [of] $en.fhem.Device{Device} [by] [(0..100){Value}] [percent{Unit:percent}]
-(turn down|decrease){Change:lightDown} [the light] [of] $en.fhem.Device{Device} [by] [(0..100){Value}] [percent{Unit:percent}]
+(turn up|increase){Change:lightUp} [the light] [of] $en.fhem.Device{Device} [by] [(0..30 [point:. 1..9]){Value!customFloat}] [percent{Unit:percent}]
+(turn down|decrease){Change:lightDown} [the light] [of] $en.fhem.Device{Device} [by] [(0..30 [point:. 1..9]){Value!customFloat}] [percent{Unit:percent}]
 ```
 
 Currently there are this possible types for tag `{Change}`:
