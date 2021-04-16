@@ -52,14 +52,13 @@ Rhasspy (pronounced RAH-SPEE) is an open source, fully offline set of voice assi
 ## About FHEM-rhasspy
 Rhasspy consist of multiple modules (Hot-Word Detection, Text to Speech, Speech to Text, Intent Recognition, ...). All of these communicate over MQTT.
 
-FHEM-rhasspy evaluates these JSON-messages and converts them to commands. And it sends messages to Rhasspy to e.g. provide responses on commands to TextToSpeech.
+FHEM-rhasspy evaluates parts of the MQTT traffic, converts these JSON-messages to commands and also sends messages to Rhasspy to e.g. provide responses on commands as TextToSpeech.
 
 FHEM-rhasspy uses the 00_MQTT2_CLIENT.pm module to receive and send these messages. Therefore it is necessary to define an MQTT2_CLIENT device in FHEM before using FHEM-rhasspy.
 
 ## Installation of FHEM-rhasspy
 - Download a RAW-Copy of 10_RHASSPY.pm and copy it to `opt/fhem/FHEM`
-- Don't forget to change the ownership of the file to `fhem.dialout` (or whatever user/group FHEM is using).
-- Restart FHEM
+- Don't forget to change the ownership of the file to `fhem:dialout` (or whatever user/group FHEM is using).
 - Define a MQTT2_CLIENT device which connects to the MQTT-server Rhasspy is using. E.g.:
 ```
 define <deviceName> MQTT2_CLIENT <ip-or-hostname-of-mqtt-server>:12183 
@@ -83,12 +82,12 @@ define <name> RHASSPY <baseUrl> <devspec> <defaultRoom> <language> <fhemId> <pre
 All parameters are optional but changing them later may result in confusing results. So it's recommended to add them when first defining the module.
 
 * `baseUrl`: The url of the Rhasspy service web-interface. If using a base and multiple satellites, use the url of the base. Default is `baseUrl=http://127.0.0.1:12101`. Make sure, this is set to correct values (IP and Port)!
-* `devspec`: [devspec](https://commandref.fhem.de/commandref.html#devspec) of the device(s) that should be controlled with Rhasspy. Default is `devspec=room=Rhasspy`.
+* `devspec`: [devspec](https://commandref.fhem.de/commandref.html#devspec) of the device(s) that should be controlled with Rhasspy. For backwards compability, default is `devspec=room=Rhasspy`, but you may use e.g. just a comma separated list of devices you want to interact with Rhasspy. Without match to devspec, no device can interact with RHASSPY, regardless if you set any of the further attributes to configure them!
 * `defaultRoom`: Name of the default room which should be used if no room-name is present in the command. Default is `defaultRoom=default`.
 * `language`: Language of the voice commands spoken to Rhasspy. Default is derived from global, which defaults to `language=en`.
 * `fhemId`: Used to differ between multiple instances of RHASSPY on the MQTT side. Also is a part of the topic tree the corresponding RHASSPY is listening to. Default is `fhemId=fhem`.
 * `prefix`: Used to differ between multiple instances of RHASSPY on the FHEM-internal side. Usefull, if you have several instances of RHASSPY in one FHEM running and want e.g. to use different identifier for groups and rooms (e.g. a different language). Default is `prefix=rhasspy`.
-* `useGenericAttrs`: By default, RHASSPY only uses it's own attributes (see list below) to identifiy options for the subordinated devices you want to control. Activating this with `useGenericAttrs=1` adds `genericDeviceType` to the global attribute list and activates RHASSPYs feature to estimate appropriate settings - similar to rhasspyMapping. Default is empty.
+* `useGenericAttrs`: By default, RHASSPY beside it's own attributes (see list below) also uses the general _genericDeviceType_ attribute (also used by other speech control solutions) to identifiy options for the subordinated devices you want to control. Set this to zero, if you want to deactivate this feature: `useGenericAttrs=0`. When not deactivated,  `genericDeviceType` will be added to the _global_ attribute list. Additionally this feature enables RHASSPYs feature to estimate appropriate settings - similar to _rhasspyMapping_. If you are not happy with the results, you may replace them by setting appropriate values in _rhasspyMapping_.
 
 Simple-Example:
 ```
@@ -97,7 +96,7 @@ define Rhasspy RHASSPY
 
 Full-Example:
 ```
-define Rhasspy RHASSPY baseUrl=http://rhasspy:12101 devspec=room=Rhasspy defaultRoom=default language=en fhemId=fhem prefix=rhasspy useGenericAttrs=1
+define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceType=.+ defaultRoom=livingroom language=es fhemId=fhem1 prefix=rhasspy2 useGenericAttrs=0
 ```
 
 ### Set-Commands (SET)
