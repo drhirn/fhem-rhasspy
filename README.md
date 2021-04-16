@@ -37,7 +37,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[ReSpeak](#respeak)\
 [Custom Intents](#custom-intents)\
 [Tips & Tricks](#tips--tricks)\
-&nbsp;&nbsp;&nbsp;&nbsp;[Custom Converter to use Real numbers](#custom-converter-to-use-real-numbers)
+&nbsp;&nbsp;&nbsp;&nbsp;[Custom Converter to use Real numbers](#custom-converter-to-use-real-numbers)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Rhasspy speaks actual state of device after switching it](#rhasspy-speaks-actual-state-of-device-after-switching-it)\
 [To-Do](#To-Do)
 
@@ -485,7 +485,8 @@ Turn the radio down
 Set the temperature in the living room 2 degree warmer
 ```
 
-Example-Rhasspy-Sentences:
+Example-Rhasspy-Sentences:\
+(if you need to speak Real numbers ("two point five") see [Custom Converter to use Real numbers](#custom-converter-to-use-real-numbers))
 ```
 [en.fhem:SetNumeric]
 (change) $de.fhem.Device{Device} [$de.fhem.Room{Room}] to (0..100){Value!int} [percent{Unit:percent}]
@@ -924,6 +925,7 @@ Restart Rhasspy and afterwards you can use your custom-converter in your sentenc
 [SetHeating]
 set heating [to] (0..30 [point:. 0..99]){temp!customFloat}
 ```
+
 
 ### Rhasspy speaks actual state of device after switching it
 
