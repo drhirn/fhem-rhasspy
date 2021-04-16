@@ -455,7 +455,7 @@ SetNumeric:currentVal=brightness,cmd=brightness,minVal=0,maxVal=255,map=percent,
 
 Arguments:
   * **currentVal** Reading which contains the acual value. Required.
-  * **part** Used to split *currentVal* into separate values. Separator is a blank. E.g. if *currentVal* is *23 C*, part=1 results in *23*. Optional.
+  * **part** Used to split *currentVal* into separate values. Separator is a blank. E.g. if *currentVal* is *23 C*, part=0 results in *23*. Optional.
   * **cmd** Set-command of the device that should be called after analysing the voice-command. Required.
   * **minVal** Lowest possible value. Optional.
   * **maxVal** Highest possible value. Optional.
@@ -917,9 +917,9 @@ SetOnOff:cmdOn=on,cmdOff=off,response={ResponseOnOff($DEVICE)}
 
 
 ## To-Do
-- [ ] Upgrade timer intent to play WAV file, stop existing timer, use times like "one hour and 15 minutes"
-- [ ] Check possibilites of *response* in mappings
-- [ ] As soon as rhasspyName is defined, FHEM-room is ignored?
+- [ ] Check and document possibilites of *response* in mappings
+- [ ] As soon as rhasspyName is defined, FHEM-room is ignored? (needs confirmation)
+- [x] Upgrade timer intent to play WAV file, stop existing timer, use times like "one hour and 15 minutes"
 - [x] Move IP of Rhasspy-Master to DEF instead of ATTR
 - [x] Add Custom intents functionality
 - [x] Set-/GetNumeric-Intents multilingual
