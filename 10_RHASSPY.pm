@@ -3515,7 +3515,7 @@ DefaultConfirmation=Klaro, mach ich</code></pre><p>
     <li>siteId, Device etc. => any element out of the JSON-$data.</li>
     </ul>
     If a simple text is returned, this will be considered as response.<br>
-    For more advanced use of this feature, you may return an array. First element of the array will be interpreted as comma-separated list of devices that may have been modified (otherwise, these devices will not cast any events! See also the "d" parameter in <i>shotcuts</i>). Second element then is regarded as resopnse and may either be simple text or HASH-type data. This will keep the dialogue open to allow interactive data exchange with <i>Rhasspy</i>. An open dialogue will be closed after some time, default is 20 seconds, you may alternatively hand over other numeric values as third element of the array.
+    For more advanced use of this feature, you may return an array. First element of the array will be interpreted as comma-separated list of devices that may have been modified (otherwise, these devices will not cast any events! See also the "d" parameter in <i>shotcuts</i>). Second element then is regarded as response and may either be simple text or HASH-type data. This will keep the dialogue open to allow interactive data exchange with <i>Rhasspy</i>. An open dialogue will be closed after some time, default is 20 seconds, you may alternatively hand over other numeric values as third element of the array.
   </li>
   <li>
     <a id="RHASSPY-attr-shortcuts"></a><b>shortcuts</b><br>
