@@ -323,7 +323,7 @@ sub RHASSPY_Define {
     my $Rhasspy  = $h->{baseUrl} // shift @{$anon} // q{http://127.0.0.1:12101};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = "0.4.8a";
+    $hash->{MODULE_VERSION} = "0.4.9";
     $hash->{baseUrl} = $Rhasspy;
     $hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
@@ -2214,8 +2214,9 @@ sub RHASSPY_handleCustomIntent {
             if ($_ eq 'NAME') {
                 $_ = qq{"$hash->{NAME}"};
             } elsif ($_ eq 'DATA') {
-                $_ = $data;
-            } elsif (defined $data->{$_}) {
+                my $json = toJSON($data);
+                $_ = qq{'$json'};
+         } elsif (defined $data->{$_}) {
                 $_ = qq{"$data->{$_}"};
             } else {
                 $_ = "undef";
@@ -2226,7 +2227,6 @@ sub RHASSPY_handleCustomIntent {
         my $cmd = qq{ $subName( $args ) };
         Log3($hash->{NAME}, 5, "Calling sub: $cmd" );
         my $error = AnalyzePerlCommand($hash, $cmd);
-
         $response = $error; # if $error && $error !~ m{Please.define.*first}x;
     }
     $response = $response // RHASSPY_getResponse($hash, 'DefaultConfirmation');
@@ -2607,7 +2607,7 @@ sub RHASSPY_handleIntentSetNumeric {
 
     # Neuen Wert bestimmen
     my $newVal;
-    my $ispct = $unit eq 'percent' || $unit eq $de_mappings->{percent} ? 1 : 0;
+    my $ispct = defined $unit && ( $unit eq 'percent' || $unit eq $de_mappings->{percent} ) ? 1 : 0;
 
     if ( !defined $change ) {
         # Direkter Stellwert ("Stelle Lampe auf 50")
@@ -3229,7 +3229,6 @@ sub RHASSPY_ReplaceReadingsVal {
 sub RHASSPY_getDataFile {
     my $hash     = shift // return;
     my $filename = shift;
-
     my $name = $hash->{NAME};
     my $lang = $hash->{LANGUAGE};
     $filename = $filename // AttrVal($name,'configFile',undef);
@@ -3469,7 +3468,7 @@ DefaultConfirmation=Klaro, mach ich</code></pre><p>
     The following arguments can be handed over:<br>
     <ul>
     <li>NAME => name of the RHASSPY device addressed, </li>
-    <li>DATA => entire JSON-$data (as parsed internally), </li>
+    <li>DATA => entire JSON-$data (as parsed internally), encoded in JSON</li>
     <li>siteId, Device etc. => any element out of the JSON-$data.</li>
     </ul>
   </li>
