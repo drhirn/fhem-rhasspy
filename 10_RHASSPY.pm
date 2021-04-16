@@ -323,7 +323,7 @@ sub RHASSPY_Define {
     my $Rhasspy  = $h->{baseUrl} // shift @{$anon} // q{http://127.0.0.1:12101};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = "0.4.9";
+    $hash->{MODULE_VERSION} = "0.4.8b";
     $hash->{baseUrl} = $Rhasspy;
     $hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
@@ -1002,15 +1002,46 @@ sub _analyze_genDevType {
         $currentMapping = { 
             GetOnOff => { GetOnOff => {currentVal => 'state', type => 'GetOnOff', valueOff => 'off'}},
             SetOnOff => { SetOnOff => {cmdOff => 'off', type => 'SetOnOff', cmdOn => 'on'}},
-            GetNumeric => { 'volume' => {currentVal => 'volume', type => 'volume' }},
-            SetNumeric => {'volume' => { cmd => 'volume', currentVal => 'volume', maxVal => '100', minVal => '0', step => '2', type => 'volume'}, 'channel' => { cmd => 'channel', currentVal => 'channel', step => '1', type => 'channel'}}, 
-            MediaControls => { MediaControls => {'cmdPlay' => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown'} } };
+            GetNumeric => { 'volume' => {currentVal => 'volume', type => 'volume' }}#,
+            #SetNumeric => {'volume' => { cmd => 'volume', currentVal => 'volume', maxVal => '100', minVal => '0', step => '2', type => 'volume'}, 'channel' => { cmd => 'channel', currentVal => 'channel', step => '1', type => 'channel'}}, 
+            #MediaControls => { MediaControls => {'cmdPlay' => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown'} } 
+            };
+
+        $currentMapping = _analyze_genDevType_setter( $allset, $currentMapping );
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
     }
 
     return;
 }
 
+sub _analyze_genDevType_setter {
+    my $setter = shift;
+    my $mapping = shift // {};
+
+    my $allValMappings = {
+        MediaControls => { 
+        cmdPlay => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown' }
+        };
+    for my $okey ( keys %{$allValMappings} ) {
+        my $ikey = $allValMappings->{$okey};
+        for ( keys %{$ikey} ) {
+            my $val = $ikey->{$_};
+            $mapping->{$okey}->{$okey}->{$_} = $val if $setter =~ m{\b$val[\b:\s]}xms;
+        }
+    }
+    my $allKeyMappings = {
+        SetNumeric => { volume => { cmd => 'volume', currentVal => 'volume', maxVal => '100', minVal => '0', step => '2', type => 'volume'}, 
+        channel => { cmd => 'channel', currentVal => 'channel', step => '1', type => 'channel'}
+            }
+        };
+        for my $okey ( keys %{$allKeyMappings} ) {
+        my $ikey = $allKeyMappings->{$okey};
+        for ( keys %{$ikey} ) {
+            $mapping->{$okey}->{$okey}->{$_} = $ikey->{$_} if $setter =~ m{\b$_[\b:\s]}xms;
+        }
+    }
+    return $mapping;
+}
 
 sub RHASSPY_execute {
     my $hash   = shift // return;
@@ -2206,29 +2237,41 @@ sub RHASSPY_handleCustomIntent {
     }
 
     my $subName = $custom->{function};
+    return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'DefaultError')) if !defined $subName;
+
     my $params = $custom->{args};
     my @rets = @{$params};
 
-    if ( defined $subName ) { #might not be necessary...
-        for (@rets) {
-            if ($_ eq 'NAME') {
-                $_ = qq{"$hash->{NAME}"};
-            } elsif ($_ eq 'DATA') {
-                my $json = toJSON($data);
-                $_ = qq{'$json'};
-         } elsif (defined $data->{$_}) {
-                $_ = qq{"$data->{$_}"};
-            } else {
-                $_ = "undef";
-            }
+    for (@rets) {
+        if ($_ eq 'NAME') {
+            $_ = qq{"$hash->{NAME}"};
+        } elsif ($_ eq 'DATA') {
+            my $json = toJSON($data);
+            $_ = qq{'$json'};
+        } elsif (defined $data->{$_}) {
+            $_ = qq{"$data->{$_}"};
+        } else {
+            $_ = "undef";
         }
+    }
 
-        my $args = join q{,}, @rets;
-        my $cmd = qq{ $subName( $args ) };
-        Log3($hash->{NAME}, 5, "Calling sub: $cmd" );
-        my $error = AnalyzePerlCommand($hash, $cmd);
+    my $args = join q{,}, @rets;
+    my $cmd = qq{ $subName( $args ) };
+    Log3($hash->{NAME}, 5, "Calling sub: $cmd" );
+    my $error = AnalyzePerlCommand($hash, $cmd);
+    if ( ref $error eq 'ARRAY' ) {
+        $response = ${$error}[0] // RHASSPY_getResponse($hash, 'DefaultConfirmation');
+        if ( ref ${$error}[0] eq 'HASH') {
+            my $timeout = ${$error}[2];
+            $timeout = defined $timeout && looks_like_number($timeout) ? $timeout : 20;
+            InternalTimer(time + $timeout, \&RHASSPY_confirm_timer, $hash, 0);
+        }
+        RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
+        return ${$error}[1]; #comma separated list of devices to trigger
+    } else {
         $response = $error; # if $error && $error !~ m{Please.define.*first}x;
     }
+
     $response = $response // RHASSPY_getResponse($hash, 'DefaultConfirmation');
 
     # Antwort senden
@@ -3471,6 +3514,8 @@ DefaultConfirmation=Klaro, mach ich</code></pre><p>
     <li>DATA => entire JSON-$data (as parsed internally), encoded in JSON</li>
     <li>siteId, Device etc. => any element out of the JSON-$data.</li>
     </ul>
+    If a simple text is returned, this will be considered as response.<br>
+    For more advanced use of this feature, you may return an array. First element of the array will be interpreted as comma-separated list of devices that may have been modified (otherwise, these devices will not cast any events! See also the "d" parameter in <i>shotcuts</i>). Second element then is regarded as resopnse and may either be simple text or HASH-type data. This will keep the dialogue open to allow interactive data exchange with <i>Rhasspy</i>. An open dialogue will be closed after some time, default is 20 seconds, you may alternatively hand over other numeric values as third element of the array.
   </li>
   <li>
     <a id="RHASSPY-attr-shortcuts"></a><b>shortcuts</b><br>
