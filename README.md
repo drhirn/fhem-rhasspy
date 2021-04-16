@@ -79,7 +79,7 @@ You can define a new instance of this module with:
 define <name> RHASSPY <baseUrl> <devspec> <defaultRoom> <language> <fhemId> <prefix> <useGenericAttrs> <encoding>
 ```
 
-All parameters are optional but changing them later may result in confusing results. So it's recommended to add them when first defining the module.
+All parameters are optional but changing some of them later may result in confusing results. So it's recommended to add especially check wheather _fhemId_ and/or _prefix_ are wanted to be set different than the defauls just from the very first start (in most cases, these are for advanced configuration, so when starting with RHASSPY, you may not care much about that).
 
 * `baseUrl`: The url of the Rhasspy service web-interface. If using a base and multiple satellites, use the url of the base. Default is `baseUrl=http://127.0.0.1:12101`. Make sure, this is set to correct values (IP and Port)!
 * `devspec`: [devspec](https://commandref.fhem.de/commandref.html#devspec) of the device(s) that should be controlled with Rhasspy. For backwards compability, default is `devspec=room=Rhasspy`, but you may use e.g. just a comma separated list of devices you want to interact with Rhasspy. Without match to devspec, no device can interact with RHASSPY, regardless if you set any of the further attributes to configure them!
@@ -122,7 +122,7 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
   Example: `set <rhasspyDevice> trainRhasspy`
 * **updateSlots**\
   Sends a command to the HTTP-API of the Rhasspy master to update all slots on Rhasspy with actual FHEM-devices, rooms, etc.\
-  The attribute *rhasspyMaster* has to be defined to work.\
+  Make sure, baseUrl is set appropriate, otherwise this will fail.\
   Example: `set <rhasspyDevice> updateSlots`\
   Updated/Created Slots are
   - de.fhem.Device
@@ -146,7 +146,7 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
 	Example: `set <rhasspyDevice> update slots_no_training`
   * **language**\
     Reinitialization of language file.\
-    Be sure to execute this command after changing something in the language-configuration files or the attribut `configFile`!\
+    Be sure to execute this command after changing something in the language-configuration files or the attribute `configFile`!\
     Example: `set <rhasspyDevice> update language`
   * **all**\
     Update devicemap and language.\
@@ -157,7 +157,7 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
     Example: `set <rhasspyDevice> siteId="default" volume="0.5"`
   
   
-  **Do not forget to issue an `update devicemap` after making any changes to Rhasspy-controlled devices, the language file or the RHASSPY-device itself!**
+  **Do not forget to issue an `update devicemap` after making any changes to Rhasspy-controlled devices or the RHASSPY-device itself!**
 
 ### Attributes (ATTR)
 * **IODev**\
@@ -165,7 +165,7 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
   Example: `attr <rhasspyDevice> IODev rhasspyMQTT2`
 * **configFile**\
   Path to the language-config file. If this attribute isn't set, english is used for voice responses.\
-  Example: `attr <rhasspyDevice> configFile /opt/fhem/.config/rhasspy/rhasspy-de.cfg`
+  Example: `attr <rhasspyDevice> configFile ./.config/rhasspy/rhasspy-de.cfg`
 * **forceNEXT**\
   If set to 1, RHASSPY will forward incoming messages also to further MQTT2-IO-client modules like MQTT2_DEVICE, even if the topic matches to one of it's own subscriptions. By default, these messages will not be forwarded for better compability with autocreate feature on MQTT2_DEVICE. See also [clientOrder](https://commandref.fhem.de/commandref.html#MQTT2_CLIENT) attribute in MQTT2 IO-type commandrefs. Setting this in one instance of RHASSPY might affect others, too.
 * **response**\
