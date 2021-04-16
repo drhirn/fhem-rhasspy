@@ -37,6 +37,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 &nbsp;&nbsp;&nbsp;&nbsp;[ReSpeak](#respeak)\
 [Custom Intents](#custom-intents)\
 [Tips & Tricks](#tips--tricks)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Custom Converter to use Real numbers](#custom-converter-to-use-real-numbers)
 &nbsp;&nbsp;&nbsp;&nbsp;[Rhasspy speaks actual state of device after switching it](#rhasspy-speaks-actual-state-of-device-after-switching-it)\
 [To-Do](#To-Do)
 
@@ -890,6 +891,39 @@ what did you say
 ```
 
 ## Tips & Tricks
+
+### Custom Converter to use Real numbers
+
+Rhasspy is (currently) not able to recognize spoken Real numbers (e.g. ten point five) as numbers. Instead it interprets them as two numbers and "point".\
+To use Real numbers correctly, you have to create a custom converter and use this in your sentences.\
+
+To do this, create a file under <rhasspy-profile>/converters, name it as you wish and make it executable.\
+E.g.
+```
+> touch .config/rhasspy/profile/en/converters/customFloat
+> chmod +x .config/rhasspy/profile/en/converters/customFloat
+```
+
+Then fill it with the following example-code:
+```
+#!/usr/bin/env python3
+import sys
+import json
+
+# [22, ".", 5]
+args = json.load(sys.stdin)
+
+# 22.5
+num = "".join(str(s).strip() for s in args)
+
+print(num)
+```
+
+Restart Rhasspy and afterwards you can use your custom-converter in your sentences.
+```
+[SetHeating]
+set heating [to] (0..30 [point:. 0..99]){temp!customFloat}
+```
 
 ### Rhasspy speaks actual state of device after switching it
 
