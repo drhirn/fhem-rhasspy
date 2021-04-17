@@ -79,7 +79,7 @@ You can define a new instance of this module with:
 define <name> RHASSPY <baseUrl> <devspec> <defaultRoom> <language> <fhemId> <prefix> <useGenericAttrs> <encoding>
 ```
 
-All parameters are optional but changing some of them later may result in confusing results. So it's recommended to add especially check wheather _fhemId_ and/or _prefix_ are wanted to be set different than the defauls just from the very first start (in most cases, these are for advanced configuration, so when starting with RHASSPY, you may not care much about that).
+All parameters are optional but changing some of them later may result in confusing results. So it's recommended to especially check if _fhemId_ and/or _prefix_ really have to be set different than the defaults (in most cases, these are for advanced configuration (e.g. multiple languages), so when starting with RHASSPY, you may not care much about that).
 
 * `baseUrl`: The url of the Rhasspy service web-interface. If using a base and multiple satellites, use the url of the base. Default is `baseUrl=http://127.0.0.1:12101`. Make sure, this is set to correct values (IP and Port)!
 * `devspec`: [devspec](https://commandref.fhem.de/commandref.html#devspec) of the device(s) that should be controlled with Rhasspy. For backwards compability, default is `devspec=room=Rhasspy`, but you may use e.g. just a comma separated list of devices you want to interact with Rhasspy. Without match to devspec, no device can interact with RHASSPY, regardless if you set any of the further attributes to configure them!

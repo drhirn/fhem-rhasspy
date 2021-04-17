@@ -323,7 +323,7 @@ sub RHASSPY_Define {
     my $Rhasspy  = $h->{baseUrl} // shift @{$anon} // q{http://127.0.0.1:12101};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = "0.4.8b";
+    $hash->{MODULE_VERSION} = "0.4.9";
     $hash->{baseUrl} = $Rhasspy;
     $hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
@@ -3478,12 +3478,6 @@ attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
    <p><b>RHASSPY itself</b> supports the following attributes:</p>
   <ul>
   <li>
-    <a id="RHASSPY-attr-rhasspyMaster"></a><b>rhasspyMaster</b><br>
-    Defines the URL to the Rhasspy Master for sending requests to the HTTP-API. Has to be in Format <code>protocol://fqdn:port</code>
-    This attribute is <b>mandatory</b>!<br>
-    Example: <code>attr &lt;rhasspyDevice&gt; rhasspyMaster http://rhasspy.example.com:12101</code>
-  </li>
-  <li>
     <a id="RHASSPY-attr-configFile"></a><b>configFile</b>
     Path to the language-config file. If this attribute isn't set, a default set of english responses is used for voice responses.<br>
     Example (placed in the same dir fhem.pl is located): <code>attr &lt;rhasspyDevice&gt; configFile ./rhasspy-de.cfg</code>
@@ -3660,6 +3654,7 @@ yellow=rgb 00F000</pre></code>
     <li>SetOnOffGroup</li>
     <li>GetOnOff</li>
     <li>SetNumeric</li>
+    <li>SetNumericGroup</li>
     <li>GetNumeric</li>
     <li>GetState</li>
     <li>MediaControls</li>
