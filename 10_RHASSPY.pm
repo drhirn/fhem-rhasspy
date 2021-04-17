@@ -983,6 +983,7 @@ sub _analyze_genDevType {
             my $maxval = InternalVal($device, 'TYPE', 'unknown') eq 'ZWave' ? 99 : 100;
             $currentMapping = 
             { GetNumeric => { dim => {currentVal => 'state', type => 'setTarget' } },
+            GetOnOff => { GetOnOff => { currentVal=>'dim', valueOn=>$maxval } },
             SetOnOff => { SetOnOff => {cmdOff => 'dim 0', type => 'SetOnOff', cmdOn => "dim $maxval"} },
             SetNumeric => { setTarget => { cmd => 'dim', currentVal => 'state', maxVal => $maxval, minVal => '0', step => '11', type => 'setTarget'} }
             };
@@ -991,6 +992,7 @@ sub _analyze_genDevType {
         elsif ( $allset =~ m{\bpct[\b:\s]}xms ) {
             $currentMapping = { 
             GetNumeric => { 'pct' => {currentVal => 'pct', type => 'setTarget'} },
+            GetOnOff => { GetOnOff => {currentVal=>'pct', valueOn=>'100' } },
             SetOnOff => { SetOnOff => {cmdOff => 'pct 0', type => 'SetOnOff', cmdOn => 'pct 100'} },
             SetNumeric => { setTarget => { cmd => 'pct', currentVal => 'pct', maxVal => '100', minVal => '0', step => '13', type => 'setTarget'} }
             };
@@ -1037,7 +1039,7 @@ sub _analyze_genDevType_setter {
         for my $okey ( keys %{$allKeyMappings} ) {
         my $ikey = $allKeyMappings->{$okey};
         for ( keys %{$ikey} ) {
-            $mapping->{$okey}->{$okey}->{$_} = $ikey->{$_} if $setter =~ m{\b$_[\b:\s]}xms;
+            $mapping->{$okey}->{$_} = $ikey->{$_} if $setter =~ m{\b$_[\b:\s]}xms;
         }
     }
     return $mapping;
@@ -3515,7 +3517,7 @@ DefaultConfirmation=Klaro, mach ich</code></pre><p>
     <li>siteId, Device etc. => any element out of the JSON-$data.</li>
     </ul>
     If a simple text is returned, this will be considered as response.<br>
-    For more advanced use of this feature, you may return an array. First element of the array will be interpreted as comma-separated list of devices that may have been modified (otherwise, these devices will not cast any events! See also the "d" parameter in <i>shotcuts</i>). Second element then is regarded as response and may either be simple text or HASH-type data. This will keep the dialogue open to allow interactive data exchange with <i>Rhasspy</i>. An open dialogue will be closed after some time, default is 20 seconds, you may alternatively hand over other numeric values as third element of the array.
+    For more advanced use of this feature, you may return an array. First element of the array will be interpreted as comma-separated list of devices that may have been modified (otherwise, these devices will not cast any events! See also the "d" parameter in <i>shotcuts</i>). Second element then is regarded as resopnse and may either be simple text or HASH-type data. This will keep the dialogue open to allow interactive data exchange with <i>Rhasspy</i>. An open dialogue will be closed after some time, default is 20 seconds, you may alternatively hand over other numeric values as third element of the array.
   </li>
   <li>
     <a id="RHASSPY-attr-shortcuts"></a><b>shortcuts</b><br>
