@@ -52,14 +52,13 @@ Rhasspy (pronounced RAH-SPEE) is an open source, fully offline set of voice assi
 ## About FHEM-rhasspy
 Rhasspy consist of multiple modules (Hot-Word Detection, Text to Speech, Speech to Text, Intent Recognition, ...). All of these communicate over MQTT.
 
-FHEM-rhasspy evaluates these JSON-messages and converts them to commands. And it sends messages to Rhasspy to e.g. provide responses on commands to TextToSpeech.
+FHEM-rhasspy evaluates parts of the MQTT traffic, converts these JSON-messages to commands and also sends messages to Rhasspy to e.g. provide responses on commands as TextToSpeech.
 
 FHEM-rhasspy uses the 00_MQTT2_CLIENT.pm module to receive and send these messages. Therefore it is necessary to define an MQTT2_CLIENT device in FHEM before using FHEM-rhasspy.
 
 ## Installation of FHEM-rhasspy
-- Download a RAW-Copy of 10_RHASSPY.pm and copy it to `opt/fhem/FHEM`
-- Don't forget to change the ownership of the file to `fhem.dialout` (or whatever user/group FHEM is using).
-- Restart FHEM
+- Download a RAW-Copy of 10_RHASSPY.pm and copy it to (in most cases) `opt/fhem/FHEM`
+- Don't forget to change the ownership of the file to `fhem:dialout` (or whatever user/group FHEM is using).
 - Define a MQTT2_CLIENT device which connects to the MQTT-server Rhasspy is using. E.g.:
 ```
 define <deviceName> MQTT2_CLIENT <ip-or-hostname-of-mqtt-server>:12183 
@@ -80,15 +79,15 @@ You can define a new instance of this module with:
 define <name> RHASSPY <baseUrl> <devspec> <defaultRoom> <language> <fhemId> <prefix> <useGenericAttrs> <encoding>
 ```
 
-All parameters are optional but changing them later may result in confusing results. So it's recommended to add them when first defining the module.
+All parameters are optional but changing some of them later may result in confusing results. So it's recommended to add especially check wheather _fhemId_ and/or _prefix_ are wanted to be set different than the defauls just from the very first start (in most cases, these are for advanced configuration, so when starting with RHASSPY, you may not care much about that).
 
 * `baseUrl`: The url of the Rhasspy service web-interface. If using a base and multiple satellites, use the url of the base. Default is `baseUrl=http://127.0.0.1:12101`. Make sure, this is set to correct values (IP and Port)!
-* `devspec`: [devspec](https://commandref.fhem.de/commandref.html#devspec) of the device(s) that should be controlled with Rhasspy. Default is `devspec=room=Rhasspy`.
+* `devspec`: [devspec](https://commandref.fhem.de/commandref.html#devspec) of the device(s) that should be controlled with Rhasspy. For backwards compability, default is `devspec=room=Rhasspy`, but you may use e.g. just a comma separated list of devices you want to interact with Rhasspy. Without match to devspec, no device can interact with RHASSPY, regardless if you set any of the further attributes to configure them!
 * `defaultRoom`: Name of the default room which should be used if no room-name is present in the command. Default is `defaultRoom=default`.
 * `language`: Language of the voice commands spoken to Rhasspy. Default is derived from global, which defaults to `language=en`.
 * `fhemId`: Used to differ between multiple instances of RHASSPY on the MQTT side. Also is a part of the topic tree the corresponding RHASSPY is listening to. Default is `fhemId=fhem`.
 * `prefix`: Used to differ between multiple instances of RHASSPY on the FHEM-internal side. Usefull, if you have several instances of RHASSPY in one FHEM running and want e.g. to use different identifier for groups and rooms (e.g. a different language). Default is `prefix=rhasspy`.
-* `useGenericAttrs`: By default, RHASSPY only uses it's own attributes (see list below) to identifiy options for the subordinated devices you want to control. Activating this with `useGenericAttrs=1` adds `genericDeviceType` to the global attribute list and activates RHASSPYs feature to estimate appropriate settings - similar to rhasspyMapping. Default is empty.
+* `useGenericAttrs`: By default, RHASSPY beside it's own attributes (see list below) also uses the general _genericDeviceType_ attribute (also used by other speech control solutions) to identifiy options for the subordinated devices you want to control. Set this to zero, if you want to deactivate this feature: `useGenericAttrs=0`. When not deactivated,  `genericDeviceType` will be added to the _global_ attribute list. Additionally this feature enables RHASSPYs feature to estimate appropriate settings - similar to _rhasspyMapping_. If you are not happy with the results, you may replace them by setting appropriate values in _rhasspyMapping_.
 
 Simple-Example:
 ```
@@ -97,7 +96,7 @@ define Rhasspy RHASSPY
 
 Full-Example:
 ```
-define Rhasspy RHASSPY baseUrl=http://rhasspy:12101 devspec=room=Rhasspy defaultRoom=default language=en fhemId=fhem prefix=rhasspy useGenericAttrs=1
+define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceType=.+ defaultRoom=livingroom language=es fhemId=fhem1 prefix=rhasspy2 useGenericAttrs=0
 ```
 
 ### Set-Commands (SET)
@@ -123,7 +122,7 @@ define Rhasspy RHASSPY baseUrl=http://rhasspy:12101 devspec=room=Rhasspy default
   Example: `set <rhasspyDevice> trainRhasspy`
 * **updateSlots**\
   Sends a command to the HTTP-API of the Rhasspy master to update all slots on Rhasspy with actual FHEM-devices, rooms, etc.\
-  The attribute *rhasspyMaster* has to be defined to work.\
+  Make sure, baseUrl is set appropriate, otherwise this will fail.\
   Example: `set <rhasspyDevice> updateSlots`\
   Updated/Created Slots are
   - de.fhem.Device
@@ -147,7 +146,7 @@ define Rhasspy RHASSPY baseUrl=http://rhasspy:12101 devspec=room=Rhasspy default
 	Example: `set <rhasspyDevice> update slots_no_training`
   * **language**\
     Reinitialization of language file.\
-    Be sure to execute this command after changing something in the language-configuration files or the attribut `configFile`!\
+    Be sure to execute this command after changing something in the language-configuration files or the attribute `configFile`!\
     Example: `set <rhasspyDevice> update language`
   * **all**\
     Update devicemap and language.\
@@ -158,7 +157,7 @@ define Rhasspy RHASSPY baseUrl=http://rhasspy:12101 devspec=room=Rhasspy default
     Example: `set <rhasspyDevice> siteId="default" volume="0.5"`
   
   
-  **Do not forget to issue an `update devicemap` after making any changes to Rhasspy-controlled devices, the language file or the RHASSPY-device itself!**
+  **Do not forget to issue an `update devicemap` after making any changes to Rhasspy-controlled devices or the RHASSPY-device itself!**
 
 ### Attributes (ATTR)
 * **IODev**\
@@ -166,7 +165,7 @@ define Rhasspy RHASSPY baseUrl=http://rhasspy:12101 devspec=room=Rhasspy default
   Example: `attr <rhasspyDevice> IODev rhasspyMQTT2`
 * **configFile**\
   Path to the language-config file. If this attribute isn't set, english is used for voice responses.\
-  Example: `attr <rhasspyDevice> configFile /opt/fhem/.config/rhasspy/rhasspy-de.cfg`
+  Example: `attr <rhasspyDevice> configFile ./.config/rhasspy/rhasspy-de.cfg`
 * **forceNEXT**\
   If set to 1, RHASSPY will forward incoming messages also to further MQTT2-IO-client modules like MQTT2_DEVICE, even if the topic matches to one of it's own subscriptions. By default, these messages will not be forwarded for better compability with autocreate feature on MQTT2_DEVICE. See also [clientOrder](https://commandref.fhem.de/commandref.html#MQTT2_CLIENT) attribute in MQTT2 IO-type commandrefs. Setting this in one instance of RHASSPY might affect others, too.
 * **response**\
@@ -194,12 +193,12 @@ define Rhasspy RHASSPY baseUrl=http://rhasspy:12101 devspec=room=Rhasspy default
 
   The following arguments can be handed over:
   * NAME => name of the RHASSPY device addressed
-  * DATA => entire JSON-$data (as parsed internally)
+  * DATA => entire JSON-$data (as parsed internally, JSON-encoded)
   * siteId, Device etc. => any element out of the JSON-$data
 
 * **shortcuts**\
   Define custom sentences without editing Rhasspy sentences.ini.\
-  The shortcuts are uploaded to Rhasspy when using the `update devicemap` set-command.\
+  The shortcuts are uploaded to Rhasspy when using the `update slots` (or `update devicemap`) set-command.\
   One shortcut per line, syntax is either a simple or an extended version.\
   Examples:
   ```
@@ -225,7 +224,7 @@ define Rhasspy RHASSPY baseUrl=http://rhasspy:12101 devspec=room=Rhasspy default
   * **r**: response\
     Response to be set to the caller. If not set, the return value of the called function will be used.\
 	You may ask for confirmation as well using the following (optional) shorts:
-    * **c**: Either numeric or text. If numeric: Timeout to wait for automatic cancellation. If text: response to send to ask for confirmation.
+    * **c**: Confirmation request: Command will only be executed, when separate confirmation is spoken. Value _c_ is either numeric or text. If numeric: Timeout to wait for automatic cancellation. If text: response to send to ask for confirmation.
     * **ct**: Numeric value for timeout in seconds, default: 15
 
 * **rhasspyTweaks**\
@@ -233,6 +232,8 @@ define Rhasspy RHASSPY baseUrl=http://rhasspy:12101 devspec=room=Rhasspy default
   Could be the place to configure additional things like additional siteId2room info or code links, allowed commands, duration of SetTimer sounds, confirmation requests etc.\
   * **timerLimits**\
     See intent [SetTimer](#settimer)
+  * **timerSounds**\
+    You may play (and repeat) WAV files instead of default one-time spoken info, when timer is ending. See intent [SetTimer](#settimer)
 
 ### Readings / Events
 * **lastIntentPayload**\
@@ -278,30 +279,50 @@ To control a device with voice-commands, Rhasspy needs to now some information a
 Except for *genericDeviceType*, all attribute-names are starting with the prefix used while defining the RHASSPY-device. The following uses the default value *rhasspy*.
 
 
-**Important**: Be sure to execute `update devicemap` after every change of the following attributes.
+**Important**: 
+* Be sure to execute `update devicemap` when changing of the following attributes has been competed - otherwise neither RHASSPY nor Rhasspy will know the changed values! 
+* RHASSPY will consolidate all information given in the attributes in it's own device hash. Use _list_ command to see result of the consolidation process initiated by the `update devicemap` command. All names and other "labels" are converted to lower case, so make sure, Rhasspy is also delivering lower case values when filling slots manually.
+* Minimum requirements for a FHEM device to work with RHASSPY are:
+** Device has to match devspec
+** at least (just) one of the following attributes has to be set in the device (basically, genericDeviceType or one of the RHASSPY-specific mapping attributes).
+* mapping logic generally is as follows:
+** if RHASSPY-specific attributes are provided, only the value of this attribute will **exclusively** be used (obviously: only for the purpose of the specific attribute, so e.g. setting _rhasspyName_ will not prevent analysis of _genericDeviceType_ possibilities to set the device _on_ or _off_ or it's _brighness_).   
+** the more specific attribute values will override the less specific ones. So, (if no _rhasspyName_ is set) _alias_ will prevent using (technical) _device name_ to be used, and having set _alexaName_ will result in (to some extend exclusive) use of the values set there. If two possibilities are on the same "specific level" (e.g. _alexaName_ and _siriName_ are set), both will be used.  
+* attribute values typically are typically read "line by line", following the general rule "one topic per line". So make sure to set newline marks at the right places!
 
+### Attribute genericDeviceType
+
+**Work in progress - you are strongly encouraged to test this new feature!**
+
+When activated (default is on), RHASSPY will try to derive mapping (and other) information from the attributes already present (if devices match devspec). Atm, the following subset of _genericDeviceType_ is supported:  
+* switch
+* light (no color features atm)
+* thermostat
+* blind
+* media
 
 ### Attribute *rhasspyName*
-Every controllable FHEM-device has to have an attribute **rhasspyName**. The content of this attribute is the name you want to call this device (e.g. *Bulb*). It's possible to use multiple names for the same device by separating them with comma.\
+The content of this attribute is the name you want to call this device (e.g. *bulb*). It's possible to use multiple names for the same device by separating them with comma.\
 Example:
 ```
-attr <device> rhasspyName Bulb,Ceiling Light,Chandelier
+attr <device> rhasspyName bulb,leiling light,chandelier
 ```
-It's also possible to have the same name for different FHEM-devices. Just make sure they have different *rhasspyRoom* attributes.
+It's also possible to have the same name for different FHEM-devices. Just make sure they are located in different _rooms_ (e.g. by setting the *rhasspyRoom* attribute).
 
 ### Attribute *rhasspyRoom*
-You can add an attribute `rhasspyRoom` to the device to tell Rhasspy in which physical room the device is. Otherwise it belongs to the "default room" you used when defining the Rhasspy-device.\
-This is useful to speak commands without a room. If there is a device *Bulb* and it's *rhasspyRoom*-attribute is equal to the siteId of your satellite, it's enough to say "Bulb on" and the Bulb in the room the command is spoken will be turned on.
-`rhasspyRoom` accepts a comma-separated list of rooms.
+You can add an attribute `rhasspyRoom` to the device to tell Rhasspy in which physical (or logical) room the device is. If omitted, (alexaRoom or) standard FHEM _room_ attribute is used. If this is also not provided, it belongs to the "default room" as set in _define_\
+This is useful to speak commands without a room. If there is a device *bulb* and it's *rhasspyRoom*-attribute is equal to the siteId of your satellite, it's enough to say "Bulb on" and the bulb in the room the command is spoken will be turned on.
+`rhasspyRoom` also accepts a comma-separated list.
 
 Example:
-```attr <device> rhasspyRoom Livingroom```
+```attr <device> rhasspyRoom livingroom```
 
 ### Attribute *rhasspyGroup*
 Comma-separated "labels" for the groups the device belongs to.
 
 Example:
-`attr <device> rhasspyGroup lights`
+`attr <device> rhasspyGroup lights,worktop illumination,kitchen illumination`
+
 
 ### Attribute *rhasspyMapping*
 If automatic detection of the right intent for a particular type of device isn't working or is not desired, this attribute is used to inform RHASSPY which intents to use to control the device.\
@@ -348,18 +369,6 @@ Example:
 attr <device> rhasspyChannels orf eins=set <device> channel 201
 orf zwei=set <device> channel 202
 ```
-
-### Attribute genericDeviceType
-
-**Work in progress - do not use in production**
-
-There are:
-* switch
-* light
-* thermostat
-* blind
-* media
-
 
 ## Intents
 Intents are used to tell FHEM what to do after receiving a voice-/text-command. This module has some build-in intents.
@@ -437,11 +446,11 @@ Example-Sentences:
 Example-Rhasspy-Sentences:
 ```
 [en.fhem:GetOnOff]
-(is) $de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched on|running|opened){Status:on}
-(is) $de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched off|stopped|closed){Status:off}
+(is) $de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched on|running|opened){State:on}
+(is) $de.fhem.Device{Device} [$de.fhem.Room{Room}] (switched off|stopped|closed){State:off}
 ```
 
-Be sure to split on- and off-states into different sentences including *{Status:on}* and *{Status:off}*
+Be sure to split on- and off-states into different sentences including *{State:on}* and *{State:off}*
 
 ### SetNumeric
 
@@ -469,7 +478,7 @@ If on of these options is set, all numeric control values are taken as percentag
 If there is a light-device with the setting *minVal=0* and *maxVal=255*, then "turn the light to 50" means the same as "turn the light to 50 percent". The light is then set to 127 instead of 50.
 
 Good to know:\
-To use the commands like *louder* or *lower* without the need to speak a device-name, the module has to know which device is currently playing. Thus it uses the *GetOnOff-Mappings* to search a turned on device with e.g. `type=volume`. First it searches in the actual *rhasspyRoom* (the *siteId* or - if missing - the default rhasspyRoom), next in all other *rhasspyRoom*s.\
+To use the commands like *louder* or *lower* without the need to speak a device-name, the module has to know which device is currently playing. Thus it uses the *GetOnOff-Mappings* to search a turned on device with e.g. `type=volume`. First it searches in the actual *rhasspyRoom* (as indicated in RHASSPY list, this is not restricted to the attribute!) (the *siteId* or - if missing - the default rhasspyRoom), next in all other *rhasspyRoom*s.\
 That's why it's advisable to also set a *GetOnOff*-Mapping if using a *SetNumeric*-Mapping.
 
 Possible **type**s:
@@ -954,7 +963,7 @@ SetOnOff:cmdOn=on,cmdOff=off,response={ResponseOnOff($DEVICE)}
 
 ## To-Do
 - [ ] Check and document possibilites of *response* in mappings
-- [ ] As soon as rhasspyName is defined, FHEM-room is ignored? (needs confirmation)
+- [ ] As soon as rhasspyName is defined, FHEM-room is ignored? (needs confirmation) (Beta-User: not intended, but rhasspyRoom should override FHEM-room) 
 - [x] Upgrade timer intent to play WAV file, stop existing timer, use times like "one hour and 15 minutes"
 - [x] Move IP of Rhasspy-Master to DEF instead of ATTR
 - [x] Add Custom intents functionality
