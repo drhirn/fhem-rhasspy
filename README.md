@@ -7,6 +7,7 @@ Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://git
 [Read First](#Read-First)\
 [About Rhasspy](#About-Rhasspy)\
 [About FHEM-rhasspy](#About-FHEM-rhasspy)\
+[About this repository](#about-this-repository)\
 [Installation of FHEM-rhasspy](#Installation-of-FHEM-rhasspy)\
 [Definition (DEF) in FHEM](#definition-def-in-fhem)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Set-Commands (SET)](#set-commands-set)\
@@ -55,6 +56,10 @@ Rhasspy consist of multiple modules (Hot-Word Detection, Text to Speech, Speech 
 FHEM-rhasspy evaluates parts of the MQTT traffic, converts these JSON-messages to commands and also sends messages to Rhasspy to e.g. provide responses on commands as TextToSpeech.
 
 FHEM-rhasspy uses the 00_MQTT2_CLIENT.pm module to receive and send these messages. Therefore it is necessary to define an MQTT2_CLIENT device in FHEM before using FHEM-rhasspy.
+
+## About this repository
+
+This repository contains all files to set up a complete installation to test Rhasspy and FHEM with Docker under Windows using the Windows Subsystem for Linux (WSL).\
 
 ## Installation of FHEM-rhasspy
 - Update FHEM
