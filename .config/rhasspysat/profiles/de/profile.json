@@ -1,0 +1,32 @@
+{
+    "intent": {
+        "system": "hermes"
+    },
+    "microphone": {
+        "pyaudio": {
+            "udp_audio_port": "12202"
+        },
+        "system": "pyaudio"
+    },
+    "mqtt": {
+        "enabled": "true",
+        "host": "rhasspy",
+        "port": "12183",
+        "site_id": "wohnzimmer"
+    },
+    "sounds": {
+        "system": "aplay"
+    },
+    "speech_to_text": {
+        "system": "hermes"
+    },
+    "text_to_speech": {
+        "system": "hermes"
+    },
+    "wake": {
+        "snowboy": {
+            "udp_audio": "12202"
+        },
+        "system": "snowboy"
+    }
+}

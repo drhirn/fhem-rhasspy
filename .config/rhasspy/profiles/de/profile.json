@@ -1,0 +1,18 @@
+{
+    "dialogue": {
+        "satellite_site_ids": "wohnzimmer,küche",
+        "system": "rhasspy"
+    },
+    "intent": {
+        "satellite_site_ids": "wohnzimmer,küche",
+        "system": "fsticuffs"
+    },
+    "speech_to_text": {
+        "satellite_site_ids": "wohnzimmer,küche",
+        "system": "kaldi"
+    },
+    "text_to_speech": {
+        "satellite_site_ids": "wohnzimmer,küche",
+        "system": "nanotts"
+    }
+}
