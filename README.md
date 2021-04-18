@@ -57,6 +57,7 @@ FHEM-rhasspy evaluates parts of the MQTT traffic, converts these JSON-messages t
 FHEM-rhasspy uses the 00_MQTT2_CLIENT.pm module to receive and send these messages. Therefore it is necessary to define an MQTT2_CLIENT device in FHEM before using FHEM-rhasspy.
 
 ## Installation of FHEM-rhasspy
+- Update FHEM
 - Download a RAW-Copy of 10_RHASSPY.pm and copy it to (in most cases) `opt/fhem/FHEM`
 - Don't forget to change the ownership of the file to `fhem:dialout` (or whatever user/group FHEM is using).
 - Define a MQTT2_CLIENT device which connects to the MQTT-server Rhasspy is using. E.g.:
@@ -71,6 +72,9 @@ attr <deviceName> clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE
 ```
 attr <deviceName> subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded
 ```
+
+**Important**: The attribute `clientOrder` ist not available in older version of MQTT2_CLIENT. Be sure to use an up-to-date version of this module.
+
 
 ## Definition (DEF) in FHEM
 You can define a new instance of this module with:
