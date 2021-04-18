@@ -7,5 +7,6 @@ opt/
 !.config/rhasspy/profiles/de/profile.json
 !.config/rhasspy/profiles/de/sentences.ini
 !.config/rhasspy/profiles/de/intents
+!.config/rhasspy/profiles/de/converters
 !.config/rhasspysat/profiles/de/profile.json
 
