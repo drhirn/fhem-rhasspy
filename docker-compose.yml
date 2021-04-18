@@ -1,0 +1,46 @@
+version: '3'
+
+services:
+    fhem:
+        image: fhem/fhem
+        container_name: fhem
+        restart: unless-stopped
+        ports:
+            - 8083:8083
+        volumes:
+            - ./opt/fhem/:/opt/fhem/
+        environment:
+            TZ: Europe/Vienna
+
+    rhasspy:
+        image: rhasspy/rhasspy
+        container_name: rhasspy
+        restart: unless-stopped
+        depends_on:
+            - fhem
+        volumes:
+            - .config/rhasspy/profiles:/profiles
+        ports:
+            - 12101:12101
+            - 12183:12183
+            - 12202:12202/udp
+        command: --user-profiles /profiles --profile de
+        environment:
+            TZ: Europe/Vienna
+
+    rhasspysat:
+        image: rhasspy/rhasspy
+        container_name: rhasspysat
+        depends_on:
+            - fhem
+            - rhasspy
+        restart: unless-stopped
+        volumes:
+            - .config/rhasspysat/profiles:/profiles
+            - ./asound.conf:/etc/asound.conf
+        ports:
+            - 13101:12101
+        command: --user-profiles /profiles --profile de
+        environment:
+            - PULSE_SERVER=host.docker.internal
+            TZ: Europe/Vienna
