@@ -10,7 +10,7 @@ services:
         volumes:
             - ./opt/fhem/:/opt/fhem/
         environment:
-            TZ: Europe/Vienna
+            - TZ=Europe/Vienna
 
     rhasspy:
         image: rhasspy/rhasspy
@@ -26,7 +26,7 @@ services:
             - 12202:12202/udp
         command: --user-profiles /profiles --profile de
         environment:
-            TZ: Europe/Vienna
+            - TZ=Europe/Vienna
 
     rhasspysat:
         image: rhasspy/rhasspy
@@ -43,4 +43,4 @@ services:
         command: --user-profiles /profiles --profile de
         environment:
             - PULSE_SERVER=host.docker.internal
-            TZ: Europe/Vienna
+            - TZ=Europe/Vienna
