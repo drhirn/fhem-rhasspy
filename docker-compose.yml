@@ -2,7 +2,7 @@ version: '3'
 
 services:
     fhem:
-        image: fhem/fhem
+        image: fhem/fhem:dev
         container_name: fhem
         restart: unless-stopped
         ports:
