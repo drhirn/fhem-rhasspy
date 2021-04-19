@@ -323,7 +323,7 @@ sub RHASSPY_Define {
     my $Rhasspy  = $h->{baseUrl} // shift @{$anon} // q{http://127.0.0.1:12101};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = "0.4.9";
+    $hash->{MODULE_VERSION} = '0.4.9';
     $hash->{baseUrl} = $Rhasspy;
     $hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
@@ -902,12 +902,12 @@ sub _analyze_genDevType {
     if (!defined AttrVal($device,"${prefix}Name", undef)) {
 
         $attrv = AttrVal($device,'alexaName', undef);
-        push @names, split m{;}x, $attrv if $attrv;
+        push @names, split m{;}x, lc $attrv if $attrv;
 
         $attrv = AttrVal($device,'siriName',undef);
-        push @names, split m{,}x, $attrv if $attrv;
+        push @names, split m{,}x, lc $attrv if $attrv;
 
-        my $alias = AttrVal($device,'alias',undef);
+        my $alias = lc AttrVal($device,'alias',undef);
         $names[0] = $alias if !@names && $alias;
         $names[0] = $device if !@names;
     }
