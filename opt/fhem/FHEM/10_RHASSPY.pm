@@ -1784,7 +1784,7 @@ sub RHASSPY_Parse {
         # Name mit IODev vergleichen
         next if $ioname ne AttrVal($hash->{NAME}, 'IODev', undef);
         next if IsDisabled( $hash->{NAME} );
-        my $topicpart = qq{/$hash->{LANGUAGE}\.$hash->{fhemId}\[._]|\Ahermes/dialogueManager};
+        my $topicpart = qq{/$hash->{LANGUAGE}\.$hash->{fhemId}\[._]|hermes/dialogueManager};
         next if $topic !~ m{$topicpart}x;
 
         Log3($hash,5,"RHASSPY: [$hash->{NAME}] Parse (IO: ${ioname}): Msg: $topic => $value");
