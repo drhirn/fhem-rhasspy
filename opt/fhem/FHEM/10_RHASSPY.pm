@@ -1784,7 +1784,7 @@ sub RHASSPY_Parse {
         # Name mit IODev vergleichen
         next if $ioname ne AttrVal($hash->{NAME}, 'IODev', undef);
         next if IsDisabled( $hash->{NAME} );
-        my $topicpart = qq{/$hash->{LANGUAGE}\.$hash->{fhemId}\[._]};
+        my $topicpart = qq{/$hash->{LANGUAGE}\.$hash->{fhemId}\[._]|\Ahermes/dialogueManager};
         next if $topic !~ m{$topicpart}x;
 
         Log3($hash,5,"RHASSPY: [$hash->{NAME}] Parse (IO: ${ioname}): Msg: $topic => $value");
@@ -1841,9 +1841,9 @@ my $dispatchFns = {
 
 # Daten vom MQTT Modul empfangen -> Device und Room ersetzen, dann erneut an NLU übergeben
 sub RHASSPY_onmessage {
-    my $hash    = shift // return;
-    my $topic   = shift // carp q[No topic provided!]   && return;
-    my $message = shift // carp q[No message provided!] && return;;
+    my $hash    = shift;# // return;
+    my $topic   = shift;# // carp q[No topic provided!]   && return;
+    my $message = shift;# // carp q[No message provided!] && return;;
     
     my $data    = RHASSPY_parseJSON($hash, $message);
     my $fhemId  = $hash->{fhemId};
@@ -1862,7 +1862,7 @@ sub RHASSPY_onmessage {
         my $reading = makeReadingName($siteId);
         $mute = ReadingsNum($hash->{NAME},"mute_$reading",0);
     }
-    
+
     # Hotword detection
     if ($topic =~ m{\Ahermes/dialogueManager}x) {
         my $room = RHASSPY_roomName($hash, $data);
@@ -3352,32 +3352,27 @@ https://forum.fhem.de/index.php/topic,113180.msg1130754.html#msg1130754
 <h3>RHASSPY</h3>
 <p>
 <ul>
-<p>This module receives, processes and executes voice commands coming from Rhasspy voice assistent.</p>
-<ul>At the moment, there's been a lot of changes to the code base, so 
-<li><b>not everything may work as expeced, FHEM may even crash!</b></li>
-<li>not everything mentionned here is fully implemented, ideas that may come are marked with an Asterix <b>*)</b>.</li>
-</ul>
-</p>
-<a id="RHASSPY-define"></a>
-<p><b>Define</b></p>
-<p><code>define &lt;name&gt; RHASSPY &lt;baseUrl&gt; &lt;devspec&gt; &lt;defaultRoom&gt; &lt;language&gt; &lt;fhemId&gt; &lt;prefix&gt; &lt;useGenericAttrs&gt; &lt;encoding&gt;</code></p>
-    <a id="RHASSPY-parseParams"></a><b>General Remark:</b> RHASSPY uses <a href="https://wiki.fhem.de/wiki/DevelopmentModuleAPI#parseParams"><b>parseParams</b></a> at quite a lot places, not only in define, but also to parse attribute values. <p>
-    So all parameters in define should be provided in the <i><b>key=value</i></b> form. In other places you may have to start e.g. a single line in an attribute with <code>option:key="value xy shall be z"</code> or <code>identifier:yourCode={fhem("set device off")} anotherOption=blabla</code> form. <br>
-    <b>All parameters in define are optional, but changing them later might lead to confusing results*)!</b>
-<ul>
-  <li><b>baseUrl</b>: http-address of the Rhasspy service web-interface. Optional. Default is <code>baseUrl=http://127.0.0.1:12101</code>.<br>Make sure, this is set to correct values (IP and Port!</li>
-  <li><b>devspec</b>: A description of devices that should be controlled by Rhasspy. Optional. Default is <code>devspec=room=Rhasspy</code>, see <a href="#devspec"> as a reference</a>, how to e.g. use a comma-separated list of devices or combinations like <code>devspec=room=livingroom,room=bathroom,bedroomlamp</code>.</li>
-  <li><b>defaultRoom</b>: Default room name. Used to speak commands without a room name (e.g. &quot;turn lights on&quot; to turn on the lights in the &quot;default room&quot;). Optional. Default is <code>defaultRoom=default</code>.<br>
-  <a id="RHASSPY-genericDeviceType"></a>Note: Additionaly, either one of the "special" attributes provided by RHASSPY or a known <i>genericDeviceType</i> (atm: switch, light, thermostat, blind and *)media are supported).</li>
-  <li><b>language</b>: Makes part of the topic tree, RHASSPY is listening to. Should (but needs not to) point to the language voice commands shall be spoken with. Default is derived from global, which defaults to <code>language=en</code></li>
-  <li><b>encoding</b>: May be helpfull in case you experience problems in conversion between RHASSPY (module) and Rhasspy (service). Example: <code>encoding=cp-1252</code>
-  <li><b>fhemId</b>: May be used to distinguishe between different instances of RHASSPY on the MQTT side. Also makes part of the topic tree the corresponding RHASSPY is listening to.<br>
-  Might be usefull, if you have several instances of FHEM running, and *) may be a criteria to distinguishe between different users (e.g. to only allow a subset of commands and/or rooms to be addressed).</li>
-  <li><b>prefix</b>: May be used to distinguishe between different instances of RHASSPY on the FHEM-internal side.<br>
-  Might be usefull, if you have several instances of RHASSPY in one FHEM running and want e.g. to use different identifier for groups and rooms (e.g. a different language).</li>
-  <li><b>useGenericAttrs</b>: By default, RHASSPY only uses it's own attributes (see list below) to identifiy options for the subordinated devices you want to control. Activating this with <code>useGenericAttrs=1</code> adds <code>genericDeviceType</code> to the global attribute list ( *) for the future also <code>homebridgeMapping</code> may also be on the list) and activates RHASSPY's feature to estimate appropriate settings - similar to rhasspyMapping.
-  </li>
-</ul>
+  <p>This module receives, processes and executes voice commands coming from <a href="https://rhasspy.readthedocs.io/en/latest/">Rhasspy voice assistent</a>.</p>
+
+  <a id="RHASSPY-define"></a>
+  <h4>Define</h4>
+  <p><code>define &lt;name&gt; RHASSPY &lt;baseUrl&gt; &lt;devspec&gt; &lt;defaultRoom&gt; &lt;language&gt; &lt;fhemId&gt; &lt;prefix&gt; &lt;useGenericAttrs&gt; &lt;encoding&gt;</code></p>
+  <p><b>All parameters in define are optional, but changing them later might lead to confusing results!</b></p>
+  <p><a id="RHASSPY-parseParams"></a><b>General Remark:</b> RHASSPY uses <a href="https://wiki.fhem.de/wiki/DevelopmentModuleAPI#parseParams"><b>parseParams</b></a> at quite a lot places, not only in define, but also to parse attribute values.<br>
+So all parameters in define should be provided in the <i><b>key=value</i></b> form. In other places you may have to start e.g. a single line in an attribute with <code>option:key="value xy shall be z"</code> or <code>identifier:yourCode={fhem("set device off")} anotherOption=blabla</code> form.</p>
+
+  <ul>
+    <li><b>baseUrl</b>: http-address of the Rhasspy service web-interface. Optional. Default is <code>baseUrl=http://127.0.0.1:12101</code>.<br>Make sure, this is set to correct values (ip and port)</li>
+    <li><b>devspec</b>: A description of devices that should be controlled by Rhasspy. Optional. Default is <code>devspec=room=Rhasspy</code>, see <a href="#devspec"> as a reference</a>, how to e.g. use a comma-separated list of devices or combinations like <code>devspec=room=livingroom,room=bathroom,bedroomlamp</code>.</li>
+    <li><b>defaultRoom</b>: Default room name. Used to speak commands without a room name (e.g. &quot;turn lights on&quot; to turn on the lights in the &quot;default room&quot;). Optional. Default is <code>defaultRoom=default</code>.</li>
+    <li><b>language</b>: Makes part of the topic tree, RHASSPY is listening to. Should (but needs not to) point to the language voice commands shall be spoken with. Default is derived from global, which defaults to <code>language=en</code></li>
+    <li><b>encoding</b>: May be helpfull in case you experience problems in conversion between RHASSPY (module) and Rhasspy (service). Example: <code>encoding=cp-1252</code>
+    <li><b>fhemId</b>: May be used to distinguishe between different instances of RHASSPY on the MQTT side. Also makes part of the topic tree the corresponding RHASSPY is listening to.<br>
+        Might be usefull, if you have several instances of FHEM running, and may - in later versions - be a criteria to distinguish between different users (e.g. to only allow a subset of commands and/or rooms to be addressed).</li>
+    <li><b>prefix</b>: May be used to distinguishe between different instances of RHASSPY on the FHEM-internal side.<br>
+        Might be usefull, if you have several instances of RHASSPY in one FHEM running and want e.g. to use different identifier for groups and rooms (e.g. a different language).</li>
+    <li><b>useGenericAttrs</b>: By default, RHASSPY only uses it's own attributes (see list below) to identifiy options for the subordinated devices you want to control. Activating this with <code>useGenericAttrs=1</code> adds <code>genericDeviceType</code> to the global attribute list and activates RHASSPY's feature to estimate appropriate settings - similar to rhasspyMapping. In later versions <code>homebridgeMapping</code> may also be on the list.</li>
+  </ul>
 <p>RHASSPY needs a <a href="#MQTT2_CLIENT">MQTT2_CLIENT</a> device connected to the same MQTT-Server as the voice assistant (Rhasspy) service.</p>
 <p>Example for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</p>
 <p>
