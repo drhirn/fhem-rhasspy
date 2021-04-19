@@ -1,9 +1,12 @@
+.~lock*
 opt/
+optT/
 !opt/fhem/fhem.cfg
 !opt/fhem/FHEM/10_RHASSPY.pm
 !opt/fhem/FHEM/rhasspy-de.cfg
 !opt/fhem/FHEM/99_myUtils.pm
 .config/
+.configT/
 !.config/rhasspy/profiles/de/profile.json
 !.config/rhasspy/profiles/de/sentences.ini
 !.config/rhasspy/profiles/de/intents
