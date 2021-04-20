@@ -97,6 +97,7 @@ All parameters are optional but changing some of them later may result in confus
 * `fhemId`: Used to differ between multiple instances of RHASSPY on the MQTT side. Also is a part of the topic tree the corresponding RHASSPY is listening to. Default is `fhemId=fhem`.
 * `prefix`: Used to differ between multiple instances of RHASSPY on the FHEM-internal side. Usefull, if you have several instances of RHASSPY in one FHEM running and want e.g. to use different identifier for groups and rooms (e.g. a different language). Default is `prefix=rhasspy`.
 * `useGenericAttrs`: By default, RHASSPY beside it's own attributes (see list below) also uses the general _genericDeviceType_ attribute (also used by other speech control solutions) to identifiy options for the subordinated devices you want to control. Set this to zero, if you want to deactivate this feature: `useGenericAttrs=0`. When not deactivated,  `genericDeviceType` will be added to the _global_ attribute list. Additionally this feature enables RHASSPYs feature to estimate appropriate settings - similar to _rhasspyMapping_. If you are not happy with the results, you may replace them by setting appropriate values in _rhasspyMapping_.
+* `encoding`: If there are any problems with mutated vowels it's possible to set a specific character encoding. Default is _none_ which in most cases is UTF-8.
 
 Simple-Example:
 ```
@@ -105,7 +106,7 @@ define Rhasspy RHASSPY
 
 Full-Example:
 ```
-define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceType=.+ defaultRoom=livingroom language=es fhemId=fhem1 prefix=rhasspy2 useGenericAttrs=0
+define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceType=.+ defaultRoom=wohnzimmer language=de fhemId=fhem1 prefix=rhasspy2 useGenericAttrs=0 encoding=cp-1252
 ```
 
 ### Set-Commands (SET)
