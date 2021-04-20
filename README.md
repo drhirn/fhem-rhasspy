@@ -59,15 +59,15 @@ FHEM-rhasspy uses the 00_MQTT2_CLIENT.pm module to receive and send these messag
 
 ## About this repository
 
-This repository contains all files to set up a complete installation to test Rhasspy and FHEM with Docker under Windows using the Windows Subsystem for Linux (WSL).\
+This repository contains all files to set up a complete installation to test Rhasspy and FHEM with Docker under Windows using the Windows Subsystem for Linux (WSL).
 
 ## Installation of FHEM-rhasspy
 - Update FHEM
-- Download a RAW-Copy of 10_RHASSPY.pm and copy it to (in most cases) `opt/fhem/FHEM`
-- Don't forget to change the ownership of the file to `fhem:dialout` (or whatever user/group FHEM is using).
+- Download a RAW-Copy of 10_RHASSPY.pm and copy it to your FHEM directory (in most cases `opt/fhem/FHEM`)
+- Don't forget to change the ownership of the file to `fhem:dialout` (or whatever user/group FHEM is using)
 - Define a MQTT2_CLIENT device which connects to the MQTT-server Rhasspy is using. E.g.:
 ```
-define <deviceName> MQTT2_CLIENT <ip-or-hostname-of-mqtt-server>:12183 
+define <deviceName> MQTT2_CLIENT <ip-or-hostname-of-mqtt-server>:<port> 
 ```
 - Change the `clientOrder` to set the right notification order:
 ```
@@ -88,11 +88,12 @@ You can define a new instance of this module with:
 define <name> RHASSPY <baseUrl> <devspec> <defaultRoom> <language> <fhemId> <prefix> <useGenericAttrs> <encoding>
 ```
 
-All parameters are optional but changing some of them later may result in confusing results. So it's recommended to especially check if _fhemId_ and/or _prefix_ really have to be set different than the defaults (in most cases, these are for advanced configuration (e.g. multiple languages), so when starting with RHASSPY, you may not care much about that).
+All parameters are optional but changing some of them later may result in confusing results. So it's recommended to especially check if _fhemId_ and/or _prefix_ really have to be set different than the defaults. In most cases, these two are for advanced configuration (e.g. multiple languages), so when starting with RHASSPY, you may not care much about that.
 
 * `baseUrl`: The url of the Rhasspy service web-interface. If using a base and multiple satellites, use the url of the base. Default is `baseUrl=http://127.0.0.1:12101`. Make sure, this is set to correct values (IP and Port)!
-* `devspec`: [devspec](https://commandref.fhem.de/commandref.html#devspec) of the device(s) that should be controlled with Rhasspy. For backwards compability, default is `devspec=room=Rhasspy`, but you may use e.g. just a comma separated list of devices you want to interact with Rhasspy. Without match to devspec, no device can interact with RHASSPY, regardless if you set any of the further attributes to configure them!
+* `devspec`: [devspec](https://commandref.fhem.de/commandref.html#devspec) of the device(s) that should be controlled with Rhasspy. For backwards compability, default is `devspec=room=Rhasspy`, but you may use e.g. just a comma separated list of devices you want to interact with Rhasspy. Without a match to devspec, no device can interact with RHASSPY, regardless if you set any of the further attributes to configure them.
 * `defaultRoom`: Name of the default room which should be used if no room-name is present in the command. Default is `defaultRoom=default`.
+
 * `language`: Language of the voice commands spoken to Rhasspy. Default is derived from global, which defaults to `language=en`.
 * `fhemId`: Used to differ between multiple instances of RHASSPY on the MQTT side. Also is a part of the topic tree the corresponding RHASSPY is listening to. Default is `fhemId=fhem`.
 * `prefix`: Used to differ between multiple instances of RHASSPY on the FHEM-internal side. Usefull, if you have several instances of RHASSPY in one FHEM running and want e.g. to use different identifier for groups and rooms (e.g. a different language). Default is `prefix=rhasspy`.
