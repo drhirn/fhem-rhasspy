@@ -114,6 +114,7 @@ All parameters are optional but changing some of them later may result in confus
 * **`encoding`**\
   If there are any problems with mutated vowels it's possible to set a specific character encoding. Default is _none_ which in most cases is UTF-8.
 
+
 Simple-Example:
 ```
 define Rhasspy RHASSPY
