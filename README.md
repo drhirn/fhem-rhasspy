@@ -90,7 +90,8 @@ define <name> RHASSPY <baseUrl> <devspec> <defaultRoom> <language> <fhemId> <pre
 
 All parameters are optional but changing some of them later may result in confusing results. So it's recommended to especially check if _fhemId_ and/or _prefix_ really have to be set different than the defaults. In most cases, these two are for advanced configuration (e.g. multiple languages), so when starting with RHASSPY, you may not care much about that.
 
-* `baseUrl`: The url of the Rhasspy service web-interface. If using a base and multiple satellites, use the url of the base. Make sure, this is set to correct values (IP and Port)! Default is `baseUrl=http://127.0.0.1:12101`.
+* **`baseUrl`**\
+  The url of the Rhasspy service web-interface. If using a base and multiple satellites, use the url of the base. Make sure, this is set to correct values (IP and Port)! Default is `baseUrl=http://127.0.0.1:12101`.
 * `devspec`: [devspec](https://commandref.fhem.de/commandref.html#devspec) of the device(s) that should be controlled with Rhasspy. For backwards compability, default is `devspec=room=Rhasspy`, but you may use e.g. just a comma separated list of devices you want to interact with Rhasspy. Without a match to devspec, no device can interact with RHASSPY, regardless if you set any of the further attributes to configure them.
 * `defaultRoom`: Name of the default room which should be used if no room-name is present in the command and no suitable room can be found for the device. Default is `defaultRoom=default`.
 * `language`: Language of the voice commands spoken to Rhasspy. Default is derived from _global_-device, which defaults to `language=en`.
