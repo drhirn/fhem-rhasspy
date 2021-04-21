@@ -36,7 +36,7 @@ use GPUtils qw(:all);
 use JSON;
 use Encode;
 use HttpUtils;
-use List::Util 1.45 qw(max min any uniq);
+use List::Util 1.45 qw(max min uniq);
 use Data::Dumper;
 
 sub ::RHASSPY_Initialize { goto &RHASSPY_Initialize }
@@ -322,10 +322,11 @@ sub RHASSPY_Define {
     my $type = shift @{$anon};
     my $Rhasspy  = $h->{baseUrl} // shift @{$anon} // q{http://127.0.0.1:12101};
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
+    $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
     $hash->{MODULE_VERSION} = '0.4.9';
     $hash->{baseUrl} = $Rhasspy;
-    $hash->{helper}{defaultRoom} = $defaultRoom;
+    #$hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
     $hash->{devspec} = $h->{devspec} // q{room=Rhasspy};
@@ -665,6 +666,7 @@ sub initialize_rhasspyTweaks {
             next;
         }
 
+=pod
         if ($line =~ m{\A[\s]*timerTrigger[\s]*=}x) {
             ($tweak, $values) = split m{=}x, $line, 2;
             $tweak = trim($tweak);
@@ -674,6 +676,7 @@ sub initialize_rhasspyTweaks {
             $hash->{helper}{tweaks}{$tweak} = join q{,}, @{$unnamedParams};
             next;
         }
+=cut
     }
     return;
 }
@@ -758,39 +761,7 @@ sub initialize_devicemap {
         _analyze_genDevType($hash, $_) if $hash->{useGenericAttrs};
         _analyze_rhassypAttr($hash, $_);
     }
-=pod    
-    $room = RHASSPY_roomName($hash, $data);
-    => $data->{Room} oder defaultRoom 
-    
-    
-    $device = RHASSPY_getDeviceByName($hash, $room, $data->{Device});
-        $room oder $name müssen übergeben werden, es werden alle Devices mit passendem rhasspyName auf Übereinstimmung mit $room gecheckt 
-        => Hash mit {$room}{rhasspyName}{FHEM-Device-Name}? (done)
-    
-    $device = RHASSPY_getDeviceByIntentAndType($hash, $room, $intent, $type); 
-        erst wird an RHASSPY_getDevicesByIntentAndType() übergeben => 
-            mapping wird ermittelt, zurückgegeben werden zwei Listen mit passenden mappings (im $room => @matchesInRoom / außerhalb $room)
-        dann wird entweder das erste Device aus @matchesInRoom zurückgegeben, oder ersatzweise erste Device aus dem 2. Array
-        
-    $device = RHASSPY_getActiveDeviceForIntentAndType($hash, $room, $intent, undef);
-        1. RHASSPY_getDevicesByIntentAndType() übergeben (s.o)
-        2. erst in $room, dann "outside":
-           a) RHASSPY_getMapping (GetOnOff) 
-           b) RHASSPY_getOnOffState aus a)
-        
-    $device = RHASSPY_getDeviceByMediaChannel($hash, $room, $channel);
-        1. alle Devices sammeln, 
-        2. rausfiltern, was diesen $channel kennt
-        3. erster Treffer wird device, es sei denn, es wird was im passenden $room gefunden
-            => Hash mit {$channel}{$room}{FHEM-Device-Name}?
-    
-    $mapping = RHASSPY_getMapping($hash, $device, $intent, $type) if defined $device;
-        $type kann ggf. offen bleiben
-        => Hash mit {FHEM-Device-Name}{$intent}{$type}?
-    
-    
-    
-=cut
+
     return;
 }
 
@@ -814,21 +785,22 @@ sub _analyze_rhassypAttr {
     @rooms = split m{,}x, lc $attrv if defined $attrv;
     @rooms = split m{,}xi, $hash->{helper}{devicemap}{devices}{$device}->{rooms} if !@rooms && defined $hash->{helper}{devicemap}{devices}{$device}->{rooms};
     if (!@rooms) {
-        $rooms[0] = $hash->{helper}{defaultRoom};
+        $rooms[0] = $hash->{defaultRoom};
     }
     $hash->{helper}{devicemap}{devices}{$device}->{rooms} = join q{,}, @rooms;
 
     #rhasspyNames ermitteln
     my @names;
-    $attrv = AttrVal($device,"${prefix}Name",undef);
-    push @names, split m{,}x, lc $attrv if $attrv;
-    $hash->{helper}{devicemap}{devices}{$device}->{alias} = $names[0] if $attrv;
-    
+    $attrv = AttrVal($device,"${prefix}Name",AttrVal($device,'alias',$device));
+    push @names, split m{,}x, lc $attrv;
+    $hash->{helper}{devicemap}{devices}{$device}->{alias} = $names[0];
+
     for my $dn (@names) {
        for (@rooms) {
            $hash->{helper}{devicemap}{rhasspyRooms}{$_}{$dn} = $device;
        }
     }
+    $hash->{helper}{devicemap}{devices}{$device}->{names} = join q{,}, @names;
 
     for my $item ('Channels', 'Colors') {
         my @rows = split m{\n}x, AttrVal($device, "${prefix}${item}", q{});
@@ -907,28 +879,24 @@ sub _analyze_genDevType {
         $attrv = AttrVal($device,'siriName',undef);
         push @names, split m{,}x, lc $attrv if $attrv;
 
-        my $alias = lc AttrVal($device,'alias',undef);
-        $names[0] = $alias if !@names && $alias;
-        $names[0] = $device if !@names;
+        my $alias = lc AttrVal($device,'alias',$device);
+        $names[0] = $alias if !@names;
     }
     $hash->{helper}{devicemap}{devices}{$device}->{alias} = $names[0] if $names[0];
 
-    #convert to lower case
-    for (@names) { $_ = lc; }
     @names = get_unique(\@names);
+    $hash->{helper}{devicemap}{devices}{$device}->{names} = join q{,}, @names if $names[0];
 
     my @rooms;
     if (!defined AttrVal($device,"${prefix}Room", undef)) {
         $attrv = AttrVal($device,'alexaRoom', undef);
-        push @rooms, split m{,}x, $attrv if $attrv;
+        push @rooms, split m{,}x, lc $attrv if $attrv;
 
         $attrv = AttrVal($device,'room',undef);
-        push @rooms, split m{,}x, $attrv if $attrv;
-        $rooms[0] = $hash->{helper}{defaultRoom} if !@rooms;
+        push @rooms, split m{,}x, lc $attrv if $attrv;
+        $rooms[0] = $hash->{defaultRoom} if !@rooms;
     }
 
-    #convert to lower case
-    for (@rooms) { $_ = lc }
     @rooms = get_unique(\@rooms);
 
     for my $dn (@names) {
@@ -937,7 +905,7 @@ sub _analyze_genDevType {
        }
     }
     $hash->{helper}{devicemap}{devices}{$device}->{rooms} = join q{,}, @rooms;
-    
+
     $attrv = AttrVal($device,'group', undef);
     $hash->{helper}{devicemap}{devices}{$device}{groups} = lc $attrv if $attrv;
 
@@ -965,6 +933,7 @@ sub _analyze_genDevType {
             $currentMapping->{SetNumeric} = {
                 brightness => { cmd => 'brightness', currentVal => 'brightness', maxVal => '255', minVal => '0', step => '10', map => 'percent', type => 'brightness'}};
         }
+        $currentMapping = _analyze_genDevType_setter( $allset, $currentMapping );
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
     }
     elsif ( $gdt eq 'thermostat' ) {
@@ -1032,14 +1001,30 @@ sub _analyze_genDevType_setter {
         }
     }
     my $allKeyMappings = {
-        SetNumeric => { volume => { cmd => 'volume', currentVal => 'volume', maxVal => '100', minVal => '0', step => '2', type => 'volume'}, 
-        channel => { cmd => 'channel', currentVal => 'channel', step => '1', type => 'channel'}
+        SetNumeric => { 
+            volume => { cmd => 'volume', currentVal => 'volume', maxVal => '100', minVal => '0', step => '2', type => 'volume'},
+            channel => { cmd => 'channel', currentVal => 'channel', step => '1', type => 'channel'}
+            },
+        SetColorParms => { hue => { cmd => 'hue', currentVal => 'hue', type => 'hue', map => 'percent'},
+            color => { cmd => 'color', currentVal => 'color', type => 'color', map => 'percent'},
+            sat => { cmd => 'sat', currentVal => 'sat', type => 'sat', map => 'percent'},
+            ct => { cmd => 'ct', currentVal => 'ct', type => 'ct', map => 'percent'},
+            rgb => { cmd => 'rgb', currentVal => 'rgb', type => 'rgb'}
             }
         };
-        for my $okey ( keys %{$allKeyMappings} ) {
+    for my $okey ( keys %{$allKeyMappings} ) {
         my $ikey = $allKeyMappings->{$okey};
         for ( keys %{$ikey} ) {
             $mapping->{$okey}->{$_} = $ikey->{$_} if $setter =~ m{\b$_[\b:\s]}xms;
+            #for my $col (qw(ct hue color sat)) {
+            if ( $_ =~ m{(ct|hue|color|sat)}xms ) {
+                my $col = $1;
+                if ($setter =~ m{\b${col}:[^\s\d]+,(?<min>[0-9.]+),(?<step>[0-9.]+),(?<max>[0-9.]+)\b}xms) {
+                    $mapping->{$okey}->{$col}->{maxVal} = $+{max};
+                    $mapping->{$okey}->{$col}->{minVal} = $+{min};
+                    $mapping->{$okey}->{$col}->{step} = $+{step};
+                }
+            }
         }
     }
     return $mapping;
@@ -1050,8 +1035,8 @@ sub RHASSPY_execute {
     my $device = shift;
     my $cmd    = shift;
     my $value  = shift;
-    my $siteId = shift // $hash->{helper}{defaultRoom};
-    $siteId = $hash->{helper}{defaultRoom} if $siteId eq 'default';
+    my $siteId = shift // $hash->{defaultRoom};
+    $siteId = $hash->{defaultRoom} if $siteId eq 'default';
 
     # Nutzervariablen setzen
     my %specials = (
@@ -1108,7 +1093,10 @@ sub RHASSPY_confirm_timer {
         RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $reaction);
         initialize_DialogManager($hash);
 
-        return $hash->{NAME};
+        my $toTrigger = $hash->{'.toTrigger'} // $hash->{NAME};
+        delete $hash->{'.toTrigger'};
+
+        return $toTrigger;
     }
     
     return $hash->{NAME};
@@ -1295,7 +1283,7 @@ sub RHASSPY_roomName {
     my $rreading = makeReadingName("siteId2room_$data->{siteId}");
     my @fromSiteId = split m{\.}x, lc $data->{siteId};
     $room = ReadingsVal($hash->{NAME}, $rreading, $fromSiteId[0]);
-    $room = $hash->{helper}{defaultRoom} if $room eq 'default' || !(length $room);
+    $room = $hash->{defaultRoom} if $room eq 'default' || !(length $room);
 
     return $room;
 }
@@ -1604,10 +1592,10 @@ sub RHASSPY_runCmd {
     my $device = shift;
     my $cmd    = shift;
     my $val    = shift; 
-    my $siteId = shift // $hash->{helper}{defaultRoom};
+    my $siteId = shift // $hash->{defaultRoom};
     my $error;
     my $returnVal;
-    $siteId = $hash->{helper}{defaultRoom} if $siteId eq 'default';
+    $siteId = $hash->{defaultRoom} if $siteId eq 'default';
 
     Log3($hash->{NAME}, 5, "runCmd called with command: $cmd");
 
@@ -2032,7 +2020,7 @@ sub RHASSPY_updateSlots {
     my $fhemId   = $hash->{fhemId};
     my $method   = q{POST};
     
-    initialize_devicemap($hash) if defined $hash->{useHash} && $hash->{useHash};
+    initialize_devicemap($hash);# if defined $hash->{useHash} && $hash->{useHash};
 
     # Collect everything and store it in arrays
     my @devices   = RHASSPY_allRhasspyNames($hash);
@@ -2064,12 +2052,26 @@ sub RHASSPY_updateSlots {
     $deviceData = {};
     my $url = q{/api/slots?overwrite_all=true};
 
+    my @gdts = (qw(switch light media blind thermostat));
+    for my $gdt (@gdts) {
+        my @names = ();
+        my @devs = devspec2array("$hash->{devspec}");
+        for my $device (@devs) {
+            push @names, split m{,}, $hash->{helper}{devicemap}{devices}{$device}->{names} if AttrVal($device, 'genericDeviceType', '') eq $gdt;;
+        }
+        @names = get_unique(\@names);
+        $deviceData->{qq(${language}.${fhemId}.Device-${gdt})} = \@names if @names;
+    }
+
+    my @allKeywords = (@groups, @rooms, @devices);
+
     $deviceData->{qq(${language}.${fhemId}.Device)}        = \@devices if @devices;
     $deviceData->{qq(${language}.${fhemId}.Room)}          = \@rooms if @rooms;
     $deviceData->{qq(${language}.${fhemId}.MediaChannels)} = \@channels if @channels;
     $deviceData->{qq(${language}.${fhemId}.Color)}         = \@colors if @colors;
     $deviceData->{qq(${language}.${fhemId}.NumericType)}   = \@types if @types;
     $deviceData->{qq(${language}.${fhemId}.Group)}         = \@groups if @groups;
+    $deviceData->{qq(${language}.${fhemId}.AllKeywords)}   = \@allKeywords if @allKeywords;
 
     $json = eval { toJSON($deviceData) };
 
@@ -2264,12 +2266,15 @@ sub RHASSPY_handleCustomIntent {
     if ( ref $error eq 'ARRAY' ) {
         $response = ${$error}[0] // RHASSPY_getResponse($hash, 'DefaultConfirmation');
         if ( ref ${$error}[0] eq 'HASH') {
-            my $timeout = ${$error}[2];
+            my $timeout = ${$error}[1];
             $timeout = defined $timeout && looks_like_number($timeout) ? $timeout : 20;
-            InternalTimer(time + $timeout, \&RHASSPY_confirm_timer, $hash, 0);
+            $hash->{'.toTrigger'} = ${$error}[1] if defined ${$error}[1];
+            return RHASSPY_confirm_timer($hash, 2, $data, $timeout, ${$error}[0]);
         }
         RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
         return ${$error}[1]; #comma separated list of devices to trigger
+    } elsif ( ref $error eq 'HASH' ) {
+        return RHASSPY_confirm_timer($hash, 2, $data, 20, $error);
     } else {
         $response = $error; # if $error && $error !~ m{Please.define.*first}x;
     }
@@ -3067,11 +3072,12 @@ sub RHASSPY_handleIntentSetTimer {
         $responseEnd =~ s{(\$\w+)}{$1}eegx;
 
         my $soundoption = $hash->{helper}{tweaks}{timerSounds}->{$label} // $hash->{helper}{tweaks}{timerSounds}->{default};
-        my $timerTrigger = $hash->{helper}{tweaks}->{timerTrigger};
+        #my $timerTrigger = $hash->{helper}{tweaks}->{timerTrigger};
         #my $addtrigger = defined $timerTrigger  && ( $timerTrigger eq 'default' || $timerTrigger =~ m{\b$label\b}x ) ? 
-        my $addtrigger = defined $timerTrigger && $label ne '' && $timerTrigger =~ m{\bdefault|$label\b}x ? 
-            qq{; trigger $name timerEnd $siteId $room $label}
-            : q{};
+        #my $addtrigger = defined $timerTrigger && $label ne '' && $timerTrigger =~ m{\bdefault|$label\b}x ? 
+        my $addtrigger =    qq{; trigger $name timerEnd $siteId $room};
+        $addtrigger .= " $label" if defined $label;
+        #    : q{};
 
         if ( !defined $soundoption ) {
             CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";deletereading $name ${roomReading}$addtrigger");
@@ -3309,6 +3315,13 @@ __END__
 
 =begin ToDo
 
+# Attribute:
+ - "shortcuts" in "rhasspyShortcuts" umbenennen
+
+# Custom Intents
+ - Bei Verwendung des Dialouges wenn man keine Antwort spricht, bricht Rhasspy ab. Die voice response "Tut mir leid, da hat etwas zu lange gedauert" wird
+   also gar nicht ausgegeben.
+
 # "rhasspySpecials" bzw. rhasspyTweaks als weitere Attribute
 Denkbare Verwendung:
 - siteId2room für mobile Geräte (Denkbare Anwendungsfälle: Auswertung BT-RSSI per Perl, aktives Setzen über ein Reading? Oder einen intent? (tweak)
@@ -3350,53 +3363,58 @@ https://forum.fhem.de/index.php/topic,113180.msg1130754.html#msg1130754
 
 <a id="RHASSPY"></a>
 <h3>RHASSPY</h3>
-<p>
-<ul>
-  <p>This module receives, processes and executes voice commands coming from <a href="https://rhasspy.readthedocs.io/en/latest/">Rhasspy voice assistent</a>.</p>
+<p>This module receives, processes and executes voice commands coming from <a href="https://rhasspy.readthedocs.io/en/latest/">Rhasspy voice assistent</a>.</p>
 
-  <a id="RHASSPY-define"></a>
-  <h4>Define</h4>
-  <p><code>define &lt;name&gt; RHASSPY &lt;baseUrl&gt; &lt;devspec&gt; &lt;defaultRoom&gt; &lt;language&gt; &lt;fhemId&gt; &lt;prefix&gt; &lt;useGenericAttrs&gt; &lt;encoding&gt;</code></p>
-  <p><b>All parameters in define are optional, but changing them later might lead to confusing results!</b></p>
-  <p><a id="RHASSPY-parseParams"></a><b>General Remark:</b> RHASSPY uses <a href="https://wiki.fhem.de/wiki/DevelopmentModuleAPI#parseParams"><b>parseParams</b></a> at quite a lot places, not only in define, but also to parse attribute values.<br>
-So all parameters in define should be provided in the <i><b>key=value</i></b> form. In other places you may have to start e.g. a single line in an attribute with <code>option:key="value xy shall be z"</code> or <code>identifier:yourCode={fhem("set device off")} anotherOption=blabla</code> form.</p>
+<a id="RHASSPY-define"></a>
+<h4>Define</h4>
+<p><code>define &lt;name&gt; RHASSPY &lt;baseUrl&gt; &lt;devspec&gt; &lt;defaultRoom&gt; &lt;language&gt; &lt;fhemId&gt; &lt;prefix&gt; &lt;useGenericAttrs&gt; &lt;encoding&gt;</code></p>
+<p><b>All parameters in define are optional, but changing them later might lead to confusing results!</b></p>
+<p><a id="RHASSPY-parseParams"></a><b>General Remark:</b> RHASSPY uses <a href="https://wiki.fhem.de/wiki/DevelopmentModuleAPI#parseParams"><b>parseParams</b></a> at quite a lot places, not only in define, but also to parse attribute values.<br>
+So all parameters in define should be provided in the <i>key=value</i> form. In other places you may have to start e.g. a single line in an attribute with <code>option:key="value xy shall be z"</code> or <code>identifier:yourCode={fhem("set device off")} anotherOption=blabla</code> form.</p>
 
-  <ul>
-    <li><b>baseUrl</b>: http-address of the Rhasspy service web-interface. Optional. Default is <code>baseUrl=http://127.0.0.1:12101</code>.<br>Make sure, this is set to correct values (ip and port)</li>
-    <li><b>devspec</b>: A description of devices that should be controlled by Rhasspy. Optional. Default is <code>devspec=room=Rhasspy</code>, see <a href="#devspec"> as a reference</a>, how to e.g. use a comma-separated list of devices or combinations like <code>devspec=room=livingroom,room=bathroom,bedroomlamp</code>.</li>
-    <li><b>defaultRoom</b>: Default room name. Used to speak commands without a room name (e.g. &quot;turn lights on&quot; to turn on the lights in the &quot;default room&quot;). Optional. Default is <code>defaultRoom=default</code>.</li>
-    <li><b>language</b>: Makes part of the topic tree, RHASSPY is listening to. Should (but needs not to) point to the language voice commands shall be spoken with. Default is derived from global, which defaults to <code>language=en</code></li>
-    <li><b>encoding</b>: May be helpfull in case you experience problems in conversion between RHASSPY (module) and Rhasspy (service). Example: <code>encoding=cp-1252</code>
-    <li><b>fhemId</b>: May be used to distinguishe between different instances of RHASSPY on the MQTT side. Also makes part of the topic tree the corresponding RHASSPY is listening to.<br>
-        Might be usefull, if you have several instances of FHEM running, and may - in later versions - be a criteria to distinguish between different users (e.g. to only allow a subset of commands and/or rooms to be addressed).</li>
-    <li><b>prefix</b>: May be used to distinguishe between different instances of RHASSPY on the FHEM-internal side.<br>
-        Might be usefull, if you have several instances of RHASSPY in one FHEM running and want e.g. to use different identifier for groups and rooms (e.g. a different language).</li>
-    <li><b>useGenericAttrs</b>: By default, RHASSPY only uses it's own attributes (see list below) to identifiy options for the subordinated devices you want to control. Activating this with <code>useGenericAttrs=1</code> adds <code>genericDeviceType</code> to the global attribute list and activates RHASSPY's feature to estimate appropriate settings - similar to rhasspyMapping. In later versions <code>homebridgeMapping</code> may also be on the list.</li>
-  </ul>
-<p>RHASSPY needs a <a href="#MQTT2_CLIENT">MQTT2_CLIENT</a> device connected to the same MQTT-Server as the voice assistant (Rhasspy) service.</p>
-<p>Example for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</p>
-<p>
-  <code><pre>defmod rhasspyMQTT2 MQTT2_CLIENT rhasspy:12183
-attr rhasspyMQTT2 clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE
-attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded</pre></code>
-  <code>define Rhasspy RHASSPY devspec=room=Rhasspy defaultRoom=Livingroom language=en</code>
-</p>
 <ul>
-  <b>Note:</b><br>
-  <a id="RHASSPY-list"></a>RHASSPY consolidates a lot of data from different sources. The <b>final data structure RHASSPY uses</b> at runtime you get using the <a href="#list">list command</a>. It's highly recommended to have a close look at this data structure, especially when starting with RHASSPY or in case something doesn't work as expected! <br> 
-  When changing something relevant within FHEM for either the data structure in<ul>
-  <li><b>RHASSPY</b> (this form is used when reffering to module or the FHEM device) or for </li>
-  <li><b>Rhasspy</b> (this form is used when reffering to the remote service), </li></ul>
-  these changes must be get to known to RHASSPY and (often, but not allways) to Rhasspy, see the different versions provided by the <a href="#RHASSPY-set-update">update command</a>.<br>
-  </li>
+  <li><b>baseUrl</b>: http-address of the Rhasspy service web-interface. Optional. Default is <code>baseUrl=http://127.0.0.1:12101</code>.<br>Make sure, this is set to correct values (ip and port)</li>
+  <li><b>devspec</b>: A description of devices that should be controlled by Rhasspy. Optional. Default is <code>devspec=room=Rhasspy</code>, see <a href="#devspec"> as a reference</a>, how to e.g. use a comma-separated list of devices or combinations like <code>devspec=room=livingroom,room=bathroom,bedroomlamp</code>.</li>
+  <li><b>defaultRoom</b>: Default room name. Used to speak commands without a room name (e.g. &quot;turn lights on&quot; to turn on the lights in the &quot;default room&quot;). Optional. Default is <code>defaultRoom=default</code>.</li>
+  <li><b>language</b>: Makes part of the topic tree, RHASSPY is listening to. Should (but needs not to) point to the language voice commands shall be spoken with. Default is derived from global, which defaults to <code>language=en</code></li>
+  <li><b>encoding</b>: May be helpfull in case you experience problems in conversion between RHASSPY (module) and Rhasspy (service). Example: <code>encoding=cp-1252</code></li>
+  <li><b>fhemId</b>: May be used to distinguishe between different instances of RHASSPY on the MQTT side. Also makes part of the topic tree the corresponding RHASSPY is listening to.<br>
+  Might be usefull, if you have several instances of FHEM running, and may - in later versions - be a criteria to distinguish between different users (e.g. to only allow a subset of commands and/or rooms to be addressed).</li>
+  <li><b>prefix</b>: May be used to distinguishe between different instances of RHASSPY on the FHEM-internal side.<br>
+  Might be usefull, if you have several instances of RHASSPY in one FHEM running and want e.g. to use different identifier for groups and rooms (e.g. a different language).</li>
+  <li><b>useGenericAttrs</b>: By default, RHASSPY only uses it's own attributes (see list below) to identifiy options for the subordinated devices you want to control. Activating this with <code>useGenericAttrs=1</code> adds <code>genericDeviceType</code> to the global attribute list and activates RHASSPY's feature to estimate appropriate settings - similar to rhasspyMapping. In later versions <code>homebridgeMapping</code> may also be on the list.</li>
 </ul>
 
+<p>RHASSPY needs a <a href="#MQTT2_CLIENT">MQTT2_CLIENT</a> device connected to the same MQTT-Server as the voice assistant (Rhasspy) service.</p>
+<p><b>Example for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</b></p>
+<p><code>defmod rhasspyMQTT2 MQTT2_CLIENT rhasspy:12183<br>
+attr rhasspyMQTT2 clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE<br>
+attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded</code></p>
+<p><code>define Rhasspy RHASSPY devspec=room=Rhasspy defaultRoom=Livingroom language=en</code></p>
+
+<p><a id="RHASSPY-list"></a><b>Note:</b> RHASSPY consolidates a lot of data from different sources. The <b>final data structure RHASSPY uses</b> at runtime can be viewed using the <a href="#list">list command</a>. It's highly recommended to have a close look at this data structure, especially when starting with RHASSPY or in case something doesn't work as expected!<br> 
+When changing something relevant within FHEM for either the data structure in</p>
+<ul>
+  <li><b>RHASSPY</b> (this form is used when reffering to module or the FHEM device) or for </li>
+  <li><b>Rhasspy</b> (this form is used when reffering to the remote service), </li>
+</ul>
+<p>these changes must be get to known to RHASSPY and (often, but not allways) to Rhasspy. See the different versions provided by the <a href="#RHASSPY-set-update">update command</a>.</p>
+
+<p><b>Additionals remarks on MQTT2-IOs:</b></p>
+<p>Using a separate MQTT server (and not the internal MQTT2_SERVER) is highly recommended, as the Rhasspy scripts also use the MQTT protocol for internal (sound!) data transfers. Best way is to either use MQTT2_CLIENT (see below) or bridge only the relevant topics from mosquitto to MQTT2_SERVER (see e.g. <a href="http://www.steves-internet-guide.com/mosquitto-bridge-configuration/">http://www.steves-internet-guide.com/mosquitto-bridge-configuration</a> for the principles). When using MQTT2_CLIENT, it's necessary to set <code>clientOrder</code> to include RHASSPY (as most likely, it's the only module listening to the CLIENT). It could be just set to <code>attr &lt;m2client&gt; clientOrder RHASSPY</code></p>
+<p>Furthermore, you are highly encouraged to restrict subscriptions only to the relevant topics:</p>
+<p><code>attr &lt;m2client&gt; subscriptions setByTheProgram</code></p>
+<p>In case you are using the MQTT server also for other purposes than Rhasspy, you have to set <code>subscriptions</code> manually to at least include the following topics additionally to the other subscriptions desired for other purposes.</p>
+<p><code>hermes/intent/+<br>
+hermes/dialogueManager/sessionStarted<br>
+hermes/dialogueManager/sessionEnded</code></p>
+
 <a id="RHASSPY-set"></a>
-<p><b>Set</b></p>
+<h4>Set</h4>
 <ul>
   <li>
-    <b><a id="RHASSPY-set-update">update</a></b><br>
-    Choose between one of the following:
+    <a id="RHASSPY-set-update"></a><b>update</b>
+    <p>Choose between one of the following:</p>
     <ul>
       <li><b>devicemap</b><br>
       When having finished the configuration work to RHASSPY and the subordinated devices, issuing a devicemap-update is mandatory, to get the RHASSPY data structure updated, inform Rhasspy on changes that may have occured (update slots) and initiate a training on updated slot values etc., see <a href="#RHASSPY-list">remarks on data structure above</a>.
@@ -3413,254 +3431,280 @@ attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
       <li><b>language</b><br>
       Reinitialization of language file.<br>
       Be sure to execute this command after changing something within in the language configuration file!<br>
-      Example: <code>set &lt;rhasspyDevice&gt update language</code>
       </li>
       <li><b>all</b><br>
       Surprise: means language file and full update to RHASSPY and Rhasspy including training.
       </li>
     </ul>
+    <p>Example: <code>set &lt;rhasspyDevice&gt; update language</code></p>
   </li>
 
   <li>
-    <b><a id="RHASSPY-set-play">play</a></b><br>
-    Send WAV file to Rhasspy.<br>
-    Both arguments (siteId and path) are required!<br>
-    Example: <code>set &lt;rhasspyDevice&gt play siteId="default" path="/opt/fhem/test.wav"</code><br>
-    You may (otionally) add number of repeats and wait time (in seconds) between repeats: <code>set &lt;rhasspyDevice&gt play siteId="default" path="./test.wav" repeats=3 wait=20</code>. <i>wait</i> defaults to 15, if only <i>repeats</i> is given.
-  </li>
-  <li>
-    <b><a id="RHASSPY-set-speak">speak</a></b><br>
-    Voice output over TTS.<br>
-    Both arguments (siteId and text) are required!<br>
-    Example: <code>set &lt;rhasspyDevice&gt speak siteId="default" text="This is a test"</code>
-  </li>
-  <li>
-    <b><a id="RHASSPY-set-textCommand">textCommand</a></b><br>
-    Send a text command to Rhasspy.<br>
-    Example: <code>set &lt;rhasspyDevice&gt textCommand turn the light on</code>
-  </li>
-  <li><b>fetchSiteIds</b>
-    Send a request to Rhasspy to send all siteId's. This by default is done once, so in case you add more satellites to your system, this may help to get RHASSPY updated.
+    <a id="RHASSPY-set-play"></a><b>play</b>
+    <p>Send WAV file to Rhasspy.<br>
+    <i>siteId</i> and <i>path</i> are required!<br>
+    You may optionally add a number of repeats and a wait time in seconds between repeats. <i>wait</i> defaults to 15, if only <i>repeats</i> is given.</p>
+    <p>Examples:<br>
+      <code>set &lt;rhasspyDevice&gt; play siteId="default" path="/opt/fhem/test.wav"</code><br>
+      <code>set &lt;rhasspyDevice&gt; play siteId="default" path="./test.wav" repeats=3 wait=20</code>
+    </p>
   </li>
 
   <li>
-    <i><b>trainRhasspy</b><br>
-    Sends a train-command to the HTTP-API of the Rhasspy master.<br>
-    As prerequisite, <i>Rhasspy</i> (in define) has to point to correct IP and Port.<br>
-    Example: <code>set &lt;rhasspyDevice&gt; trainRhasspy</code><br>
-    *) Might be removed in the future in favor of the update features</i>
+    <a id="RHASSPY-set-speak"></a><b>speak</b>
+    <p>Voice output over TTS.<br>
+    Both arguments (siteId and text) are required!</p>
+    <p>Example:<br>
+    <code>set &lt;rhasspyDevice&gt; speak siteId="default" text="This is a test"</code></p>
   </li>
 
   <li>
-    <b><a id="RHASSPY-set-volume">volume</a></b><br>
-    Sets volume of given siteId between 0 and 1 (float)<br>
-    Both arguments (siteId and volume) are required!<br>
-    Example: <code>set &lt;rhasspyDevice&gt; siteId="default" volume="0.5"</code>
-  </li>
-  <li>
-    <b><a id="RHASSPY-set-customSlot">customSlot</a></b><br>
-    Provide slotname, slotdata and (optional) info, if existing data shall be overwritten and training shall be initialized immediately afterwards. 
-    First two arguments are required, third and fourth are optional!<br>
-    <i>overwrite</i> defaults to <i>true</i>, setting any other value than <i>true</i> will keep existing Rhasspy slot data.<br>
-    Examples: <code>set &lt;rhasspyDevice&gt; customSlot mySlot a,b,c overwrite training </code> or 
-    <code>set &lt;rhasspyDevice&gt; customSlot slotname=mySlot slotdata=a,b,c overwrite=false</code>
+    <a id="RHASSPY-set-textCommand"></a><b>textCommand</b>
+    <p>Send a text command to Rhasspy.</p>
+    <p>Example:<br>
+    <code>set &lt;rhasspyDevice&gt; textCommand turn the light on</code></p>
   </li>
 
+  <li>
+    <a id="RHASSPY-set-fetchSiteIds"></a><b>fetchSiteIds</b>
+    <p>Send a request to Rhasspy to send all siteId's. This by default is done once, so in case you add more satellites to your system, this may help to get RHASSPY updated.</p>
+    <p>Example:<br>
+    <code>set &lt;rhasspyDevice&gt; fetchSiteIds</code></p>
+  </li>
+
+  <li>
+    <a id="RHASSPY-set-trainRhasspy"></a><b>trainRhasspy</b>
+    <p>Sends a train-command to the HTTP-API of the Rhasspy master<br>
+    Might be removed in the future versions in favor of the update features</p>
+    <p>Example:<br>
+    <code>set &lt;rhasspyDevice&gt; trainRhasspy</code></p>
+  </li>
+
+  <li>
+    <a id="RHASSPY-set-volume"></a><b>volume</b>
+    <p>Sets volume of given siteId between 0 and 1 (float)<br>
+    Both arguments (siteId and volume) are required!</p>
+    <p>Example:<br>
+    <code>set &lt;rhasspyDevice&gt; siteId="default" volume="0.5"</code></p>
+  </li>
+
+  <li>
+    <a id="RHASSPY-set-customSlot"></a><b>customSlot</b>
+    <p>Creates a new - or overwrites an existing slot - in Rhasspy<br>
+    Provide slotname, slotdata and (optional) info, if existing data shall be overwritten and training shall be initialized immediately afterwards.<br>
+    First two arguments are required, third and fourth are optional.<br>
+    <i>overwrite</i> defaults to <i>true</i>, setting any other value than <i>true</i> will keep existing Rhasspy slot data.</p>
+    <p>Examples:<br>
+    <code>set &lt;rhasspyDevice&gt; customSlot mySlot a,b,c overwrite training </code><br>
+    <code>set &lt;rhasspyDevice&gt; customSlot slotname=mySlot slotdata=a,b,c overwrite=false</code></p>
+  </li>
 </ul>
+
 <a id="RHASSPY-attr"></a>
-<p><b>Attributes</b></p>
-    Note: To get RHASSPY to work properly, you have to configure attributes at RHASSPY itself and the subordinated devices as well! 
-   <p><b>RHASSPY itself</b> supports the following attributes:</p>
-  <ul>
+<h4>Attributes</h4>
+<p>Note: To get RHASSPY working properly, you have to configure attributes at RHASSPY itself and the subordinated devices as well.</p>
+
+<a id="RHASSPY-attr-device"></a>
+<p><b>RHASSPY itself</b> supports the following attributes:</p>
+<ul>
   <li>
-    <a id="RHASSPY-attr-configFile"></a><b>configFile</b>
-    Path to the language-config file. If this attribute isn't set, a default set of english responses is used for voice responses.<br>
-    Example (placed in the same dir fhem.pl is located): <code>attr &lt;rhasspyDevice&gt; configFile ./rhasspy-de.cfg</code>
-    The file itself must contain a JSON-encoded keyword-value structure (partly with sub-structures) following the given structure for the mentionned english defaults. As a reference, there's one available in German also, or just make a dump of the English structure with e.g. (replace RHASSPY by your device's name): <br><code>{toJSON($defs{RHASSPY}->{helper}{lng})}</code>, edit the result e.g. using https://jsoneditoronline.org and place this in your own configFile version. There might be some variables to be used - these should also work in your sentences.<br>
-    configFile also allows combining e.g. a default set of German sentences with some few own modifications by using "defaults" subtree for the defaults and "user" subtree for your modified versions. This feature might be helpfull in case the base language structure has to be changed in the future.
+    <a id="RHASSPY-attr-configFile"></a><b>configFile</b><br>
+    <p>Path to the language-config file. If this attribute isn't set, a default set of english responses is used for voice responses.<br>
+    The file itself must contain a JSON-encoded keyword-value structure (partly with sub-structures) following the given structure for the mentioned english defaults. As a reference, there's one available in german, or just make a dump of the English structure with e.g. (replace RHASSPY by your device's name): <code>{toJSON($defs{RHASSPY}->{helper}{lng})}</code>, edit the result e.g. using https://jsoneditoronline.org and place this in your own configFile version. There might be some variables to be used - these should also work in your sentences.<br>
+    configFile also allows combining e.g. a default set of german sentences with some few own modifications by using "defaults" subtree for the defaults and "user" subtree for your modified versions. This feature might be helpful in case the base language structure has to be changed in the future.</p>
+    <p>Example (placed in the same dir fhem.pl is located):</p>
+    <p><code>attr &lt;rhasspyDevice&gt; configFile ./rhasspy-de.cfg</code></p>
   </li>
+
   <li>
-    <b>response</b><br>
-    Optionally define alternative default answers. Available keywords are <code>DefaultError</code>, <code>NoActiveMediaDevice</code> and <code>DefaultConfirmation</code>.<br>
-    Example:
-    <pre><code>DefaultError=
-DefaultConfirmation=Klaro, mach ich</code></pre><p>
-    Note: Kept for compability reasons. Consider using configFile instead!
+    <a id="RHASSPY-attr-response"></a><b>response</b>
+    <p><b>Not recommended. Use the language-file instead.</b></p>
+    <p>Optionally define alternative default answers. Available keywords are <code>DefaultError</code>, <code>NoActiveMediaDevice</code> and <code>DefaultConfirmation</code>.</p>
+    <p>Example:</p>
+    <p><code>DefaultError=
+DefaultConfirmation=Klaro, mach ich</code></p>
   </li>
+
   <li>
-    <a id="RHASSPY-attr-rhasspyIntents"></a><b>rhasspyIntents</b><br>
-    Optional, defines custom intents. See <a href="https://github.com/Thyraz/Snips-Fhem#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren" hreflang="de">Custom Intent erstellen</a>.<br>
-    One intent per line.<br>
-    Example: <code>attr &lt;rhasspyDevice&gt; rhasspyIntents SetCustomIntentsTest=SetCustomIntentsTest(siteId,Type)</code>
-    together with the follwoing myUtils-Code should get a short impression of the possibilities:
-    <code><pre>sub SetCustomIntentsTest {
-        my $room = shift; 
-        my $type = shift;
-        Log3('rhasspy',3 , "RHASSPY: Room $room, Type $type");
-        return "RHASSPY: Room $room, Type $type";
-    }</pre></code>
-    The following arguments can be handed over:<br>
+    <a id="RHASSPY-attr-rhasspyIntents"></a><b>rhasspyIntents</b>
+    <p>Defines custom intents. See <a href="https://github.com/Thyraz/Snips-Fhem#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren" hreflang="de">Custom Intent erstellen</a>.<br>
+    One intent per line.</p>
+    <p>Example:</p>
+    <p><code>attr &lt;rhasspyDevice&gt; rhasspyIntents SetCustomIntentsTest=SetCustomIntentsTest(siteId,Type)</code></p>
+    <p>together with the following myUtils-Code should get a short impression of the possibilities:</p>
+    <p><code>sub SetCustomIntentsTest {<br>
+        my $room = shift;<br>
+        my $type = shift;<br>
+        Log3('rhasspy',3 , "RHASSPY: Room $room, Type $type");<br>
+        return "RHASSPY: Room $room, Type $type";<br>
+    }</code></p>
+    <p>The following arguments can be handed over:</p>
     <ul>
     <li>NAME => name of the RHASSPY device addressed, </li>
     <li>DATA => entire JSON-$data (as parsed internally), encoded in JSON</li>
     <li>siteId, Device etc. => any element out of the JSON-$data.</li>
     </ul>
-    If a simple text is returned, this will be considered as response.<br>
-    For more advanced use of this feature, you may return an array. First element of the array will be interpreted as comma-separated list of devices that may have been modified (otherwise, these devices will not cast any events! See also the "d" parameter in <i>shotcuts</i>). Second element then is regarded as resopnse and may either be simple text or HASH-type data. This will keep the dialogue open to allow interactive data exchange with <i>Rhasspy</i>. An open dialogue will be closed after some time, default is 20 seconds, you may alternatively hand over other numeric values as third element of the array.
+    <p>If a simple text is returned, this will be considered as response.<br>
+    For more advanced use of this feature, you may return an array. First element of the array will be interpreted as comma-separated list of devices that may have been modified (otherwise, these devices will not cast any events! See also the "d" parameter in <a href="#RHASSPY-attr-shortcuts"><i>shotcuts</i></a>). The second element is interpreted as response and may either be simple text or HASH-type data. This will keep the dialogue-session open to allow interactive data exchange with <i>Rhasspy</i>. An open dialogue will be closed after some time, default is 20 seconds, you may alternatively hand over other numeric values as third element of the array.</p>
   </li>
+
   <li>
-    <a id="RHASSPY-attr-shortcuts"></a><b>shortcuts</b><br>
-    Define custom sentences without editing Rhasspy sentences.ini<br>
+    <a id="RHASSPY-attr-shortcuts"></a><b>shortcuts</b>
+    <p>Define custom sentences without editing Rhasspys sentences.ini<br>
     The shortcuts are uploaded to Rhasspy when using the updateSlots set-command.<br>
-    One shortcut per line, syntax is either a simple and an extended version:<br>
-    Examples:<code><pre>mute on=set amplifier2 mute on
+    One shortcut per line, syntax is either a simple and an extended version.</p>
+    <p>Examples:</p>
+    <p><code>mute on=set amplifier2 mute on
 lamp off={fhem("set lampe1 off")}
 i="you are so exciting" f="set $NAME speak siteId='livingroom' text='Thanks a lot, you are even more exciting!'"
-i="mute off" p={fhem ("set $NAME mute off")} n=amplifier2 c="Please confirm!"</pre></code>
-    Abbreviations explanation:
+i="mute off" p={fhem ("set $NAME mute off")} n=amplifier2 c="Please confirm!"
+i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code></p>
+    <p>Abbreviations explanation:</p>
     <ul>
-    <li>i => intent<br>
-    Lines starting with "i:" will be interpreted as extended version, so if you want to use that syntax style, starting with "i:" is mandatory.</li> 
-    <li>f => FHEM command<br>
-    Syntax as usual in FHEMWEB command field.</li>
-    <li>p => Perl command<br>
-    Syntax as usual in FHEMWEB command field, enclosed in {}; this has priority to "f=".
-    </li>
-    <li>d => device name(s, comma separated) that shall be handed over to fhem.pl as updated. Needed for triggering further actions and longpoll! If not set, the return value of the called function will be used. </li>
-    <li>r => Response to be set to the caller. If not set, the return value of the called function will be used.</li>
-    You may ask for confirmation as well using the following (optional) shorts:
-    <li>c => either numeric or text. If numeric: Timeout to wait for automatic cancellation. If text: response to send to ask for confirmation.</li>
-    <li>ct => numeric value for timeout in seconds, default: 15.</li>
-    Response sentence will be parsed to do "set magic"-like replacements, so also a line like <code>i="what's the time for sunrise" r="at [Astro:SunRise] o'clock"</code> is valid.
+      <li><b>i</b> => intent<br>
+      Lines starting with "i:" will be interpreted as extended version, so if you want to use that syntax style, starting with "i:" is mandatory.</li> 
+      <li><b>f</b> => FHEM command<br>
+      Syntax as usual in FHEMWEB command field.</li>
+      <li><b>p</b> => Perl command<br>
+      Syntax as usual in FHEMWEB command field, enclosed in {}; this has priority to "f=".</li>
+      <li><b>d</b> => device name(s, comma separated) that shall be handed over to fhem.pl as updated. Needed for triggering further actions and longpoll! If not set, the return value of the called function will be used. </li>
+      <li><b>r</b> => Response to be set to the caller. If not set, the return value of the called function will be used.<br>
+      Response sentence will be parsed to do "set magic"-like replacements, so also a line like <code>i="what's the time for sunrise" r="at [Astro:SunRise] o'clock"</code> is valid.<br>
+      You may ask for confirmation as well using the following (optional) shorts:
+      <ul>
+        <li><b>c</b> => either numeric or text. If numeric: Timeout to wait for automatic cancellation. If text: response to send to ask for confirmation.</li>
+        <li><b>ct</b> => numeric value for timeout in seconds, default: 15.</li>
+      </ul></li>
     </ul>
-    <br>
   </li>
+
   <li>
-  <a id="RHASSPY-attr-rhasspyTweaks"></a><b>rhasspyTweaks</b><br>
+    <a id="RHASSPY-attr-rhasspyTweaks"></a><b>rhasspyTweaks</b>
+    <p>Sets additional settings like siteId2room info or code links, allowed commands, confirmation requests etc.</p>
     <ul>
-    <li><b>timerLimits</b><br>
-      <code>timerLimits=90,300,3000,2*HOURSECONDS,50</code><br>
-      5 values have to be set, corresponding with the limits to <i>timerSet</i> responses. so above example will lead to seconds response for less then 90 seconds, minute+seconds response for less than 300 seconds etc.. Last value is the limit in seconds, if timer is set in time of day format..
+      <li><p><b>timerLimits</b><br>
+        Used to determine when the timer should response with e.g. "set to 30 minutes" or with "set to 10:30"</p>
+        <code>timerLimits=90,300,3000,2*HOURSECONDS,50</code>
+        <p>Five values have to be set, corresponding with the limits to <i>timerSet</i> responses. so above example will lead to seconds response for less then 90 seconds, minute+seconds response for less than 300 seconds etc.. Last value is the limit in seconds, if timer is set in time of day format.</p>
       </li>
-      <li><b>timerSounds</b><br>
-      <code>timerSounds= default=./yourfile1.wav eggs=3:20:./yourfile2.wav potatoes=5:./yourfile3.wav</code><br>
-      Above keys are some examples and neet to match "Label" values provided by Rhasspy. "default" is optional. If set, this file will be used for all labeled timer without match to other keywords. Numbers are optional, first is numer of repeats, second is waiting time between two repeats. 5 <i>repeats</i> defaults to 5, <i>wait</i> to 15. If only one number is set, this will be taken as <i>repeats</i>.
+      <li><p><b>timerSounds</b><br>
+        Per default the timer responds with a voice command if it has elapsed. If you want to use a wav-file instead, you can set this here.</p>
+        <code>timerSounds= default=./yourfile1.wav eggs=3:20:./yourfile2.wav potatoes=5:./yourfile3.wav</code><br>
+        <p>Above keys are some examples and need to match the "Label"-tags for the timer provided by the Rhasspy-sentences.<br>
+        <i>default</i> is optional. If set, this file will be used for all labeled timer without match to other keywords.<br>
+        The two numbers are optional. The first one sets the number of repeats, the second is the waiting time between the repeats.<br>
+        <i>repeats</i> defaults to 5, <i>wait</i> to 15<br>
+        If only one number is set, this will be taken as <i>repeats</i>.</p>
       </li>
-      <li><b>timerTrigger</b><br>
-      <code>timerTrigger= default</code> or <code>timerTrigger= eggs potatoes</code><br>
-      Above keys are some examples and neet to match "Label" values provided by Rhasspy. "default" is optional. If set, all labeled timers will cause your RHASSPY device to issue a trigger command at timer end time. Trigger event is 
-      <code>&lt;rhasspyDevice&gt; timerEnd &lt;siteId&gt; &lt;room&gt; &lt;label&gt;</code>
-      </li>
-      </ul>
-      *) <i>rhasspyTweaks</i> in the future might be the place to configure additional things like additional siteId2room info or code links, allowed commands, confirmation requests etc.     
+    </ul>
   </li>
+
   <li>
-    <b>forceNEXT</b><br>
-    If set to 1, RHASSPY will forward incoming messages also to further MQTT2-IO-client modules like MQTT2_DEVICE, even if the topic matches to one of it's own subscriptions. By default, these messages will not be forwarded for better compability with autocreate feature on MQTT2_DEVICE. See also <a href="#MQTT2_CLIENTclientOrder">clientOrder attribute in MQTT2 IO-type commandrefs</a>; setting this in one instance of RHASSPY might affect others, too.
+    <a id="RHASSPY-attr-forceNext"></a><b>forceNEXT</b>
+    <p>If set to 1, RHASSPY will forward incoming messages also to further MQTT2-IO-client modules like MQTT2_DEVICE, even if the topic matches to one of it's own subscriptions. By default, these messages will not be forwarded for better compability with autocreate feature on MQTT2_DEVICE. See also <a href="#MQTT2_CLIENTclientOrder">clientOrder attribute in MQTT2 IO-type commandrefs</a>; setting this in one instance of RHASSPY might affect others, too.</p>
   </li>
 </ul>
+
 <p>&nbsp;</p>
-<p><b>Additionals remarks on MQTT2-IOs:</b></p>
-<p>Using a separate MQTT server (and not the internal MQTT2_SERVER) is highly recommended, as the Rhasspy scripts also use the MQTT protocol for internal (sound!) data transfers. Best way is to either use MQTT2_CLIENT (see below) or bridge only the relevant topics from mosquitto to MQTT2_SERVER (see e.g. <a href="http://www.steves-internet-guide.com/mosquitto-bridge-configuration/">http://www.steves-internet-guide.com/mosquitto-bridge-configuration</a> for the principles). When using MQTT2_CLIENT, it's necessary to set <code>clientOrder</code> to include RHASSPY (as most likely, it's the only module listening to the CLIENT). It could be just set to <pre><code>attr <m2client> clientOrder RHASSPY</code></pre></p>
-<p>Furthermore, you are highly encouraged to restrict subscriptions only to the relevant topics: <pre><code>attr <m2client> subscriptions setByTheProgram</code></pre></p>
-<p>In case you are using the MQTT server also for other purposes than Rhasspy, you have to set <code>subscriptions</code> manually to at least include the following topics additionally to the other subscriptions desired for other purposes.<pre><code>hermes/intent/+
-hermes/dialogueManager/sessionStarted
-hermes/dialogueManager/sessionEnded</code></pre></p>
+<a id="RHASSPY-attr-subdevice"></a>
+<p><b>For the subordinated devices</b>, a list of the possible attributes is automatically extended by several further entries</p>
+<p>The names of these attributes all start with the <i>prefix</i> previously defined in RHASSPY - except for <a href="#RHASSPY-genericDeviceType">genericDeviceType</a> (gDT).<br>
+These attributes are used to configure the actual mapping to the intents and the content sent by Rhasspy.</p>
+<p>Note: As the analyses of the gDT is intented to lead to fast configuration progress, it's highly recommended to use this as a starting point. All other RHASSPY-specific attributes will then be considered as a user command to <b>overwrite</b> the results provided by the automatics initiated by gDT usage.</p>
+    
+<p>By default, the following attribute names are used: rhasspyName, rhasspyRoom, rhasspyGroup, rhasspyChannels, rhasspyColors, rhasspySpecials.<br>
+Each of the keywords found in these attributes will be sent by <a href="#RHASSPY-set-update">update</a> to Rhasspy to create the corresponding slot.</p>
+
+<ul>
+  <li>
+    <a id="RHASSPY-attr-rhasspyName"></a><b>rhasspyName</b>
+    <p>Comma-separated "labels" for the device as used when speaking a voice-command. They will be used as keywords by Rhasspy. May contain space or mutated vovels.</p>
+    <p>Example:<br>
+    <code>attr m2_wz_08_sw rhasspyName kitchen lamp,ceiling lamp,workspace,whatever</code></p>
+  </li>
+  <li>
+    <a id="RHASSPY-attr-rhasspyRoom"></a><b>rhasspyRoom</b>
+    <p>Comma-separated "labels" for the "rooms" the device is located in. Recommended to be unique.</p>
+    <p>Example:<br>
+    <code>attr m2_wz_08_sw rhasspyRoom living room</code></p>
+  </li>
+  <li>
+    <a id="RHASSPY-attr-rhasspyGroup"></a><b>rhasspyGroup</b>
+    <p>Comma-separated "labels" for the "groups" the device is in. Recommended to be unique.</p>
+    <p>Example:
+    <code>attr m2_wz_08_sw rhasspyGroup lights</code></p>
+  </li>
+  <li>
+    <a id="RHASSPY-attr-Mapping"></a><b>rhasspyMapping</b>
+    <p>If automatic detection (gDT) does not work or is not desired, this is the place to tell RHASSPY how your device can be controlled.</p>
+    <p>Example:</p>
+    <p><code>attr lamp rhasspyMapping SetOnOff:cmdOn=on,cmdOff=off,response="All right"<br>
+GetOnOff:currentVal=state,valueOff=off<br>
+GetNumeric:currentVal=pct,type=brightness<br>
+SetNumeric:currentVal=brightness,cmd=brightness,minVal=0,maxVal=255,map=percent,step=1,type=brightness<br>
+GetState:response=The temperature in the kitchen is at [lamp:temperature] degrees<br>
+MediaControls:cmdPlay=play,cmdPause=pause,cmdStop=stop,cmdBack=previous,cmdFwd=next</code></p>
+  </li>
+  <li>
+    <a id="RHASSPY-attr-rhasspyChannels"></a><b>rhasspyChannels</b>
+    <p>Used to change the channels of a tv, set light-scenes, etc.<br>
+    <i>key=value</i> line by line arguments mapping command strings to fhem- or Perl commands.</p>
+    <p>Example:</p>
+    <p><code>attr TV rhasspyChannels orf eins=channel 201<br>
+orf zwei=channel 202<br>
+orf drei=channel 203<br>
+</code></p>
+  </li>
+  <li>
+    <a id="RHASSPY-attr-rhasspyColors"></a><b>rhasspyColors</b>
+    <p>Used to change to colors of a light<br>
+    <i>key=value</i> line by line arguments mapping keys to setter strings on the same device.</p>
+    <p>Example:</p>
+    <p><code>attr lamp1 rhasspyColors red=rgb FF0000<br>
+green=rgb 00FF00<br>
+blue=rgb 0000FF<br>
+yellow=rgb 00F000</code></p>
+    </li>
+    <li>
+    <a id="RHASSPY-attr-rhasspySpecials"></a><b>rhasspySpecials</b>
+    <p><i>key=value</i> line by line arguments similar to <a href="#RHASSPY-attr-rhasspyTweaks">rhasspyTweaks</a>.</p>
+    <p>Example:</p>
+    <p><code>attr lamp1 rhasspySpecials group:async_delay=100 prio=1 group=lights</code></p>
+    <p>Currently only group related stuff is implemented, this could be the place to hold additional options, e.g. for confirmation requests.</p>
+    <p>Explanation on the above group line. All arguments are optional:</p>
+    <ul>
+      <li>group<br>
+        If set, the device will not be directly addressed, but the mentioned group - typically a FHEM <a href="#structure">structure</a> device or a HUEDevice-type group. This has the advantage of saving RF ressources and/or already implemented logics.<br>
+        Note: all addressed devices will be switched, even if they are not member of the rhasspyGroup. Each group should only be addressed once, but it's recommended to put this info in all devices under RHASSPY control in the same external group logic.</li>
+      <li>async_delay<br>
+        Float nummeric value, just as async_delay in structure; the delay will be obeyed prior to the next sending command.</li> 
+      <li>prio<br>
+        Numeric value, defaults to "0". <i>prio</i> and <i>async_delay</i> will be used to determine the sending order as follows: first devices will be those with lowest prio arg, second sort argument is <i>async_delay</i> with lowest value first </li>
+    </ul>
+  </li>
 </ul>
-<ul>
-    <p><b>For the subordinated devices</b>, a list of the possible attributes is automatically extended by several further entries. 
-    Their names all start with the prefix previously defined in RHASSPY - except for <a href="#RHASSPY-genericDeviceType">genericDeviceType</a> (gDT). These attributes are used to configure the actual mapping to the intents and content sent by Rhasspy.<br/>
-    Note: As the analyses of the gDT is intented *) to lead to fast configuration progress, it's highly recommended to use this as a starting point. All other RHASSPY-specific attributes will then be considered as a user command to <b>overwrite</b> the results provided by the automatics initiated by gDT usage.
-    
-    By default, the following attribute names are used: rhasspyName, rhasspyRoom, rhasspyGroup, rhasspyChannels, rhasspyColors, rhasspySpecials.<br>
-    Each of the keywords found in these attributes will be sent by <a href="#RHASSPY-set-update">update</a> to Rhasspy to make part of the corresponding slot.<br>
-    <br/>The meaning of these attributes is explained below.
-    <ul>
-    <li>
-    <b><a id="RHASSPY-attr-rhasspyName">rhasspyName</a></b><br>
-    Comma-separated "labels" for the subordineted device. They will be used as keywords by Rhasspy. May contain space or mutated vovels.<br>
-    Example: <code>attr m2_wz_08_sw rhasspyName kitchen lamp,ceiling lamp,workspace,whatever</code><br>
-    Needs not to be unique, as long as identification is possible by room (derived from siteId) (or group).
-    </li>
-    <li>
-    <b><a id="RHASSPY-attr-rhasspyRoom">rhasspyRoom</a></b><br>
-    Comma-separated "labels" for the "rooms" the subordineted device is located. Recommended to be unique.<br>
-    For further details see <i>rhasspyName</i>.
-    </li>
-    
-    <li>
-    <b><a id="RHASSPY-attr-rhasspyGroup">rhasspyGroup</a></b><br>
-    Comma-separated "labels" for the "groups" the subordineted device makes part of. Recommended to be unique.<br> For further details see <i>rhasspyRoom</i>.
-    </li>
-    
-    <li>
-    <b><a id="RHASSPY-attr-Mapping">rhasspyMapping</a></b><br>
-    If automatic detection does not work or is not desired, this is the central place to get your devices work with RHASSPY:
-    Example: <pre><code>attr lamp rhasspyMapping SetOnOff:cmdOn=on,cmdOff=off,response="All right"
-GetOnOff:currentVal=state,valueOff=off
-GetNumeric:currentVal=pct,type=brightness
-SetNumeric:currentVal=brightness,minVal=0,maxVal=255,map=percent,cmd=brightness,step=1,type=brightness
-GetState:response=The temperature in the kitchen is at [lamp:temparature] degrees
-MediaControls:cmdPlay=play,cmdPause=pause,cmdStop=stop,cmdBack=previous,cmdFwd=next</pre></code>
-    </li>
-    
-    <li>
-    <b><a id="RHASSPY-attr-rhasspyChannels">rhasspyChannels</a></b><br>
-    key=value line by line arguments mapping command strings to fhem- or Perl commands.
-    Example: <code><pre>attr m2_wz_08_sw rhasspyChannels orf eins=set lampe1 on
-orf zwei=set lampe1 off
-orf drei=set lampe1 on
-</pre></code><br>
-    </li>
-    <li>
-    <b><a id="RHASSPY-attr-rhasspyColors">rhasspyColors</a></b><br>
-    key=value line by line arguments mapping keys to setter strings on the same device.
-    Example: <code><pre>attr lamp1 rhasspyColors red=rgb FF0000
-green=rgb 00FF00
-blue=rgb 0000FF
-yellow=rgb 00F000</pre></code>
-    </li>
-    <li>
-    <b><a id="RHASSPY-attr-rhasspySpecials">rhasspySpecials</a></b><br>
-    key=value line by line arguments similar to <a href="#RHASSPY-attr-rhasspyTweaks">rhasspyTweaks</a>.
-    Example: </pre><code>attr lamp1 rhasspySpecials group:async_delay=100 prio=1 group=lights</pre></code><br>
-    *) At the moment, only group related stuff is implemented, this could be the place to hold additional options, e.g. for confirmation requests
-    Explanation on the above group line, all arguments are optional:
-    <ul>
-    <li>group<br>
-    If set, the device will not be directly addressed, but the mentioned group - typically a FHEM <a href="#structure">structure</a> device or a HUEDevice-type group. This has the advantage of saving RF ressources and/or already implemented logics. Note: all addressed devices will be switched, even if they are not member of the rhasspyGroup! Each group should only be addressed once, but it's recommended to put this info in all devices beeing unter RHASSPY control in the same external group logic.
-    <li>async_delay<br>
-    Float nummeric value, just as async_delay in structure; the delay will be obeyed prior to the next sending command.</li> 
-    <li>prio<br>
-    Numeric value, defaults to "0". <i>prio</i> and <i>async_delay</i> will be used to determine the sending order as follows: first devices will be those with lowest prio arg, second sort argument is <i>async_delay</i> with lowest value first </li>
-    </ul>
-    </li>
 
-    </ul>
 
-    
-    </p>
+<a id="RHASSPY-intents"></a>
+<h4>Intents</h4>
+<p>The following intents are directly implemented in RHASSPY code:
 <ul>
-   <a id="RHASSPY-intent"></a><p><b>intents</b>
-   <p>The following intents are directly implemented in RHASSPY code:
-   <ul>
-    <li>Shortcuts</li>
-    <li>SetOnOff</li>
-    <li>SetOnOffGroup</li>
-    <li>GetOnOff</li>
-    <li>SetNumeric</li>
-    <li>SetNumericGroup</li>
-    <li>GetNumeric</li>
-    <li>GetState</li>
-    <li>MediaControls</li>
-    <li>MediaChannels</li>
-    <li>SetColor</li>
-    <li>GetTime</li>
-    <li>GetWeekday</li>
-    <li>SetTimer</li>
-    <li>ConfirmAction</li>
-    <li>ReSpeak</li>
-   </ul>
+  <li>Shortcuts</li>
+  <li>SetOnOff</li>
+  <li>SetOnOffGroup</li>
+  <li>GetOnOff</li>
+  <li>SetNumeric</li>
+  <li>SetNumericGroup</li>
+  <li>GetNumeric</li>
+  <li>GetState</li>
+  <li>MediaControls</li>
+  <li>MediaChannels</li>
+  <li>SetColor</li>
+  <li>GetTime</li>
+  <li>GetWeekday</li>
+  <li>SetTimer</li>
+  <li>ConfirmAction</li>
+  <li>ReSpeak</li>
 </ul>
 
 =end html
