@@ -92,30 +92,40 @@ All parameters are optional but changing some of them later may result in confus
 
 * **`baseUrl`**\
   The url of the Rhasspy service web-interface. If using a base and multiple satellites, use the url of the base. Make sure, this is set to correct values (IP and Port)! Default is `baseUrl=http://127.0.0.1:12101`.
+
 * **`devspec`**\
   [devspec](https://commandref.fhem.de/commandref.html#devspec) of the device(s) that should be controlled with Rhasspy. For backwards compability, default is `devspec=room=Rhasspy`, but you may use e.g. just a comma separated list of devices you want to interact with Rhasspy. Without a match to devspec, no device can interact with RHASSPY, regardless if you set any of the further attributes to configure them.
-* **`defaultRoom**\
+
+* **`defaultRoom`**\
   Name of the default room which should be used if no room-name is present in the command and no suitable room can be found for the device. Default is `defaultRoom=default`.
+
 * **`language`**\
   Language of the voice commands spoken to Rhasspy. Default is derived from _global_-device, which defaults to `language=en`.
+
 * **`fhemId`**\
   Used to differ between multiple instances of RHASSPY on the MQTT side. Also is a part of the topic tree the corresponding RHASSPY is listening to. Default is `fhemId=fhem`.
+
 * **`prefix`**\
   Used to differ between multiple instances of RHASSPY on the FHEM-internal side. Usefull, if you have several instances of RHASSPY in one FHEM running and want e.g. to use different identifier for groups and rooms (e.g. a different language). Default is `prefix=rhasspy`.
+
 * **`useGenericAttrs`**\
   By default, RHASSPY - beside it's own attributes - uses the general _genericDeviceType_ attribute (which is also used by other voice command solutions) to identifiy the control-features of the devices you want to command. This option adds the attribute `genericDeviceType` to the _global_ attribute list. If you are not happy with the results _genericDeviceType_ provides, you may replace them by setting appropriate values in _rhasspyMapping_. Set this to zero, if you want to deactivate this feature: `useGenericAttrs=0`.
+
 * **`encoding`**\
   If there are any problems with mutated vowels it's possible to set a specific character encoding. Default is _none_ which in most cases is UTF-8.
 
-Simple-Example:
+
+
+Simple-Example for a define:
 ```
 define Rhasspy RHASSPY
 ```
 
-Full-Example:
+Full-Example for a define:
 ```
 define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceType=.+ defaultRoom=wohnzimmer language=de fhemId=fhem1 prefix=rhasspy2 useGenericAttrs=0 encoding=cp-1252
 ```
+
 
 ### Set-Commands (SET)
 * **customSlot**\
