@@ -2969,27 +2969,32 @@ sub RHASSPY_handleIntentMediaChannels {
 sub RHASSPY_handleIntentSetColor {
     my $hash = shift // return;
     my $data = shift // return;
-    my $color, my $device, my $room;
-    my $cmd;
-    my $response;
+                                    
+            
+                 
 
     Log3($hash->{NAME}, 5, "handleIntentSetColor called");
+    my $response;
 
     # At least Device AND Color have to be received
-    if (exists $data->{Color} && exists $data->{Device}) {
-        $room = RHASSPY_roomName($hash, $data);
-        $color = $data->{Color};
+    return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoValidData')) if !exists $data->{Color} && !exists $data->{Saturation} && !exists $data->{Colortemp} && !exists $data->{Hue} || !exists $data->{Device};
+    #if (exists $data->{Color} && exists $data->{Device}) {
+    my $room = RHASSPY_roomName($hash, $data);
+    my $color = $data->{Color} // q{};
 
-        # Search for matching device and command
-        $device = RHASSPY_getDeviceByName($hash, $room, $data->{Device});
-        $cmd = RHASSPY_getCmd($hash, $device, 'rhasspyColors', $color, undef);
+    # Search for matching device and command
+    my $device = RHASSPY_getDeviceByName($hash, $room, $data->{Device});
+    my $cmd = RHASSPY_getCmd($hash, $device, 'rhasspyColors', $color, undef);
 
-        if ( defined $device && defined $cmd ) {
-            $response = RHASSPY_getResponse($hash, 'DefaultConfirmation');
+    return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoDeviceFound')) if !defined $device;
+                                                                          
 
-            # Execute Cmd
-            RHASSPY_runCmd($hash, $device, $cmd);
-        }
+    if ( defined $cmd ) {
+        $response = RHASSPY_getResponse($hash, 'DefaultConfirmation');
+        # Execute Cmd
+        RHASSPY_runCmd($hash, $device, $cmd);
+    } else {
+        $response = RHASSPY_runSetColorCmd($hash, $device, $data);
     }
     # Send voice response
     $response = $response // RHASSPY_getResponse($hash, 'DefaultError');
@@ -2997,7 +3002,50 @@ sub RHASSPY_handleIntentSetColor {
     return $device;
 }
 
+sub RHASSPY_runSetColorCmd {
+    my $hash   = shift // return;
+    my $device = shift // return;
+    my $data   = shift // return;
 
+    my $color  = $data->{Color};
+    
+    my $mapping = $hash->{helper}{devicemap}{devices}{$device}{intents}{SetColorParms} // return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoMappingFound'));
+
+    my $error;
+    my $success;
+
+    #shortcuts: hue, sat or CT are directly addressed and possible commands
+    my $keywords = {hue => 'Hue', sat => 'Saturation', ct => 'Colortemp'};
+    for (keys %{$keywords}) {
+        my $kw = $keywords->{$_};
+        if ( defined $data->{$kw} && defined $mapping->{$_} ) {
+            my $value = ($mapping->{$_}->{maxVal} - $mapping->{$_}->{minVal}) * $data->{$kw} / 100;
+            $error = AnalyzeCommand($hash, "set $device $mapping->{$_}->{cmd} $value");
+            return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $error) if $error;
+            return RHASSPY_getResponse($hash, 'DefaultConfirmation');
+        }
+    }
+
+    #shortcut: Rgb field is used or color is in HEX value and rgb is a possible command
+    if ( ( defined $data->{Rgb} || $color =~ m{\A[[:xdigit:]]\z}x ) && defined $mapping->{rgb} ) {
+        $color = $data->{Rgb} if defined $data->{Rgb};
+        $error = AnalyzeCommand($hash, "set $device $mapping->{rgb}->{cmd} $data->{Rgb}");
+        return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $error) if $error;
+        return RHASSPY_getResponse($hash, 'DefaultConfirmation');
+    }
+
+    my %word2rgb = {
+        white => {r => 255, g => 255, b => 255},
+        grey  => {r => 122, g => 122, b => 122},
+        darkgrey => {r => 10, g => 10, b => 10, f => 1}, #this includes brightness info!
+        red   => {r => 255, g => 0, b => 0},
+        green => {r => 0, g => 255, b => 0},
+        blue  => {r => 0, g => 0, b => 255}
+    };
+    #todo: Tabelle erweitern, ggf. aktuelle Helligkeit ermitteln
+
+    return "function not implemented yet"
+}
 # Handle incoming SetTimer intents
 sub RHASSPY_handleIntentSetTimer {
     my $hash = shift;
@@ -3661,9 +3709,9 @@ orf drei=channel 203<br>
     <i>key=value</i> line by line arguments mapping keys to setter strings on the same device.</p>
     <p>Example:</p>
     <p><code>attr lamp1 rhasspyColors red=rgb FF0000<br>
-green=rgb 00FF00<br>
+green=rgb 008000<br>
 blue=rgb 0000FF<br>
-yellow=rgb 00F000</code></p>
+yellow=rgb FFFF00</code></p>
     </li>
     <li>
     <a id="RHASSPY-attr-rhasspySpecials"></a><b>rhasspySpecials</b>
