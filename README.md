@@ -450,9 +450,9 @@ Explanation on the above group line. All arguments are optional:
 * **group**
   If set, the device will not be directly addressed, but the mentioned group - typically a FHEM structure device or a HUEDevice-type group. This has the advantage of saving RF ressources and/or already implemented logics.\
   Note: all addressed devices will be switched, even if they are not member of the rhasspyGroup. Each group should only be addressed once, but it's recommended to put this info in all devices under RHASSPY control in the same external group logic.
-  * **async_delay**
+* **async_delay**
   Float nummeric value, just as async_delay in structure; the delay will be obeyed prior to the next sending command.
-  * **prio**
+* **prio**
   Numeric value, defaults to "0". prio and async_delay will be used to determine the sending order as follows: first devices will be those with lowest prio arg, second sort argument is async_delay with lowest value first
 
 
@@ -463,12 +463,11 @@ Intents are used to tell FHEM what to do after receiving a voice-/text-command. 
 Intent to turn on/off, open/close, start/stop, ... devices.
 
 Example-Mappings:
-
-`SetOnOff:cmdOn=on,cmdOff=off`\
-`SetOnOff:cmdOn=on,cmdOff=off,response="Sir yes Sir"`\
-<!--
-`SetOnOff:cmdOn=on,cmdOff=off,response="$DEVICE now [$DEVICE:state]"`
--->
+```
+SetOnOff:cmdOn=on,cmdOff=off
+SetOnOff:cmdOn=on,cmdOff=off,response="Sir yes Sir"
+SetOnOff:cmdOn=on,cmdOff=off,response="$DEVICE now [$DEVICE:state]"
+```
 
 Arguments:
   * **cmdOn** Command to turn the device on. See [Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping).
@@ -488,6 +487,13 @@ Example-Rhasspy-Sentences:
 (turn on|open|start){Value:on) $de.fhem.Device{Device} [$de.fhem.Room{Room}]
 (turn off|close|stop){Value:off} $de.fhem.Device{Device} [$de.fhem.Room{Room}]
 ```
+
+Required tags:
+* Value:on and/or Value:off
+* Device
+
+Optional tags:
+* Room
 
 ### SetOnOffGroup
 Intent to switch a group of devices.
