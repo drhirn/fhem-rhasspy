@@ -1,19 +1,17 @@
 # FHEM-rhasspy
 [FHEM](https://fhem.de) module for [Rhasspy](https://github.com/rhasspy)
 
-Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://github.com/Thyraz/Snips-Fhem).
-
 ## Contents
 [Read First](#Read-First)\
 [About Rhasspy](#About-Rhasspy)\
 [About FHEM-rhasspy](#About-FHEM-rhasspy)\
 [About this repository](#about-this-repository)\
 [Installation of FHEM-rhasspy](#Installation-of-FHEM-rhasspy)\
+[Additionals remarks on MQTT2-IOs](#additionals-remarks-on-mqtt2-ios)\
 [Definition (DEF) in FHEM](#definition-def-in-fhem)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Set-Commands (SET)](#set-commands-set)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attributes (ATTR)](#attributes-attr)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Readings/Events](#readings--events)\
-[Additionals remarks on MQTT2-IOs](#additionals-remarks-on-mqtt2-ios)\
 [Configure FHEM-devices for use with Rhasspy](#configure-fhem-devices-for-use-with-rhasspy)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyName*](#attribute-rhasspyname)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyRoom*](#attribute-rhasspyroom)\
@@ -57,6 +55,8 @@ FHEM-rhasspy evaluates parts of the MQTT traffic, converts these JSON-messages t
 
 FHEM-rhasspy uses the 00_MQTT2_CLIENT.pm module to receive and send these messages. Therefore it is necessary to define an MQTT2_CLIENT device in FHEM before using FHEM-rhasspy.
 
+fhem-rhasspy is based on the [Snips-Module](https://github.com/Thyraz/Snips-Fhem). Thanks to Thyraz, who did all the groundwork with his!
+
 ## About this repository
 
 This repository contains all files to set up a complete installation to test Rhasspy and FHEM with Docker under Windows using the Windows Subsystem for Linux (WSL).
@@ -80,6 +80,17 @@ attr <deviceName> subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
 
 **Important**: The attribute `clientOrder` ist not available in older version of MQTT2_CLIENT. Be sure to use an up-to-date version of this module.
 
+## Additionals remarks on MQTT2-IOs
+Using a separate MQTT server (and not the internal MQTT2_SERVER) is highly recommended, as the Rhasspy scripts also use the MQTT protocol for internal (sound!) data transfers. Best way is to either use MQTT2_CLIENT (see below) or bridge only the relevant topics from mosquitto to MQTT2_SERVER (see e.g. http://www.steves-internet-guide.com/mosquitto-bridge-configuration/ for the principles). When using MQTT2_CLIENT, it's necessary to set `clientOrder` to include RHASSPY (as most likely, it's the only module listening to the CLIENT). It could be just set to `attr <m2client> clientOrder RHASSPY`
+
+Furthermore, you are highly encouraged to restrict subscriptions only to the relevant topics: `attr <m2client> subscriptions setByTheProgram`
+
+In case you are using the MQTT server also for other purposes than Rhasspy, you have to set `subscriptions` manually to at least include the following topics additionally to the other subscriptions desired for other purposes:
+```
+hermes/intent/+
+hermes/dialogueManager/sessionStarted
+hermes/dialogueManager/sessionEnded
+```
 
 ## Definition (DEF) in FHEM
 You can define a new instance of this module with:
@@ -290,39 +301,27 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
   Contains the last response ot the `updateSlots` command.`
 
 
-## Additionals remarks on MQTT2-IOs
-Using a separate MQTT server (and not the internal MQTT2_SERVER) is highly recommended, as the Rhasspy scripts also use the MQTT protocol for internal (sound!) data transfers. Best way is to either use MQTT2_CLIENT (see below) or bridge only the relevant topics from mosquitto to MQTT2_SERVER (see e.g. http://www.steves-internet-guide.com/mosquitto-bridge-configuration/ for the principles). When using MQTT2_CLIENT, it's necessary to set `clientOrder` to include RHASSPY (as most likely, it's the only module listening to the CLIENT). It could be just set to `attr <m2client> clientOrder RHASSPY`\
-
-Furthermore, you are highly encouraged to restrict subscriptions only to the relevant topics: `attr <m2client> subscriptions setByTheProgram`\
-
-In case you are using the MQTT server also for other purposes than Rhasspy, you have to set `subscriptions` manually to at least include the following topics additionally to the other subscriptions desired for other purposes:
-```
-hermes/intent/+
-hermes/dialogueManager/sessionStarted
-hermes/dialogueManager/sessionEnded
-```
-
 ## Configure FHEM-devices for use with Rhasspy
 To control a device with voice-commands, Rhasspy needs to now some information about the device. It collects this information from the following attributes or from the *genericDeviceType*-attribute.\
 Except for *genericDeviceType*, all attribute-names are starting with the prefix used while defining the RHASSPY-device. The following uses the default value *rhasspy*.
 
 
 **Important**: 
-* Be sure to execute `update devicemap` when changing of the following attributes has been competed - otherwise neither RHASSPY nor Rhasspy will know the changed values! 
+* Be sure to execute `update devicemap` everytime after changing one of the following attributes - otherwise neither RHASSPY nor Rhasspy will know the changed values
 * RHASSPY will consolidate all information given in the attributes in it's own device hash. Use _list_ command to see result of the consolidation process initiated by the `update devicemap` command. All names and other "labels" are converted to lower case, so make sure, Rhasspy is also delivering lower case values when filling slots manually.
-* Minimum requirements for a FHEM device to work with RHASSPY are:
-** Device has to match devspec
-** at least (just) one of the following attributes has to be set in the device (basically, genericDeviceType or one of the RHASSPY-specific mapping attributes).
+* Minimum requirements for a FHEM device to work with RHASSPY are:\
+  * Device has to match devspec
+  * at least one of the following attributes has to be set in the device (basically, genericDeviceType or one of the RHASSPY-specific mapping attributes).
 * mapping logic generally is as follows:
-** if RHASSPY-specific attributes are provided, only the value of this attribute will **exclusively** be used (obviously: only for the purpose of the specific attribute, so e.g. setting _rhasspyName_ will not prevent analysis of _genericDeviceType_ possibilities to set the device _on_ or _off_ or it's _brighness_).   
-** the more specific attribute values will override the less specific ones. So, (if no _rhasspyName_ is set) _alias_ will prevent using (technical) _device name_ to be used, and having set _alexaName_ will result in (to some extend exclusive) use of the values set there. If two possibilities are on the same "specific level" (e.g. _alexaName_ and _siriName_ are set), both will be used.  
-* attribute values typically are typically read "line by line", following the general rule "one topic per line". So make sure to set newline marks at the right places!
+  * if RHASSPY-specific attributes are provided, only the value of this attribute will **exclusively** be used (obviously: only for the purpose of the specific attribute, so e.g. setting _rhasspyName_ will not prevent analysis of _genericDeviceType_ possibilities to set the device _on_ or _off_ or it's _brighness_).   
+  * the more specific attribute values will override the less specific ones. So, (if no _rhasspyName_ is set) _alias_ will prevent using (technical) _device name_ to be used, and having set _alexaName_ will result in (to some extend exclusive) use of the values set there. If two possibilities are on the same "specific level" (e.g. _alexaName_ and _siriName_ are set), both will be used.  
+* attribute values typically are typically read "line by line", following the general rule "one topic per line". So make sure to set newline marks at the right places
 
 ### Attribute genericDeviceType
 
 **Work in progress - you are strongly encouraged to test this new feature!**
 
-When activated (default is on), RHASSPY will try to derive mapping (and other) information from the attributes already present (if devices match devspec). Atm, the following subset of _genericDeviceType_ is supported:  
+When activated (default is on), RHASSPY will try to determine mapping (and other) information from the attributes already present (if devices match devspec). Currently the following subset of _genericDeviceType_ is supported:  
 * switch
 * light (no color features atm)
 * thermostat
