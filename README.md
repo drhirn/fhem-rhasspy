@@ -224,7 +224,7 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
   * DATA => entire JSON-$data (as parsed internally, JSON-encoded)
   * siteId, Device etc. => any element out of the JSON-$data
 
-* **shortcuts**\
+* **rhasspyShortcuts**\
   Define custom sentences without editing Rhasspy sentences.ini.\
   The shortcuts are uploaded to Rhasspy when using the `update slots` (or `update devicemap`) set-command.\
   One shortcut per line, syntax is either a simple or an extended version.\
