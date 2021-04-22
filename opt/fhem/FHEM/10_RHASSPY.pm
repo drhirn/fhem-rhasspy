@@ -303,7 +303,7 @@ sub RHASSPY_Initialize {
     $hash->{DeleteFn}    = \&RHASSPY_Delete;
     $hash->{SetFn}       = \&RHASSPY_Set;
     $hash->{AttrFn}      = \&RHASSPY_Attr;
-    $hash->{AttrList}    = "IODev rhasspyIntents:textField-long rhasspyShortcuts:textField-long rhasspyTweaks:textField-long response:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals configFile " . $readingFnAttributes;
+    $hash->{AttrList}    = "IODev rhasspyIntents:textField-long rhasspyShortcuts:textField-long rhasspyTweaks:textField-long response:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals languageFile " . $readingFnAttributes;
     $hash->{Match}       = q{.*};
     $hash->{ParseFn}     = \&RHASSPY_Parse;
     $hash->{parseParams} = 1;
@@ -324,7 +324,7 @@ sub RHASSPY_Define {
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.4.10';
+    $hash->{MODULE_VERSION} = '0.4.11';
     $hash->{baseUrl} = $Rhasspy;
     #$hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
@@ -369,7 +369,7 @@ sub firstInit {
 sub initialize_Language {
     my $hash = shift // return;
     my $lang = shift // return;
-    my $cfg  = shift // AttrVal($hash->{NAME},'configFile',undef);
+    my $cfg  = shift // AttrVal($hash->{NAME},'languageFile',undef);
 
     my $cp = q{UTF-8};
 
@@ -583,10 +583,10 @@ sub RHASSPY_Attr {
         } 
     }
 
-    if ( $attribute eq 'configFile' ) {
+    if ( $attribute eq 'languageFile' ) {
         if ($command ne 'set') {
             delete $hash->{CONFIGFILE};
-            delete $attr{$name}{configFile}; 
+            delete $attr{$name}{languageFile}; 
             delete $hash->{helper}{lng};
             $value = undef;
         }
@@ -666,17 +666,16 @@ sub initialize_rhasspyTweaks {
             next;
         }
 
-=pod
-        if ($line =~ m{\A[\s]*timerTrigger[\s]*=}x) {
+        if ($line =~ m{\A[\s]*useGenericAttrs[\s]*=}x) {
             ($tweak, $values) = split m{=}x, $line, 2;
             $tweak = trim($tweak);
             return "Error in $line! No content provided!" if !length $values && $init_done;
             my($unnamedParams, $namedParams) = parseParams($values);
-            return "Error in $line! Only unnamed parameters are allowed" if ( keys %{$namedParams} ) && $init_done;
-            $hash->{helper}{tweaks}{$tweak} = join q{,}, @{$unnamedParams};
+            return "Error in $line! Provide at least one key-value pair!" if ( @{$unnamedParams} || !keys %{$namedParams} ) && $init_done;
+            $hash->{helper}{tweaks}{$tweak} = $namedParams;
             next;
         }
-=cut
+
     }
     return;
 }
@@ -1455,7 +1454,7 @@ sub RHASSPY_getDevicesByGroup {
         my $allrooms = $hash->{helper}{devicemap}{devices}{$dev}->{rooms};
         next if $room ne 'global' && $allrooms !~ m{\b$room\b}x;
 
-        my $allgroups = $hash->{helper}{devicemap}{devices}{$dev}->{groups};
+        my $allgroups = $hash->{helper}{devicemap}{devices}{$dev}->{groups} // next;
         next if $allgroups !~ m{\b$group\b}x;
 
         my $specials = $hash->{helper}{devicemap}{devices}{$dev}{group_specials};
@@ -1819,6 +1818,7 @@ my $dispatchFns = {
     MediaControls   => \&RHASSPY_handleIntentMediaControls,
     MediaChannels   => \&RHASSPY_handleIntentMediaChannels,
     SetColor        => \&RHASSPY_handleIntentSetColor,
+    SetColorGroup   => \&RHASSPY_handleIntentSetColorGroup,
     GetTime         => \&RHASSPY_handleIntentGetTime,
     GetWeekday      => \&RHASSPY_handleIntentGetWeekday,
     SetTimer        => \&RHASSPY_handleIntentSetTimer,
@@ -2020,7 +2020,9 @@ sub RHASSPY_updateSlots {
     my $fhemId   = $hash->{fhemId};
     my $method   = q{POST};
     
-    initialize_devicemap($hash);# if defined $hash->{useHash} && $hash->{useHash};
+    initialize_devicemap($hash);
+    my $tweaks = $hash->{helper}{tweaks}->{updateSlots};
+    my $noEmpty = !defined $tweaks || defined $tweaks->{noEmptySlots} && $tweaks->{noEmptySlots} != 1 ? 1 : 0;
 
     # Collect everything and store it in arrays
     my @devices   = RHASSPY_allRhasspyNames($hash);
@@ -2031,6 +2033,15 @@ sub RHASSPY_updateSlots {
     my @groups    = RHASSPY_allRhasspyGroups($hash);
     my @shortcuts = keys %{$hash->{helper}{shortcuts}};
 
+    if ($noEmpty) { 
+        @devices    =  ('') if !@devices;
+        @rooms     = ('') if !@rooms;
+        @channels  = ('') if !@channels;
+        @colors    = ('') if !@colors;
+        @types     = ('') if !@types;
+        @groups    = ('') if !@groups;
+        @shortcuts = ('') if !@shortcuts;
+    }
     my $deviceData;
 
     if (@shortcuts) {
@@ -2050,20 +2061,24 @@ sub RHASSPY_updateSlots {
 
     my $json;
     $deviceData = {};
-    my $url = q{/api/slots?overwrite_all=true};
+    my $overwrite = defined $tweaks && defined $tweaks->{overwrite_all} ? $tweaks->{useGenericAttrs}->{overwrite_all} : 'true';
+    my $url = qq{/api/slots?overwrite_all=$overwrite};
+    
 
     my @gdts = (qw(switch light media blind thermostat));
     for my $gdt (@gdts) {
+        last if !$hash->{useGenericAttrs};
         my @names = ();
         my @devs = devspec2array("$hash->{devspec}");
         for my $device (@devs) {
             push @names, split m{,}, $hash->{helper}{devicemap}{devices}{$device}->{names} if AttrVal($device, 'genericDeviceType', '') eq $gdt;;
         }
         @names = get_unique(\@names);
+        @names = ('') if !@names && $noEmpty;
         $deviceData->{qq(${language}.${fhemId}.Device-${gdt})} = \@names if @names;
     }
 
-    my @allKeywords = (@groups, @rooms, @devices);
+    my @allKeywords = uniq(@groups, @rooms, @devices);
 
     $deviceData->{qq(${language}.${fhemId}.Device)}        = \@devices if @devices;
     $deviceData->{qq(${language}.${fhemId}.Room)}          = \@rooms if @rooms;
@@ -2551,7 +2566,7 @@ sub RHASSPY_handleIntentSetNumericGroup {
     my $updatedList;
 
     my $init_delay = 0;
-    my $needs_sorting = (@{$hash->{".asyncQueue"}});
+    my $needs_sorting = (@{$hash->{'.asyncQueue'}});
 
     for my $device (@devlist) {
         my $tempdata = $data;
@@ -2566,7 +2581,7 @@ sub RHASSPY_handleIntentSetNumericGroup {
             $updatedList = $updatedList ? "$updatedList,$device" : $device;
         } else {
             my $hlabel = $devices->{$device}->{delay};
-            push @{$hash->{".asyncQueue"}}, {device => $device, SetNumeric => $tempdata, prio => $devices->{$device}->{prio}, delay => $hlabel};
+            push @{$hash->{'.asyncQueue'}}, {device => $device, SetNumeric => $tempdata, prio => $devices->{$device}->{prio}, delay => $hlabel};
             InternalTimer(time+$delaysum,\&RHASSPY_asyncQueue,$hash,0) if !$init_delay;
             $init_delay = 1;
         }
@@ -2970,19 +2985,27 @@ sub RHASSPY_handleIntentSetColor {
     my $hash = shift // return;
     my $data = shift // return;
 
+    my $inBulk = $data->{'.inBulk'} // 0;
+    my $device = $data->{'.DevName'};
+
     Log3($hash->{NAME}, 5, "handleIntentSetColor called");
     my $response;
 
     # At least Device AND Color have to be received
-    return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoValidData')) if !exists $data->{Color} && !exists $data->{Saturation} && !exists $data->{Colortemp} && !exists $data->{Hue} || !exists $data->{Device};
+    if ( !exists $data->{Color} && !exists $data->{Rgb} &&!exists $data->{Saturation} && !exists $data->{Colortemp} && !exists $data->{Hue} || !exists $data->{Device} && !defined $device) {
+        return if $inBulk;
+        return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoValidData')) ;
+    }
+
     #if (exists $data->{Color} && exists $data->{Device}) {
     my $room = RHASSPY_roomName($hash, $data);
     my $color = $data->{Color} // q{};
 
     # Search for matching device and command
-    my $device = RHASSPY_getDeviceByName($hash, $room, $data->{Device});
+    $device = RHASSPY_getDeviceByName($hash, $room, $data->{Device}) if !defined $device;
     my $cmd = RHASSPY_getCmd($hash, $device, 'rhasspyColors', $color, undef);
 
+    return if $inBulk && !defined $device;
     return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoDeviceFound')) if !defined $device;
 
     if ( defined $cmd ) {
@@ -2990,11 +3013,11 @@ sub RHASSPY_handleIntentSetColor {
         # Execute Cmd
         RHASSPY_runCmd($hash, $device, $cmd);
     } else {
-        $response = RHASSPY_runSetColorCmd($hash, $device, $data);
+        $response = RHASSPY_runSetColorCmd($hash, $device, $data, $inBulk);
     }
     # Send voice response
     $response = $response // RHASSPY_getResponse($hash, 'DefaultError');
-    RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
+    RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response) if !$inBulk;
     return $device;
 }
 
@@ -3002,10 +3025,11 @@ sub RHASSPY_runSetColorCmd {
     my $hash   = shift // return;
     my $device = shift // return;
     my $data   = shift // return;
+    my $inBulk = shift // 0;
 
     my $color  = $data->{Color};
     
-    my $mapping = $hash->{helper}{devicemap}{devices}{$device}{intents}{SetColorParms} // return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoMappingFound'));
+    my $mapping = $hash->{helper}{devicemap}{devices}{$device}{intents}{SetColorParms} // return $inBulk ?undef : RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoMappingFound'));
 
     my $error;
     my $success;
@@ -3017,6 +3041,7 @@ sub RHASSPY_runSetColorCmd {
         if ( defined $data->{$kw} && defined $mapping->{$_} ) {
             my $value = ($mapping->{$_}->{maxVal} - $mapping->{$_}->{minVal}) * $data->{$kw} / 100;
             $error = AnalyzeCommand($hash, "set $device $mapping->{$_}->{cmd} $value");
+            return if $inBulk;
             return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $error) if $error;
             return RHASSPY_getResponse($hash, 'DefaultConfirmation');
         }
@@ -3025,7 +3050,8 @@ sub RHASSPY_runSetColorCmd {
     #shortcut: Rgb field is used or color is in HEX value and rgb is a possible command
     if ( ( defined $data->{Rgb} || $color =~ m{\A[[:xdigit:]]\z}x ) && defined $mapping->{rgb} ) {
         $color = $data->{Rgb} if defined $data->{Rgb};
-        $error = AnalyzeCommand($hash, "set $device $mapping->{rgb}->{cmd} $data->{Rgb}");
+        $error = AnalyzeCommand($hash, "set $device $mapping->{rgb}->{cmd} $color");
+        return if $inBulk;
         return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $error) if $error;
         return RHASSPY_getResponse($hash, 'DefaultConfirmation');
     }
@@ -3040,7 +3066,58 @@ sub RHASSPY_runSetColorCmd {
     };
     #todo: Tabelle erweitern, ggf. aktuelle Helligkeit ermitteln
 
-    return "function not implemented yet"
+    return "function to convert between different colorspaces not implemented yet"
+}
+
+sub RHASSPY_handleIntentSetColorGroup {
+    my $hash = shift // return;
+    my $data = shift // return;
+
+    Log3($hash->{NAME}, 5, 'handleIntentSetColorGroup called');
+
+    return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoValidData')) if !exists $data->{Color} && !exists $data->{Rgb} &&!exists $data->{Saturation} && !exists $data->{Colortemp} && !exists $data->{Hue};
+
+    my $devices = RHASSPY_getDevicesByGroup($hash, $data);
+
+    #see https://perlmaven.com/how-to-sort-a-hash-of-hashes-by-value for reference
+    my @devlist = sort {
+        $devices->{$a}{prio} <=> $devices->{$b}{prio}
+        or
+        $devices->{$a}{delay} <=> $devices->{$b}{delay}
+        }  keys %{$devices};
+
+    Log3($hash, 5, 'sorted devices list is: ' . join q{ }, @devlist);
+    return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoDeviceFound')) if !keys %{$devices}; 
+
+    my $delaysum = 0;
+    my $updatedList;
+    my $init_delay = 0;
+    my $needs_sorting = (@{$hash->{'.asyncQueue'}});
+
+    for my $device (@devlist) {
+        my $tempdata = $data;
+        $tempdata->{'.DevName'} = $device;
+        $tempdata->{'.inBulk'} = 1;
+
+        # execute Cmd
+        if ( !$delaysum ) {
+            RHASSPY_handleIntentSetColor($hash, $data);
+            Log3($hash->{NAME}, 5, "Running SetColor on device [$device]" );
+            $delaysum += $devices->{$device}->{delay};
+            $updatedList = $updatedList ? "$updatedList,$device" : $device;
+        } else {
+            my $hlabel = $devices->{$device}->{delay};
+            push @{$hash->{'.asyncQueue'}}, {device => $device, SetColor => $tempdata, prio => $devices->{$device}->{prio}, delay => $hlabel};
+            InternalTimer(time+$delaysum,\&RHASSPY_asyncQueue,$hash,0) if !$init_delay;
+            $init_delay = 1;
+        }
+    }
+
+    _sortAsyncQueue($hash) if $init_delay && $needs_sorting;
+
+    # Send response
+    RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'DefaultConfirmation'));
+    return $updatedList;
 }
 
 # Handle incoming SetTimer intents
@@ -3327,7 +3404,7 @@ sub RHASSPY_getDataFile {
     my $filename = shift;
     my $name = $hash->{NAME};
     my $lang = $hash->{LANGUAGE};
-    $filename = $filename // AttrVal($name,'configFile',undef);
+    $filename = $filename // AttrVal($name,'languageFile',undef);
     my @t = localtime gettimeofday();
     $filename = ResolveDateWildcards($filename, @t);
     $hash->{CONFIGFILE} = $filename; # for configDB migration
@@ -3343,7 +3420,7 @@ sub RHASSPY_readLanguageFromFile {
     Log3($name, 5, "trying to read language from $filename");
     my ($ret, @content) = FileRead($filename);
     if ($ret) {
-        Log3($name, 1, "$name failed to read configFile $filename!") ;
+        Log3($name, 1, "$name failed to read languageFile $filename!");
         return $ret, undef;
     }
     my @cleaned = grep { $_ !~ m{\A\s*[#]}x } @content;
@@ -3550,12 +3627,12 @@ hermes/dialogueManager/sessionEnded</code></p>
 <p><b>RHASSPY itself</b> supports the following attributes:</p>
 <ul>
   <li>
-    <a id="RHASSPY-attr-configFile"></a><b>configFile</b><br>
+    <a id="RHASSPY-attr-languageFile"></a><b>languageFile</b><br>
     <p>Path to the language-config file. If this attribute isn't set, a default set of english responses is used for voice responses.<br>
-    The file itself must contain a JSON-encoded keyword-value structure (partly with sub-structures) following the given structure for the mentioned english defaults. As a reference, there's one available in german, or just make a dump of the English structure with e.g. (replace RHASSPY by your device's name): <code>{toJSON($defs{RHASSPY}->{helper}{lng})}</code>, edit the result e.g. using https://jsoneditoronline.org and place this in your own configFile version. There might be some variables to be used - these should also work in your sentences.<br>
-    configFile also allows combining e.g. a default set of german sentences with some few own modifications by using "defaults" subtree for the defaults and "user" subtree for your modified versions. This feature might be helpful in case the base language structure has to be changed in the future.</p>
+    The file itself must contain a JSON-encoded keyword-value structure (partly with sub-structures) following the given structure for the mentioned english defaults. As a reference, there's one available in german, or just make a dump of the English structure with e.g. (replace RHASSPY by your device's name): <code>{toJSON($defs{RHASSPY}->{helper}{lng})}</code>, edit the result e.g. using https://jsoneditoronline.org and place this in your own languageFile version. There might be some variables to be used - these should also work in your sentences.<br>
+    languageFile also allows combining e.g. a default set of german sentences with some few own modifications by using "defaults" subtree for the defaults and "user" subtree for your modified versions. This feature might be helpful in case the base language structure has to be changed in the future.</p>
     <p>Example (placed in the same dir fhem.pl is located):</p>
-    <p><code>attr &lt;rhasspyDevice&gt; configFile ./rhasspy-de.cfg</code></p>
+    <p><code>attr &lt;rhasspyDevice&gt; languageFile ./rhasspy-de.cfg</code></p>
   </li>
 
   <li>
@@ -3596,10 +3673,10 @@ DefaultConfirmation=Klaro, mach ich</code></p>
     The shortcuts are uploaded to Rhasspy when using the updateSlots set-command.<br>
     One shortcut per line, syntax is either a simple and an extended version.</p>
     <p>Examples:</p>
-    <p><code>mute on=set amplifier2 mute on
-lamp off={fhem("set lampe1 off")}
-i="you are so exciting" f="set $NAME speak siteId='livingroom' text='Thanks a lot, you are even more exciting!'"
-i="mute off" p={fhem ("set $NAME mute off")} n=amplifier2 c="Please confirm!"
+    <p><code>mute on=set amplifier2 mute on<br>
+lamp off={fhem("set lampe1 off")}<br>
+i="you are so exciting" f="set $NAME speak siteId='livingroom' text='Thanks a lot, you are even more exciting!'"<br>
+i="mute off" p={fhem ("set $NAME mute off")} n=amplifier2 c="Please confirm!"<br>
 i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code></p>
     <p>Abbreviations explanation:</p>
     <ul>
@@ -3610,7 +3687,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
       <li><b>p</b> => Perl command<br>
       Syntax as usual in FHEMWEB command field, enclosed in {}; this has priority to "f=".</li>
       <li><b>d</b> => device name(s, comma separated) that shall be handed over to fhem.pl as updated. Needed for triggering further actions and longpoll! If not set, the return value of the called function will be used. </li>
-      <li><b>r</b> => Response to be set to the caller. If not set, the return value of the called function will be used.<br>
+      <li><b>r</b> => Response to be send to the caller. If not set, the return value of the called function will be used.<br>
       Response sentence will be parsed to do "set magic"-like replacements, so also a line like <code>i="what's the time for sunrise" r="at [Astro:SunRise] o'clock"</code> is valid.<br>
       You may ask for confirmation as well using the following (optional) shorts:
       <ul>
@@ -3637,6 +3714,13 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         The two numbers are optional. The first one sets the number of repeats, the second is the waiting time between the repeats.<br>
         <i>repeats</i> defaults to 5, <i>wait</i> to 15<br>
         If only one number is set, this will be taken as <i>repeats</i>.</p>
+      </li>
+      <li><p><b>updateSlots</b><br>
+        Changes aspects on slot generation.</p>
+        <code>noEmptySlots=1</code><br>
+        <p>By default, RHASSPY will generate an additional slot for each of the genericDeviceType it recognizes, regardless, if there's any devices marked to belong to this type. If set to <i>1</i>, no empty slots will be generated.</p>
+        <code>overwrite_all=false</code><br>
+        <p>By default, RHASSPY will overwrite all generated slots. Setting this to <i>false</i> will change this.</p>
       </li>
     </ul>
   </li>
