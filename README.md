@@ -147,8 +147,11 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
   Example: `set <rhasspyDevice> fetchSiteIds`
 * **play**\
   Send a WAV file to Rhasspy.\
-  Both arguments (siteId and path) are required!\
-  Example: `set <rhasspyDevice> play siteId="default" path="/opt/fhem/test.wav"`
+  `siteId` and `path` are required!\
+  You may optionally add a number of repeats and a wait time in seconds between repeats. wait defaults to 15, if only repeats is given.\
+  Examples:\
+  `set <rhasspyDevice> play siteId="default" path="/opt/fhem/test.wav"`
+  `set <rhasspyDevice> play siteId="default" path="./test.wav" repeats=3 wait=20`
 * **speak**\
   Voice output over TTS.\
   Both arguments (siteId and text) are required!\
@@ -159,39 +162,40 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
 * **trainRhasspy**\
   Sends a train-command to the HTTP-API of the Rhasspy base.\
   Example: `set <rhasspyDevice> trainRhasspy`
-* **updateSlots**\
-  Sends a command to the HTTP-API of the Rhasspy master to update all slots on Rhasspy with actual FHEM-devices, rooms, etc.\
-  Make sure, baseUrl is set appropriate, otherwise this will fail.\
-  Example: `set <rhasspyDevice> updateSlots`\
-  Updated/Created Slots are
-  - de.fhem.Device
-  - de.fhem.Room
-  - de.fhem.MediaChannels
-  - de.fhem.Color
-  - de.fhem.NumericType
+
 * **update**
   * **devicemap**\
     When the configuration work to RHASSPY and all subordinated devices is finished or there had been changes, issuing a devicemap-update is mandatory, to get the RHASSPY data structure updated, inform Rhasspy on changes that may have occured (update slots) and initiate a training on updated slot values etc.
-	Has to be executed after changes to the attributes of a Rhasspy-controlled devices or the RHASSPY device itself.\
-	Example: `set <rhasspyDevice> update devicemap`
+    Has to be executed after changes to the attributes of a Rhasspy-controlled devices or the RHASSPY device itself.\
+    Example: `set <rhasspyDevice> update devicemap`
   * **devicemap_only**\
     Used to check whether attribute changes have found their way to the data structure. This will neither update slots nor initiate any training towards Rhasspy.\
-	Example: `set <rhasspyDevice> update devicemap_only`
+    Example: `set <rhasspyDevice> update devicemap_only`
   * **slots**\
-    May be helpful after checks on the FHEM side to update all Rhasspy slots and initiate training.\
-	Example: `set <rhasspyDevice> update slots`
+    Sends a command to the HTTP-API of the Rhasspy master to update all slots on Rhasspy with actual FHEM-devices, rooms, etc.\
+    Updated/Created Slots are
+    - en.fhem.AllKeywords
+    - en.fhem.Device
+    - en.fhem.Device-*genericDeviceType*
+    - en.fhem.Group
+    - en.fhem.Room
+    - en.fhem.MediaChannels
+    - en.fhem.Color
+    - en.fhem.NumericType
+   
+    Example: `set <rhasspyDevice> update slots`
   * **slots_no_training**\
-	Same as `slots` without starting a training after updating.\
-	Example: `set <rhasspyDevice> update slots_no_training`
+    Same as `slots` without starting a training after updating.\
+    Example: `set <rhasspyDevice> update slots_no_training`
   * **language**\
     Reinitialization of language file.\
     Be sure to execute this command after changing something in the language-configuration files or the attribute `configFile`!\
     Example: `set <rhasspyDevice> update language`
   * **all**\
     Update devicemap and language.\
-	Example: `set <rhasspyDevice> update all`
+    Example: `set <rhasspyDevice> update all`
 * **volume**\
-	Sets volume of given siteId between 0 and 1 (float)\
+    Sets volume of given siteId between 0 and 1 (float)\
     Both arguments (siteId and volume) are required!\
     Example: `set <rhasspyDevice> siteId="default" volume="0.5"`
   
