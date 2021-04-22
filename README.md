@@ -1,19 +1,17 @@
 # FHEM-rhasspy
 [FHEM](https://fhem.de) module for [Rhasspy](https://github.com/rhasspy)
 
-Thanks to Thyraz, who did all the groundwork with his [Snips-Module](https://github.com/Thyraz/Snips-Fhem).
-
 ## Contents
 [Read First](#Read-First)\
 [About Rhasspy](#About-Rhasspy)\
 [About FHEM-rhasspy](#About-FHEM-rhasspy)\
 [About this repository](#about-this-repository)\
 [Installation of FHEM-rhasspy](#Installation-of-FHEM-rhasspy)\
+[Additionals remarks on MQTT2-IOs](#additionals-remarks-on-mqtt2-ios)\
 [Definition (DEF) in FHEM](#definition-def-in-fhem)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Set-Commands (SET)](#set-commands-set)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attributes (ATTR)](#attributes-attr)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Readings/Events](#readings--events)\
-[Additionals remarks on MQTT2-IOs](#additionals-remarks-on-mqtt2-ios)\
 [Configure FHEM-devices for use with Rhasspy](#configure-fhem-devices-for-use-with-rhasspy)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyName*](#attribute-rhasspyname)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyRoom*](#attribute-rhasspyroom)\
@@ -57,6 +55,8 @@ FHEM-rhasspy evaluates parts of the MQTT traffic, converts these JSON-messages t
 
 FHEM-rhasspy uses the 00_MQTT2_CLIENT.pm module to receive and send these messages. Therefore it is necessary to define an MQTT2_CLIENT device in FHEM before using FHEM-rhasspy.
 
+fhem-rhasspy is based on the [Snips-Module](https://github.com/Thyraz/Snips-Fhem). Thanks to Thyraz, who did all the groundwork with his!
+
 ## About this repository
 
 This repository contains all files to set up a complete installation to test Rhasspy and FHEM with Docker under Windows using the Windows Subsystem for Linux (WSL).
@@ -80,6 +80,17 @@ attr <deviceName> subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
 
 **Important**: The attribute `clientOrder` ist not available in older version of MQTT2_CLIENT. Be sure to use an up-to-date version of this module.
 
+## Additionals remarks on MQTT2-IOs
+Using a separate MQTT server (and not the internal MQTT2_SERVER) is highly recommended, as the Rhasspy scripts also use the MQTT protocol for internal (sound!) data transfers. Best way is to either use MQTT2_CLIENT (see below) or bridge only the relevant topics from mosquitto to MQTT2_SERVER (see e.g. http://www.steves-internet-guide.com/mosquitto-bridge-configuration/ for the principles). When using MQTT2_CLIENT, it's necessary to set `clientOrder` to include RHASSPY (as most likely, it's the only module listening to the CLIENT). It could be just set to `attr <m2client> clientOrder RHASSPY`
+
+Furthermore, you are highly encouraged to restrict subscriptions only to the relevant topics: `attr <m2client> subscriptions setByTheProgram`
+
+In case you are using the MQTT server also for other purposes than Rhasspy, you have to set `subscriptions` manually to at least include the following topics additionally to the other subscriptions desired for other purposes:
+```
+hermes/intent/+
+hermes/dialogueManager/sessionStarted
+hermes/dialogueManager/sessionEnded
+```
 
 ## Definition (DEF) in FHEM
 You can define a new instance of this module with:
@@ -129,15 +140,25 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
 
 ### Set-Commands (SET)
 * **customSlot**\
-  Update a single Rhasspy-slot
+  Creates a new - or overwrites an existing slot - in Rhasspy\
+  Provide slotname, slotdata and (optional) info, if existing data shall be overwritten and training shall be initialized immediately afterwards.\
+  First two arguments are required, third and fourth are optional.\
+  `overwrite` defaults to true, setting any other value than true will keep existing Rhasspy slot data.\
+
+  Examples:\
+  `set <rhasspyDevice> customSlot mySlot a,b,c overwrite training`\
+  `set <rhasspyDevice> customSlot slotname=mySlot slotdata=a,b,c overwrite=false`
 * **fetchSiteIds**\
   Fetch all available siteIds from Rhasspy-Base and create a reading _siteIds_. Used for e.g. to determine on which Rhasspy satellite the user gets informed that a timer has ended.\
   Has to be executed everytime a new satellite is installed or a new siteId is added to Rhasspy.
   Example: `set <rhasspyDevice> fetchSiteIds`
 * **play**\
   Send a WAV file to Rhasspy.\
-  Both arguments (siteId and path) are required!\
-  Example: `set <rhasspyDevice> play siteId="default" path="/opt/fhem/test.wav"`
+  `siteId` and `path` are required!\
+  You may optionally add a number of repeats and a wait time in seconds between repeats. wait defaults to 15, if only repeats is given.\
+  Examples:\
+  `set <rhasspyDevice> play siteId="default" path="/opt/fhem/test.wav"`\
+  `set <rhasspyDevice> play siteId="default" path="./test.wav" repeats=3 wait=20`
 * **speak**\
   Voice output over TTS.\
   Both arguments (siteId and text) are required!\
@@ -148,51 +169,57 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
 * **trainRhasspy**\
   Sends a train-command to the HTTP-API of the Rhasspy base.\
   Example: `set <rhasspyDevice> trainRhasspy`
-* **updateSlots**\
-  Sends a command to the HTTP-API of the Rhasspy master to update all slots on Rhasspy with actual FHEM-devices, rooms, etc.\
-  Make sure, baseUrl is set appropriate, otherwise this will fail.\
-  Example: `set <rhasspyDevice> updateSlots`\
-  Updated/Created Slots are
-  - de.fhem.Device
-  - de.fhem.Room
-  - de.fhem.MediaChannels
-  - de.fhem.Color
-  - de.fhem.NumericType
+
 * **update**
   * **devicemap**\
     When the configuration work to RHASSPY and all subordinated devices is finished or there had been changes, issuing a devicemap-update is mandatory, to get the RHASSPY data structure updated, inform Rhasspy on changes that may have occured (update slots) and initiate a training on updated slot values etc.
-	Has to be executed after changes to the attributes of a Rhasspy-controlled devices or the RHASSPY device itself.\
-	Example: `set <rhasspyDevice> update devicemap`
+    Has to be executed after changes to the attributes of a Rhasspy-controlled devices or the RHASSPY device itself.\
+    Example: `set <rhasspyDevice> update devicemap`
   * **devicemap_only**\
     Used to check whether attribute changes have found their way to the data structure. This will neither update slots nor initiate any training towards Rhasspy.\
-	Example: `set <rhasspyDevice> update devicemap_only`
+    Example: `set <rhasspyDevice> update devicemap_only`
   * **slots**\
-    May be helpful after checks on the FHEM side to update all Rhasspy slots and initiate training.\
-	Example: `set <rhasspyDevice> update slots`
+    Sends a command to the HTTP-API of the Rhasspy master to update all slots on Rhasspy with actual FHEM-devices, rooms, etc.\
+    Updated/Created Slots are
+    - en.fhem.AllKeywords
+    - en.fhem.Device
+    - en.fhem.Device-*genericDeviceType*
+    - en.fhem.Group
+    - en.fhem.Room
+    - en.fhem.MediaChannels
+    - en.fhem.Color
+    - en.fhem.NumericType
+   
+    Example: `set <rhasspyDevice> update slots`
   * **slots_no_training**\
-	Same as `slots` without starting a training after updating.\
-	Example: `set <rhasspyDevice> update slots_no_training`
+    Same as `slots` without starting a training after updating.\
+    Example: `set <rhasspyDevice> update slots_no_training`
   * **language**\
     Reinitialization of language file.\
     Be sure to execute this command after changing something in the language-configuration files or the attribute `configFile`!\
     Example: `set <rhasspyDevice> update language`
   * **all**\
     Update devicemap and language.\
-	Example: `set <rhasspyDevice> update all`
+    Example: `set <rhasspyDevice> update all`
 * **volume**\
-	Sets volume of given siteId between 0 and 1 (float)\
+    Sets volume of given siteId between 0 and 1 (float)\
     Both arguments (siteId and volume) are required!\
     Example: `set <rhasspyDevice> siteId="default" volume="0.5"`
-  
-  
-  **Do not forget to issue an `update devicemap` after making any changes to Rhasspy-controlled devices or the RHASSPY-device itself!**
+
+
+**Do not forget to issue an `update devicemap` after making any changes to Rhasspy-controlled devices or the RHASSPY-device itself!**
 
 ### Attributes (ATTR)
 * **IODev**\
   The MQTT2_CLIENT device FHEM-rhasspy is connected to.
   Example: `attr <rhasspyDevice> IODev rhasspyMQTT2`
 * **configFile**\
-  Path to the language-config file. If this attribute isn't set, english is used for voice responses.\
+  Path to the language-config file.\
+  If this attribute isn't set, english is used for voice responses.
+  
+  The file itself must contain a JSON-encoded keyword-value structure following the given structure for the mentioned english defaults. As a reference, there is a german language file available. Or it's possible to make a dump of the english structure (with e.g.: `{toJSON($defs{RHASSPY}->{helper}{lng})}`; replace RHASSPY by your device's name). Create a new file and edit this results as desired. There might be some variables to be used - these should also work in your sentences.\
+  configFile also allows combining a default set of e.g. german sentences with some few own modifications by using "defaults" subtree for the defaults and "user" subtree for your modified versions. This feature might be helpful in case the base language structure has to be changed in the future.
+  
   Example: `attr <rhasspyDevice> configFile ./.config/rhasspy/rhasspy-de.cfg`
 * **forceNEXT**\
   If set to 1, RHASSPY will forward incoming messages also to further MQTT2-IO-client modules like MQTT2_DEVICE, even if the topic matches to one of it's own subscriptions. By default, these messages will not be forwarded for better compability with autocreate feature on MQTT2_DEVICE. See also [clientOrder](https://commandref.fhem.de/commandref.html#MQTT2_CLIENT) attribute in MQTT2 IO-type commandrefs. Setting this in one instance of RHASSPY might affect others, too.
@@ -224,12 +251,17 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
   * DATA => entire JSON-$data (as parsed internally, JSON-encoded)
   * siteId, Device etc. => any element out of the JSON-$data
 
+  If a simple text is returned, this will be considered as response.\
+  For more advanced use of this feature, you may return an array. First element of the array will be interpreted as comma-separated list of devices that may have been modified (otherwise, these devices will not cast any events! See also the "d" parameter in *rhasspyShortcuts*). The second element is interpreted as response and may either be simple text or HASH-type data. This will keep the dialogue-session open to allow interactive data exchange with Rhasspy. An open dialogue will be closed after some time, default is 20 seconds, you may alternatively hand over other numeric values as third element of the array.
+
 * **rhasspyShortcuts**\
   Define custom sentences without editing Rhasspy sentences.ini.\
   The shortcuts are uploaded to Rhasspy when using the `update slots` (or `update devicemap`) set-command.\
   One shortcut per line, syntax is either a simple or an extended version.\
   Examples:
   ```
+  mute on=set amplifier mute on
+  mute off={fhem("set amplifier mute off")}
   i="turn dark" f="set bulb1 off" d="bulb1"
   i="turn bright" f="set bulb1 on" d="bulb1"
   i="let it be day" p={fhem ("set $NAME on")} d="bulb01"
@@ -250,13 +282,14 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
   * **d**: device name(s)\
     Device name(s, comma separated) that will be handed over to fhem.pl as updated devices. Needed for triggering further actions and longpoll! If not set, the return value of the called function will be used.
   * **r**: response\
-    Response to be set to the caller. If not set, the return value of the called function will be used.\
+    Response to be send to the caller. If not set, the return value of the called function will be used.\
+    Response sentence will be parsed to do "set magic"-like replacements, so also a line like `i="what's the time for sunrise" r="at [Astro:SunRise] o'clock"` is valid.
 	You may ask for confirmation as well using the following (optional) shorts:
     * **c**: Confirmation request: Command will only be executed, when separate confirmation is spoken. Value _c_ is either numeric or text. If numeric: Timeout to wait for automatic cancellation. If text: response to send to ask for confirmation.
     * **ct**: Numeric value for timeout in seconds, default: 15
 
 * **rhasspyTweaks**\
-  Not fully implemented yet.\
+  Currently sets additional settings for timers. May contain further custom settings in future versions like siteId2room info or code links, allowed commands, confirmation requests etc.\
   Could be the place to configure additional things like additional siteId2room info or code links, allowed commands, duration of SetTimer sounds, confirmation requests etc.\
   * **timerLimits**\
     See intent [SetTimer](#settimer)
@@ -290,39 +323,27 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
   Contains the last response ot the `updateSlots` command.`
 
 
-## Additionals remarks on MQTT2-IOs
-Using a separate MQTT server (and not the internal MQTT2_SERVER) is highly recommended, as the Rhasspy scripts also use the MQTT protocol for internal (sound!) data transfers. Best way is to either use MQTT2_CLIENT (see below) or bridge only the relevant topics from mosquitto to MQTT2_SERVER (see e.g. http://www.steves-internet-guide.com/mosquitto-bridge-configuration/ for the principles). When using MQTT2_CLIENT, it's necessary to set `clientOrder` to include RHASSPY (as most likely, it's the only module listening to the CLIENT). It could be just set to `attr <m2client> clientOrder RHASSPY`\
-
-Furthermore, you are highly encouraged to restrict subscriptions only to the relevant topics: `attr <m2client> subscriptions setByTheProgram`\
-
-In case you are using the MQTT server also for other purposes than Rhasspy, you have to set `subscriptions` manually to at least include the following topics additionally to the other subscriptions desired for other purposes:
-```
-hermes/intent/+
-hermes/dialogueManager/sessionStarted
-hermes/dialogueManager/sessionEnded
-```
-
 ## Configure FHEM-devices for use with Rhasspy
 To control a device with voice-commands, Rhasspy needs to now some information about the device. It collects this information from the following attributes or from the *genericDeviceType*-attribute.\
 Except for *genericDeviceType*, all attribute-names are starting with the prefix used while defining the RHASSPY-device. The following uses the default value *rhasspy*.
 
 
 **Important**: 
-* Be sure to execute `update devicemap` when changing of the following attributes has been competed - otherwise neither RHASSPY nor Rhasspy will know the changed values! 
+* Be sure to execute `update devicemap` everytime after changing one of the following attributes - otherwise neither RHASSPY nor Rhasspy will know the changed values
 * RHASSPY will consolidate all information given in the attributes in it's own device hash. Use _list_ command to see result of the consolidation process initiated by the `update devicemap` command. All names and other "labels" are converted to lower case, so make sure, Rhasspy is also delivering lower case values when filling slots manually.
-* Minimum requirements for a FHEM device to work with RHASSPY are:
-** Device has to match devspec
-** at least (just) one of the following attributes has to be set in the device (basically, genericDeviceType or one of the RHASSPY-specific mapping attributes).
+* Minimum requirements for a FHEM device to work with RHASSPY are:\
+  * Device has to match devspec
+  * at least one of the following attributes has to be set in the device (basically, genericDeviceType or one of the RHASSPY-specific mapping attributes).
 * mapping logic generally is as follows:
-** if RHASSPY-specific attributes are provided, only the value of this attribute will **exclusively** be used (obviously: only for the purpose of the specific attribute, so e.g. setting _rhasspyName_ will not prevent analysis of _genericDeviceType_ possibilities to set the device _on_ or _off_ or it's _brighness_).   
-** the more specific attribute values will override the less specific ones. So, (if no _rhasspyName_ is set) _alias_ will prevent using (technical) _device name_ to be used, and having set _alexaName_ will result in (to some extend exclusive) use of the values set there. If two possibilities are on the same "specific level" (e.g. _alexaName_ and _siriName_ are set), both will be used.  
-* attribute values typically are typically read "line by line", following the general rule "one topic per line". So make sure to set newline marks at the right places!
+  * if RHASSPY-specific attributes are provided, only the value of this attribute will **exclusively** be used (obviously: only for the purpose of the specific attribute, so e.g. setting _rhasspyName_ will not prevent analysis of _genericDeviceType_ possibilities to set the device _on_ or _off_ or it's _brighness_).   
+  * the more specific attribute values will override the less specific ones. So, (if no _rhasspyName_ is set) _alias_ will prevent using (technical) _device name_ to be used, and having set _alexaName_ will result in (to some extend exclusive) use of the values set there. If two possibilities are on the same "specific level" (e.g. _alexaName_ and _siriName_ are set), both will be used.  
+* attribute values typically are typically read "line by line", following the general rule "one topic per line". So make sure to set newline marks at the right places
 
 ### Attribute genericDeviceType
 
 **Work in progress - you are strongly encouraged to test this new feature!**
 
-When activated (default is on), RHASSPY will try to derive mapping (and other) information from the attributes already present (if devices match devspec). Atm, the following subset of _genericDeviceType_ is supported:  
+When activated (default is on), RHASSPY will try to determine mapping (and other) information from the attributes already present (if devices match devspec). Currently the following subset of _genericDeviceType_ is supported:  
 * switch
 * light (no color features atm)
 * thermostat
