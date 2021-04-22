@@ -146,7 +146,7 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
   `overwrite` defaults to true, setting any other value than true will keep existing Rhasspy slot data.\
 
   Examples:\
-  `set <rhasspyDevice> customSlot mySlot a,b,c overwrite training`
+  `set <rhasspyDevice> customSlot mySlot a,b,c overwrite training`\
   `set <rhasspyDevice> customSlot slotname=mySlot slotdata=a,b,c overwrite=false`
 * **fetchSiteIds**\
   Fetch all available siteIds from Rhasspy-Base and create a reading _siteIds_. Used for e.g. to determine on which Rhasspy satellite the user gets informed that a timer has ended.\
@@ -157,7 +157,7 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
   `siteId` and `path` are required!\
   You may optionally add a number of repeats and a wait time in seconds between repeats. wait defaults to 15, if only repeats is given.\
   Examples:\
-  `set <rhasspyDevice> play siteId="default" path="/opt/fhem/test.wav"`
+  `set <rhasspyDevice> play siteId="default" path="/opt/fhem/test.wav"`\
   `set <rhasspyDevice> play siteId="default" path="./test.wav" repeats=3 wait=20`
 * **speak**\
   Voice output over TTS.\
@@ -215,10 +215,10 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
   Example: `attr <rhasspyDevice> IODev rhasspyMQTT2`
 * **configFile**\
   Path to the language-config file.\
-  If this attribute isn't set, english is used for voice responses.\
+  If this attribute isn't set, english is used for voice responses.
   
   The file itself must contain a JSON-encoded keyword-value structure following the given structure for the mentioned english defaults. As a reference, there is a german language file available. Or it's possible to make a dump of the english structure (with e.g.: `{toJSON($defs{RHASSPY}->{helper}{lng})}`; replace RHASSPY by your device's name). Create a new file and edit this results as desired. There might be some variables to be used - these should also work in your sentences.\
-  configFile also allows combining a default set of e.g. german sentences with some few own modifications by using "defaults" subtree for the defaults and "user" subtree for your modified versions. This feature might be helpful in case the base language structure has to be changed in the future.\
+  configFile also allows combining a default set of e.g. german sentences with some few own modifications by using "defaults" subtree for the defaults and "user" subtree for your modified versions. This feature might be helpful in case the base language structure has to be changed in the future.
   
   Example: `attr <rhasspyDevice> configFile ./.config/rhasspy/rhasspy-de.cfg`
 * **forceNEXT**\
@@ -251,12 +251,17 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
   * DATA => entire JSON-$data (as parsed internally, JSON-encoded)
   * siteId, Device etc. => any element out of the JSON-$data
 
+  If a simple text is returned, this will be considered as response.\
+  For more advanced use of this feature, you may return an array. First element of the array will be interpreted as comma-separated list of devices that may have been modified (otherwise, these devices will not cast any events! See also the "d" parameter in *rhasspyShortcuts*). The second element is interpreted as response and may either be simple text or HASH-type data. This will keep the dialogue-session open to allow interactive data exchange with Rhasspy. An open dialogue will be closed after some time, default is 20 seconds, you may alternatively hand over other numeric values as third element of the array.
+
 * **rhasspyShortcuts**\
   Define custom sentences without editing Rhasspy sentences.ini.\
   The shortcuts are uploaded to Rhasspy when using the `update slots` (or `update devicemap`) set-command.\
   One shortcut per line, syntax is either a simple or an extended version.\
   Examples:
   ```
+  mute on=set amplifier mute on
+  mute off={fhem("set amplifier mute off")}
   i="turn dark" f="set bulb1 off" d="bulb1"
   i="turn bright" f="set bulb1 on" d="bulb1"
   i="let it be day" p={fhem ("set $NAME on")} d="bulb01"
@@ -277,13 +282,14 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
   * **d**: device name(s)\
     Device name(s, comma separated) that will be handed over to fhem.pl as updated devices. Needed for triggering further actions and longpoll! If not set, the return value of the called function will be used.
   * **r**: response\
-    Response to be set to the caller. If not set, the return value of the called function will be used.\
+    Response to be send to the caller. If not set, the return value of the called function will be used.\
+    Response sentence will be parsed to do "set magic"-like replacements, so also a line like `i="what's the time for sunrise" r="at [Astro:SunRise] o'clock"` is valid.
 	You may ask for confirmation as well using the following (optional) shorts:
     * **c**: Confirmation request: Command will only be executed, when separate confirmation is spoken. Value _c_ is either numeric or text. If numeric: Timeout to wait for automatic cancellation. If text: response to send to ask for confirmation.
     * **ct**: Numeric value for timeout in seconds, default: 15
 
 * **rhasspyTweaks**\
-  Not fully implemented yet.\
+  Currently sets additional settings for timers. May contain further custom settings in future versions like siteId2room info or code links, allowed commands, confirmation requests etc.\
   Could be the place to configure additional things like additional siteId2room info or code links, allowed commands, duration of SetTimer sounds, confirmation requests etc.\
   * **timerLimits**\
     See intent [SetTimer](#settimer)
