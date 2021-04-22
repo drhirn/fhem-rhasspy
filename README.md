@@ -925,14 +925,14 @@ Required tags to cancel a timer:
 * Label
 
 #### rhasspyTweaks for Timer
-* **timerLimits**
+* **timerLimits**\
   Used to determine when the timer should response with e.g. "set to 30 minutes" or with "set to 10:30"\
 
   Example:
   ```
   timerLimits=90,300,3000,2*HOURSECONDS,50
   ```
-* **timerSounds**
+* **timerSounds**\
   Per default the timer responds with a voice command if it has elapsed. If you want to use a wav-file instead, you can set this here.
 
   All five values have to be set, corresponding with the limits to *timerSet* responses.\
