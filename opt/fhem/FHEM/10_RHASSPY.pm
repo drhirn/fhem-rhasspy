@@ -3695,35 +3695,35 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         <li><b>ct</b> => numeric value for timeout in seconds, default: 15.</li>
       </ul></li>
     </ul>
-  </li>
+  </li><br>
 
   <li>
     <a id="RHASSPY-attr-rhasspyTweaks"></a><b>rhasspyTweaks</b>
-    <p>Currently sets additional settings for timers. May contain further custom settings in future versions like siteId2room info or code links, allowed commands, confirmation requests etc.</p>
+    <p>Currently sets additional settings for timers and slot-updates to Rhasspy. May contain further custom settings in future versions like siteId2room info or code links, allowed commands, confirmation requests etc.</p>
     <ul>
-      <li><p><b>timerLimits</b><br>
-        Used to determine when the timer should response with e.g. "set to 30 minutes" or with "set to 10:30"</p>
-        <code>timerLimits=90,300,3000,2*HOURSECONDS,50</code>
+      <li><b>timerLimits</b>
+        <p>Used to determine when the timer should response with e.g. "set to 30 minutes" or with "set to 10:30"</p>
+        <p><code>timerLimits=90,300,3000,2*HOURSECONDS,50</code></p>
         <p>Five values have to be set, corresponding with the limits to <i>timerSet</i> responses. so above example will lead to seconds response for less then 90 seconds, minute+seconds response for less than 300 seconds etc.. Last value is the limit in seconds, if timer is set in time of day format.</p>
       </li>
-      <li><p><b>timerSounds</b><br>
-        Per default the timer responds with a voice command if it has elapsed. If you want to use a wav-file instead, you can set this here.</p>
-        <code>timerSounds= default=./yourfile1.wav eggs=3:20:./yourfile2.wav potatoes=5:./yourfile3.wav</code><br>
+      <li><b>timerSounds</b>
+        <p>Per default the timer responds with a voice command if it has elapsed. If you want to use a wav-file instead, you can set this here.</p>
+        <p><code>timerSounds= default=./yourfile1.wav eggs=3:20:./yourfile2.wav potatoes=5:./yourfile3.wav</code></p>
         <p>Above keys are some examples and need to match the "Label"-tags for the timer provided by the Rhasspy-sentences.<br>
         <i>default</i> is optional. If set, this file will be used for all labeled timer without match to other keywords.<br>
         The two numbers are optional. The first one sets the number of repeats, the second is the waiting time between the repeats.<br>
         <i>repeats</i> defaults to 5, <i>wait</i> to 15<br>
         If only one number is set, this will be taken as <i>repeats</i>.</p>
       </li>
-      <li><p><b>updateSlots</b><br>
-        Changes aspects on slot generation.</p>
-        <code>noEmptySlots=1</code><br>
+      <li><b>updateSlots</b>
+        <p>Changes aspects on slot generation and updates.</p>
+        <p><code>noEmptySlots=1</code></p>
         <p>By default, RHASSPY will generate an additional slot for each of the genericDeviceType it recognizes, regardless, if there's any devices marked to belong to this type. If set to <i>1</i>, no empty slots will be generated.</p>
-        <code>overwrite_all=false</code><br>
+        <p><code>overwrite_all=false</code></p>
         <p>By default, RHASSPY will overwrite all generated slots. Setting this to <i>false</i> will change this.</p>
       </li>
     </ul>
-  </li>
+  </li><br>
 
   <li>
     <a id="RHASSPY-attr-forceNext"></a><b>forceNEXT</b>
