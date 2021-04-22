@@ -140,7 +140,14 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
 
 ### Set-Commands (SET)
 * **customSlot**\
-  Update a single Rhasspy-slot
+  Creates a new - or overwrites an existing slot - in Rhasspy\
+  Provide slotname, slotdata and (optional) info, if existing data shall be overwritten and training shall be initialized immediately afterwards.\
+  First two arguments are required, third and fourth are optional.\
+  `overwrite` defaults to true, setting any other value than true will keep existing Rhasspy slot data.\
+
+  Examples:\
+  `set <rhasspyDevice> customSlot mySlot a,b,c overwrite training`
+  `set <rhasspyDevice> customSlot slotname=mySlot slotdata=a,b,c overwrite=false`
 * **fetchSiteIds**\
   Fetch all available siteIds from Rhasspy-Base and create a reading _siteIds_. Used for e.g. to determine on which Rhasspy satellite the user gets informed that a timer has ended.\
   Has to be executed everytime a new satellite is installed or a new siteId is added to Rhasspy.
@@ -198,16 +205,21 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
     Sets volume of given siteId between 0 and 1 (float)\
     Both arguments (siteId and volume) are required!\
     Example: `set <rhasspyDevice> siteId="default" volume="0.5"`
-  
-  
-  **Do not forget to issue an `update devicemap` after making any changes to Rhasspy-controlled devices or the RHASSPY-device itself!**
+
+
+**Do not forget to issue an `update devicemap` after making any changes to Rhasspy-controlled devices or the RHASSPY-device itself!**
 
 ### Attributes (ATTR)
 * **IODev**\
   The MQTT2_CLIENT device FHEM-rhasspy is connected to.
   Example: `attr <rhasspyDevice> IODev rhasspyMQTT2`
 * **configFile**\
-  Path to the language-config file. If this attribute isn't set, english is used for voice responses.\
+  Path to the language-config file.\
+  If this attribute isn't set, english is used for voice responses.\
+  
+  The file itself must contain a JSON-encoded keyword-value structure following the given structure for the mentioned english defaults. As a reference, there is a german language file available. Or it's possible to make a dump of the english structure (with e.g.: `{toJSON($defs{RHASSPY}->{helper}{lng})}`; replace RHASSPY by your device's name). Create a new file and edit this results as desired. There might be some variables to be used - these should also work in your sentences.\
+  configFile also allows combining a default set of e.g. german sentences with some few own modifications by using "defaults" subtree for the defaults and "user" subtree for your modified versions. This feature might be helpful in case the base language structure has to be changed in the future.\
+  
   Example: `attr <rhasspyDevice> configFile ./.config/rhasspy/rhasspy-de.cfg`
 * **forceNEXT**\
   If set to 1, RHASSPY will forward incoming messages also to further MQTT2-IO-client modules like MQTT2_DEVICE, even if the topic matches to one of it's own subscriptions. By default, these messages will not be forwarded for better compability with autocreate feature on MQTT2_DEVICE. See also [clientOrder](https://commandref.fhem.de/commandref.html#MQTT2_CLIENT) attribute in MQTT2 IO-type commandrefs. Setting this in one instance of RHASSPY might affect others, too.
