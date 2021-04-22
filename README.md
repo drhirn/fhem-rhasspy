@@ -511,6 +511,13 @@ Example-Rhasspy-Sentences:
 (turn on|open){Value:on} all $de.fhem.Group{Group} (:){Room:global}([$en.fhem.Room{Room}])
 (turn off|close){Value:off} all $de.fhem.Group{Group} (:){Room:global}([$de.fhem.Room{Room}])
 ```
+
+Required tags:
+* Value:on and/or Value:off
+* Group
+
+Optional tags:
+* Room
  
 ### GetOnOff
 Intent to request the current state of a device.
@@ -543,6 +550,13 @@ Example-Rhasspy-Sentences:
 ```
 
 Be sure to split on- and off-states into different sentences including *{State:on}* and *{State:off}*
+
+Required tags:
+* State:on and/or State:off
+* Device
+
+Optional tags:
+* Room
 
 ### SetNumeric
 
@@ -910,12 +924,24 @@ Required tags to set a timer:
 Required tags to cancel a timer:
 * Label
 
-**rhasspyTweaks**
-```
-timerLimits=90,300,3000,2*HOURSECONDS,50
-```
-All five values have to be set, corresponding with the limits to *timerSet* responses.\
-Above example will lead to seconds response for less then 90 seconds, minute+seconds response for less than 300 seconds etc.. Last value is the limit in seconds, if timer is set in time of day format.
+#### rhasspyTweaks for Timer
+* **timerLimits**
+  Used to determine when the timer should response with e.g. "set to 30 minutes" or with "set to 10:30"\
+
+  Example:
+  ```
+  timerLimits=90,300,3000,2*HOURSECONDS,50
+  ```
+* **timerSounds**
+  Per default the timer responds with a voice command if it has elapsed. If you want to use a wav-file instead, you can set this here.
+
+  All five values have to be set, corresponding with the limits to *timerSet* responses.\
+  Following example will lead to seconds response for less then 90 seconds, minute+seconds response for less than 300 seconds etc.. Last value is the limit in seconds, if timer is set in time of day format.
+
+  Example:
+  ```
+  timerSounds= default=./yourfile1.wav eggs=3:20:./yourfile2.wav potatoes=5:./yourfile3.wav
+  ```
 
 ### SetMute
 
