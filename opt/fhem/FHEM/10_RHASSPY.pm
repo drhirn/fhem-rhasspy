@@ -303,7 +303,7 @@ sub RHASSPY_Initialize {
     $hash->{DeleteFn}    = \&RHASSPY_Delete;
     $hash->{SetFn}       = \&RHASSPY_Set;
     $hash->{AttrFn}      = \&RHASSPY_Attr;
-    $hash->{AttrList}    = "IODev rhasspyIntents:textField-long shortcuts:textField-long rhasspyTweaks:textField-long response:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals configFile " . $readingFnAttributes;
+    $hash->{AttrList}    = "IODev rhasspyIntents:textField-long rhasspyShortcuts:textField-long rhasspyTweaks:textField-long response:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals configFile " . $readingFnAttributes;
     $hash->{Match}       = q{.*};
     $hash->{ParseFn}     = \&RHASSPY_Parse;
     $hash->{parseParams} = 1;
@@ -324,7 +324,7 @@ sub RHASSPY_Define {
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.4.9';
+    $hash->{MODULE_VERSION} = '0.4.10';
     $hash->{baseUrl} = $Rhasspy;
     #$hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
@@ -556,7 +556,7 @@ sub RHASSPY_Attr {
         return;
     }
 
-    if ( $attribute eq 'shortcuts' ) {
+    if ( $attribute eq 'rhasspyShortcuts' ) {
         for ( keys %{ $hash->{helper}{shortcuts} } ) {
             delete $hash->{helper}{shortcuts}{$_};
         }
@@ -2969,9 +2969,6 @@ sub RHASSPY_handleIntentMediaChannels {
 sub RHASSPY_handleIntentSetColor {
     my $hash = shift // return;
     my $data = shift // return;
-                                    
-            
-                 
 
     Log3($hash->{NAME}, 5, "handleIntentSetColor called");
     my $response;
@@ -2987,7 +2984,6 @@ sub RHASSPY_handleIntentSetColor {
     my $cmd = RHASSPY_getCmd($hash, $device, 'rhasspyColors', $color, undef);
 
     return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, RHASSPY_getResponse($hash, 'NoDeviceFound')) if !defined $device;
-                                                                          
 
     if ( defined $cmd ) {
         $response = RHASSPY_getResponse($hash, 'DefaultConfirmation');
@@ -3046,6 +3042,7 @@ sub RHASSPY_runSetColorCmd {
 
     return "function not implemented yet"
 }
+
 # Handle incoming SetTimer intents
 sub RHASSPY_handleIntentSetTimer {
     my $hash = shift;
@@ -3363,9 +3360,6 @@ __END__
 
 =begin ToDo
 
-# Attribute:
- - "shortcuts" in "rhasspyShortcuts" umbenennen
-
 # Custom Intents
  - Bei Verwendung des Dialouges wenn man keine Antwort spricht, bricht Rhasspy ab. Die voice response "Tut mir leid, da hat etwas zu lange gedauert" wird
    also gar nicht ausgegeben.
@@ -3435,7 +3429,7 @@ So all parameters in define should be provided in the <i>key=value</i> form. In 
 
 <p>RHASSPY needs a <a href="#MQTT2_CLIENT">MQTT2_CLIENT</a> device connected to the same MQTT-Server as the voice assistant (Rhasspy) service.</p>
 <p><b>Example for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</b></p>
-<p><code>defmod rhasspyMQTT2 MQTT2_CLIENT rhasspy:12183<br>
+<p><code>defmod rhasspyMQTT2 MQTT2_CLIENT 192.168.1.122:12183<br>
 attr rhasspyMQTT2 clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE<br>
 attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded</code></p>
 <p><code>define Rhasspy RHASSPY devspec=room=Rhasspy defaultRoom=Livingroom language=en</code></p>
@@ -3593,11 +3587,11 @@ DefaultConfirmation=Klaro, mach ich</code></p>
     <li>siteId, Device etc. => any element out of the JSON-$data.</li>
     </ul>
     <p>If a simple text is returned, this will be considered as response.<br>
-    For more advanced use of this feature, you may return an array. First element of the array will be interpreted as comma-separated list of devices that may have been modified (otherwise, these devices will not cast any events! See also the "d" parameter in <a href="#RHASSPY-attr-shortcuts"><i>shotcuts</i></a>). The second element is interpreted as response and may either be simple text or HASH-type data. This will keep the dialogue-session open to allow interactive data exchange with <i>Rhasspy</i>. An open dialogue will be closed after some time, default is 20 seconds, you may alternatively hand over other numeric values as third element of the array.</p>
+    For more advanced use of this feature, you may return an array. First element of the array will be interpreted as comma-separated list of devices that may have been modified (otherwise, these devices will not cast any events! See also the "d" parameter in <a href="#RHASSPY-attr-rhasspyShortcuts"><i>rhasspyShortcuts</i></a>). The second element is interpreted as response and may either be simple text or HASH-type data. This will keep the dialogue-session open to allow interactive data exchange with <i>Rhasspy</i>. An open dialogue will be closed after some time, default is 20 seconds, you may alternatively hand over other numeric values as third element of the array.</p>
   </li>
 
   <li>
-    <a id="RHASSPY-attr-shortcuts"></a><b>shortcuts</b>
+    <a id="RHASSPY-attr-rhasspyShortcuts"></a><b>rhasspyShortcuts</b>
     <p>Define custom sentences without editing Rhasspys sentences.ini<br>
     The shortcuts are uploaded to Rhasspy when using the updateSlots set-command.<br>
     One shortcut per line, syntax is either a simple and an extended version.</p>
@@ -3628,7 +3622,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
 
   <li>
     <a id="RHASSPY-attr-rhasspyTweaks"></a><b>rhasspyTweaks</b>
-    <p>Sets additional settings like siteId2room info or code links, allowed commands, confirmation requests etc.</p>
+    <p>Currently sets additional settings for timers. May contain further custom settings in future versions like siteId2room info or code links, allowed commands, confirmation requests etc.</p>
     <ul>
       <li><p><b>timerLimits</b><br>
         Used to determine when the timer should response with e.g. "set to 30 minutes" or with "set to 10:30"</p>
