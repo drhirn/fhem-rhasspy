@@ -13,12 +13,14 @@
 &nbsp;&nbsp;&nbsp;&nbsp;[Attributes (ATTR)](#attributes-attr)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Readings/Events](#readings--events)\
 [Configure FHEM-devices for use with Rhasspy](#configure-fhem-devices-for-use-with-rhasspy)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Attribute *genericDeviceType*](#attribute-genericdevicetype)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyName*](#attribute-rhasspyname)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyRoom*](#attribute-rhasspyroom)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyMapping*](#attribute-rhasspymapping)\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Formatting Commands and Readings inside a *rhasspyMapping*](#formatting-commands-and-readings-inside-a-rhasspymapping)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyChannels*](#attribute-rhasspychannels)\
-&nbsp;&nbsp;&nbsp;&nbsp;[Attribute *genericDeviceType*](#attribute-genericdevicetype)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspyColors*](#attribute-rhasspycolors)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Attribute *rhasspySpecials*](#attribute-rhasspyspecials)\
 [Intents](#intents)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetOnOff](#setonoff)\
 &nbsp;&nbsp;&nbsp;&nbsp;[SetOnOffGroup](#setonoffgroup)\
@@ -289,12 +291,21 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
     * **ct**: Numeric value for timeout in seconds, default: 15
 
 * **rhasspyTweaks**\
-  Currently sets additional settings for timers. May contain further custom settings in future versions like siteId2room info or code links, allowed commands, confirmation requests etc.\
+  Currently sets additional settings for timers and slot-updates to Rhasspy. May contain further custom settings in future versions like siteId2room info or code links, allowed commands, confirmation requests etc.\
   Could be the place to configure additional things like additional siteId2room info or code links, allowed commands, duration of SetTimer sounds, confirmation requests etc.\
   * **timerLimits**\
     See intent [SetTimer](#settimer)
   * **timerSounds**\
     You may play (and repeat) WAV files instead of default one-time spoken info, when timer is ending. See intent [SetTimer](#settimer)
+  * **updateSlots**\
+    Changes aspects on slot generation and updates.
+    
+    `noEmptySlots=1`
+    By default, RHASSPY will generate an additional slot for each of the genericDeviceType it recognizes, regardless, if there's any devices marked to belong to this type. If set to 1, no empty slots will be generated.
+
+    `overwrite_all=false`
+    By default, RHASSPY will overwrite all generated slots. Setting this to false will change this.
+
 
 ### Readings / Events
 * **lastIntentPayload**\
@@ -345,7 +356,7 @@ Except for *genericDeviceType*, all attribute-names are starting with the prefix
 
 When activated (default is on), RHASSPY will try to determine mapping (and other) information from the attributes already present (if devices match devspec). Currently the following subset of _genericDeviceType_ is supported:  
 * switch
-* light (no color features atm)
+* light
 * thermostat
 * blind
 * media
@@ -382,17 +393,10 @@ Example:
 attr <device> rhasspyMapping SetOnOff:cmdOn=on,cmdOff=off,response="All right"
 GetOnOff:currentVal=state,valueOff=off
 GetNumeric:currentVal=pct,type=brightness
-SetNumeric:currentVal=pct,minVal=0,maxVal=100,map=percent,cmd=pct,step=1,type=brightness
+SetNumeric:currentVal=brightness,cmd=brightness,minVal=0,maxVal=255,map=percent,step=1,type=brightness
 Status:response=The brightness in the kitchen is at [<device>:pct]
 MediaControls:cmdPlay=play,cmdPause=pause,cmdStop=stop,cmdBack=previous,cmdFwd=next
 ```
-
-<!--
-Gibt man bei der Option `currentVal` das Reading im Format *reading* oder *Device:reading* an,\
-kann mit der Option `part` das Reading an Leerzeichen getrennt werden.\
-Über `part=1` bestimmt ihr, dass nur der erst Teil des Readings übernommen werden soll.\
-Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
--->
 
 #### Formatting Commands and Readings inside a *rhasspyMapping*
 Some intents can use FHEM-commands or -readings to get or set values.\
@@ -415,9 +419,42 @@ One line per channel.
 
 Example:
 ```
-attr <device> rhasspyChannels orf eins=set <device> channel 201
-orf zwei=set <device> channel 202
+attr <device> rhasspyChannels orf eins=channel 201
+orf zwei=channel 202
+orf drei=channel 203
 ```
+
+### Attribute rhasspyColors
+Used to change to colors of a light\
+key=value line by line arguments mapping keys to setter strings on the same device.
+
+Example:
+```
+attr lamp1 rhasspyColors red=rgb FF0000
+green=rgb 008000
+blue=rgb 0000FF
+yellow=rgb FFFF00
+```
+
+### Attribute rhasspySpecials
+key=value line by line arguments similar to rhasspyTweaks\
+Currently only group related stuff is implemented, this could be the place to hold additional options, e.g. for confirmation requests.
+
+Example:
+```
+attr lamp1 rhasspySpecials group:async_delay=100 prio=1 group=lights
+```
+
+Explanation on the above group line. All arguments are optional:
+
+* **group**
+  If set, the device will not be directly addressed, but the mentioned group - typically a FHEM structure device or a HUEDevice-type group. This has the advantage of saving RF ressources and/or already implemented logics.\
+  Note: all addressed devices will be switched, even if they are not member of the rhasspyGroup. Each group should only be addressed once, but it's recommended to put this info in all devices under RHASSPY control in the same external group logic.
+  * **async_delay**
+  Float nummeric value, just as async_delay in structure; the delay will be obeyed prior to the next sending command.
+  * **prio**
+  Numeric value, defaults to "0". prio and async_delay will be used to determine the sending order as follows: first devices will be those with lowest prio arg, second sort argument is async_delay with lowest value first
+
 
 ## Intents
 Intents are used to tell FHEM what to do after receiving a voice-/text-command. This module has some build-in intents.
