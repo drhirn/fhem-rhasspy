@@ -49,8 +49,8 @@ sub siteId2room {
         Log3($hash->{NAME}, 1, "JSON decoding error, $rawd seems not to be valid JSON data:  $@");
         return "Error! $rawd seems not to be valid JSON data!";
     }
-    my $site = $data->{siteId};
-    my $room = $data->{Room};
+    my $site = encode('UTF-8',$data->{siteId});
+    my $room = encode('UTF-8',$data->{Room});
     my $rreading = makeReadingName("siteId2room_$site");
     
     readingsSingleUpdate($hash, $rreading, $room, 1);
