@@ -360,6 +360,7 @@ When activated (default is on), RHASSPY will try to determine mapping (and other
 * thermostat
 * blind
 * media
+* thermometer
 
 ### Attribute *rhasspyName*
 The content of this attribute is the name you want to call this device (e.g. *bulb*). It's possible to use multiple names for the same device by separating them with comma.\

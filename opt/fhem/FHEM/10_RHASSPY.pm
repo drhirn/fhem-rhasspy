@@ -946,7 +946,19 @@ sub _analyze_genDevType {
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
     }
 
-    if ( $gdt eq 'blind' ) {
+    elsif ( $gdt eq 'thermometer' ) {
+        my $r = $defs{$device}{READINGS};
+        if($r) {
+            for (sort keys %{$r}) {
+                if ( $_ =~ m{\A(?<id>temperature|humidity)\z} ) {
+                    $currentMapping->{GetNumeric}->{$+{id}} = {currentVal => $+{id}, type => $+{id} };
+                }
+            }
+        }
+        $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
+    }
+
+    elsif ( $gdt eq 'blind' ) {
         if ( $allset =~ m{\bdim[\b:\s]}xms ) {
             my $maxval = InternalVal($device, 'TYPE', 'unknown') eq 'ZWave' ? 99 : 100;
             $currentMapping = 
@@ -1356,7 +1368,9 @@ sub RHASSPY_getDeviceByIntentAndType {
     my $room   = shift;
     my $intent = shift;
     my $type   = shift; #Beta-User: any necessary parameters...?
+    #my $inBulk = shift // 0;
 
+    #rem. Beta-User: atm function is only called by GetNumeric!
     my $device;
 
     # Devices sammeln
@@ -2065,7 +2079,7 @@ sub RHASSPY_updateSlots {
     my $url = qq{/api/slots?overwrite_all=$overwrite};
     
 
-    my @gdts = (qw(switch light media blind thermostat));
+    my @gdts = (qw(switch light media blind thermostat thermometer));
     for my $gdt (@gdts) {
         last if !$hash->{useGenericAttrs};
         my @names = ();
@@ -2777,7 +2791,7 @@ sub RHASSPY_handleIntentGetNumeric {
     my $location = $data->{Device};
     if ( !defined $location ) {
         my $rooms = $hash->{helper}{devicemap}{devices}{$device}->{rooms};
-        $location = $data->{Room} if $rooms =~ m{\b$data->{Room}\b}ix;
+        $location = $data->{Room} if defined $rooms && $rooms =~ m{\b$data->{Room}\b}ix;
 
         #Beta-User: this might be the place to implement the "no device in room" branch
         ($location, my $nn) = split m{,}x, $rooms if !defined $location;
@@ -3048,15 +3062,15 @@ sub RHASSPY_runSetColorCmd {
     }
 
     #shortcut: Rgb field is used or color is in HEX value and rgb is a possible command
-    if ( ( defined $data->{Rgb} || $color =~ m{\A[[:xdigit:]]\z}x ) && defined $mapping->{rgb} ) {
+    if ( ( defined $data->{Rgb} || defined $color && $color =~ m{\A[[:xdigit:]]\z}x ) && defined $mapping->{rgb} ) {
         $color = $data->{Rgb} if defined $data->{Rgb};
         $error = AnalyzeCommand($hash, "set $device $mapping->{rgb}->{cmd} $color");
         return if $inBulk;
         return RHASSPY_respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $error) if $error;
         return RHASSPY_getResponse($hash, 'DefaultConfirmation');
     }
-
-    my %word2rgb = {
+=pod
+    my $word2rgb = {
         white => {r => 255, g => 255, b => 255},
         grey  => {r => 122, g => 122, b => 122},
         darkgrey => {r => 10, g => 10, b => 10, f => 1}, #this includes brightness info!
@@ -3065,7 +3079,7 @@ sub RHASSPY_runSetColorCmd {
         blue  => {r => 0, g => 0, b => 255}
     };
     #todo: Tabelle erweitern, ggf. aktuelle Helligkeit ermitteln
-
+=cut
     return "function to convert between different colorspaces not implemented yet"
 }
 
@@ -3826,6 +3840,7 @@ yellow=rgb FFFF00</code></p>
   <li>MediaControls</li>
   <li>MediaChannels</li>
   <li>SetColor</li>
+  <li>SetColorGroup</li>
   <li>GetTime</li>
   <li>GetWeekday</li>
   <li>SetTimer</li>
