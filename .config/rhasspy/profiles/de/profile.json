@@ -7,6 +7,11 @@
         "satellite_site_ids": "wohnzimmer,küche",
         "system": "fsticuffs"
     },
+    "sounds": {
+        "error": "${RHASSPY_PROFILE_DIR}/error.wav",
+        "recorded": "${RHASSPY_PROFILE_DIR}/end_of_input.wav",
+        "wake": "${RHASSPY_PROFILE_DIR}/start_of_input.wav"
+    },
     "speech_to_text": {
         "satellite_site_ids": "wohnzimmer,küche",
         "system": "kaldi"
