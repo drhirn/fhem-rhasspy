@@ -333,7 +333,7 @@ sub Define {
     $hash->{fhemId} = $h->{fhemId} // q{fhem};
     initialize_prefix($hash, $h->{prefix}) if !defined $hash->{prefix} || $hash->{prefix} ne $h->{prefix};
     $hash->{prefix} = $h->{prefix} // q{rhasspy};
-    $hash->{encoding} = $h->{encoding};
+    $hash->{encoding} = $h->{encoding} // q{UTF-8};
     $hash->{useGenericAttrs} = $h->{useGenericAttrs} // 1;
     $hash->{'.asyncQueue'} = [];
     #Beta-User: Für's Ändern von defaultRoom oder prefix vielleicht (!?!) hilfreich: https://forum.fhem.de/index.php/topic,119150.msg1135838.html#msg1135838 (Rudi zu resolveAttrRename) 
@@ -403,7 +403,7 @@ sub initialize_prefix {
     addToAttrList("${prefix}Name");
     addToAttrList("${prefix}Room");
     addToAttrList("${prefix}Mapping:textField-long");
-    addToAttrList("${prefix}Channels:textField-long");
+    #addToAttrList("${prefix}Channels:textField-long");
     #addToAttrList("${prefix}Colors:textField-long");
     addToAttrList("${prefix}Group:textField");
     addToAttrList("${prefix}Specials:textField-long");
@@ -1276,6 +1276,7 @@ sub getAllRhasspyGroups {
     }
     return get_unique(\@groups, 1);
 }
+
 # Derive room info from spoken text, siteId or additional logics around siteId
 sub getRoomName {
     my $hash = shift // return;
@@ -2055,6 +2056,8 @@ sub updateSlots {
         @groups    = ('') if !@groups;
         @shortcuts = ('') if !@shortcuts;
     }
+
+
     my $deviceData;
 
     if (@shortcuts) {
@@ -3134,30 +3137,23 @@ sub _ct2rgb {
     $ct = 1000000/$ct if( $ct > 1000 );
 
     # adjusted by 1000K
-    my $temp = (1000000/$ct)/100 + 10;
+    my $temp = 10000/$ct + 10;
 
     my $r = 255;
-    my $g = 0;
-    my $b = 255;
-
-    $r = 329.698727446 * ($temp - 60) ** -0.1332047592 if( $temp > 66 );
+    $r = 329.698727446 * ($temp - 60) ** -0.1332047592 if $temp > 66;
     $r = max( 0, min ( $r , 255 ) );
-    $r = 255 if( $r > 255 );
     
-    if ( $temp <= 66 ) {
-        $g = 99.4708025861 * log($temp) - 161.1195681661;
-    } else {
-        $g = 288.1221695283 * ($temp - 60) ** -0.0755148492;
-    }
-    $r = max( 0, min ( $g , 255 ) );
+    my $g = $temp <= 66 ?
+        99.4708025861 * log($temp) - 161.1195681661
+        : 288.1221695283 * ($temp - 60) ** -0.0755148492;
+    $g = max( 0, min ( $g , 255 ) );
 
-    #$b = 0 if $temp <= 19;
+    my $b = $temp <= 19 ? 0 : 255;
     $b = 138.5177312231 * log($temp-10) - 305.0447927307 if $temp < 66;
-    $r = max( 0, min ( $r , 255 ) );
+    $b = max( 0, min ( $b , 255 ) );
 
     return( $r, $g, $b );
 }
-
 
 sub handleIntentSetColorGroup {
     my $hash = shift // return;
@@ -3547,6 +3543,7 @@ Denkbare Verwendung:
 - Farbe und Farbtemperatur 
 - Hat man in einem Raum einen Satelliten aber kein Device mit der siteId/Raum, kann man den Satelliten bei z.B. dem Timer nicht ansprechen, weil der Raum nicht in den Slots ist.
   Irgendwie müssen wir die neue siteId in den Slot Rooms bringen
+
 =end ToDo
 
 =begin ToClarify
@@ -3874,6 +3871,7 @@ MediaControls:cmdPlay=play,cmdPause=pause,cmdStop=stop,cmdBack=previous,cmdFwd=n
 orf zwei=channel 202<br>
 orf drei=channel 203<br>
 </code></p>
+    <p>Note: This attribute is not added to global attribute list by default. Add it using userattr or by editing the global userattr attribute.</p>
   </li>
   <li>
     <a id="RHASSPY-attr-rhasspyColors"></a><b>rhasspyColors</b>
