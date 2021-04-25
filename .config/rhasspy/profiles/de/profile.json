@@ -1,10 +1,10 @@
 {
     "dialogue": {
-        "satellite_site_ids": "wohnzimmer,küche,büro",
+        "satellite_site_ids": "wohnzimmer,küche,büro,vorraum",
         "system": "rhasspy"
     },
     "intent": {
-        "satellite_site_ids": "wohnzimmer,küche,büro",
+        "satellite_site_ids": "wohnzimmer,küche,büro,vorraum",
         "system": "fsticuffs"
     },
     "sounds": {
@@ -13,11 +13,11 @@
         "wake": "${RHASSPY_PROFILE_DIR}/start_of_input.wav"
     },
     "speech_to_text": {
-        "satellite_site_ids": "wohnzimmer,küche,büro",
+        "satellite_site_ids": "wohnzimmer,küche,büro,vorraum",
         "system": "kaldi"
     },
     "text_to_speech": {
-        "satellite_site_ids": "wohnzimmer,küche,büro",
+        "satellite_site_ids": "wohnzimmer,küche,büro,vorraum",
         "system": "nanotts"
     }
 }
