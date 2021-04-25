@@ -3525,9 +3525,14 @@ __END__
 
 =begin ToDo
 
+# PERL WARNING: Useless use of private variable in void context at ./FHEM/10_RHASSPY.pm line 1638, <$fh> line 310.
+        # [DEVICE:READING] Einträge ersetzen
+        $returnVal =    ($hash, $cmd);
+
 # Custom Intents
  - Bei Verwendung des Dialouges wenn man keine Antwort spricht, bricht Rhasspy ab. Die voice response "Tut mir leid, da hat etwas zu lange gedauert" wird
-   also gar nicht ausgegeben.
+   also gar nicht ausgegeben und:
+   PERL WARNING: Use of uninitialized value $cmd in pattern match (m//) at fhem.pl line 5868.
 
 # "rhasspySpecials" bzw. rhasspyTweaks als weitere Attribute
 Denkbare Verwendung:
