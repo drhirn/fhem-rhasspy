@@ -1,6 +1,8 @@
+.gitignore
 .~lock*
 opt/
 optT/
+opt.alt/
 !opt/fhem/fhem.cfg
 !opt/fhem/FHEM/10_RHASSPY.pm
 !opt/fhem/FHEM/rhasspy-de.cfg
