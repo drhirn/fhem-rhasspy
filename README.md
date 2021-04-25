@@ -1007,7 +1007,7 @@ It's possible to create custom intents in FHEM's 99_myUtils.pm.
 As example an intent that repeats the last voice response Rhasspy has spoken.
 
 Add the following `sub` to your 99_myUtils.pm:
-```
+```perl
 sub Respeak(){
     #Credits to JensS
     my $name = "Rhasspy"; #Replace "Rhasspy" with the name of your RHASSPY-Device
