@@ -335,8 +335,9 @@ define Rhasspy RHASSPY baseUrl=http://192.160.2.122:12101 devspec=genericDeviceT
 
 
 ## Configure FHEM-devices for use with Rhasspy
-To control a device with voice-commands, Rhasspy needs to now some information about the device. It collects this information from the following attributes or from the *genericDeviceType*-attribute.\
-Except for *genericDeviceType*, all attribute-names are starting with the prefix used while defining the RHASSPY-device. The following uses the default value *rhasspy*.
+To control a device with voice-commands, Rhasspy needs to now some information about the device. It collects this information from the *genericDeviceType*-attribute or from special attributes.\
+Except for *genericDeviceType*, all attribute-names are starting with the prefix used while defining the RHASSPY-device.\
+This documentation uses the default prefix *rhasspy*.
 
 
 **Important**: 
@@ -352,15 +353,22 @@ Except for *genericDeviceType*, all attribute-names are starting with the prefix
 
 ### Attribute genericDeviceType
 
-**Work in progress - you are strongly encouraged to test this new feature!**
+If `useGenericAttrs` in the DEF is set to "1" (which is the default), RHASSPY will try to determine mapping (and other) information from the attributes already present (if devices match devspec). Currently the following subset of _genericDeviceType_ is supported:
 
-When activated (default is on), RHASSPY will try to determine mapping (and other) information from the attributes already present (if devices match devspec). Currently the following subset of _genericDeviceType_ is supported:  
 * switch
 * light
 * thermostat
+* thermometer
 * blind
 * media
-* thermometer
+
+When using _genericDeviceType_, collected information about the device are for example:
+* the name (NAME or alias)
+* the ROOM or GROUP the device is in
+* how to GET information from the device
+* how to SET state/values
+
+This is the easiest way to get devices to work with RHASSPY. In some cases it may happen that _gDT_ delivers to less or not suitable information for this particual device. Then it's possible to overwrite this with the following RHASSPY specific device attributes.
 
 ### Attribute *rhasspyName*
 The content of this attribute is the name you want to call this device (e.g. *bulb*). It's possible to use multiple names for the same device by separating them with comma.\
@@ -1034,7 +1042,7 @@ E.g.
 ```
 
 Then fill it with the following example-code:
-```
+```python
 #!/usr/bin/env python3
 import sys
 import json
@@ -1060,7 +1068,7 @@ set heating [to] (0..30 [point:. 0..99]){temp!customFloat}
 JensS wrote a short script to let Rhasspy speak the actual state of a FHEM-device after switching it with a voice-command.\
 Add the following to your 99_myUtils.pm
 
-```
+```perl
 sub ResponseOnOff($){
   my ($dev) = @_;
   my $room;
