@@ -423,6 +423,7 @@ sub Undefine {
 
 sub Delete {
     my $hash = shift // return;
+    my $prefix = $hash->{prefix} // return;
     RemoveInternalTimer($hash);
 
 # DELETE POD AFTER TESTS ARE COMPLETED    
@@ -3058,6 +3059,7 @@ sub _runSetColorCmd {
             my $value = ($mapping->{$_}->{maxVal} - $mapping->{$_}->{minVal}) * $data->{$kw} / 360;
             $error = AnalyzeCommand($hash, "set $device $mapping->{$_}->{cmd} $value");
             return if $inBulk;
+            Log3($hash->{NAME}, 5, "Setting color to $value");
             return respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $error) if $error;
             return getResponse($hash, 'DefaultConfirmation');
         }
@@ -3068,6 +3070,7 @@ sub _runSetColorCmd {
         $color = $data->{Rgb} if defined $data->{Rgb};
         $error = AnalyzeCommand($hash, "set $device $mapping->{rgb}->{cmd} $color");
         return if $inBulk;
+        Log3($hash->{NAME}, 5, "Setting rgb-color to $color");
         return respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $error) if $error;
         return getResponse($hash, 'DefaultConfirmation');
     }
@@ -3107,6 +3110,7 @@ sub _runSetColorCmd {
         return "mapping problem in Hue2rgb" if !defined $rgb;
         $error = AnalyzeCommand($hash, "set $device $mapping->{rgb}->{cmd} $rgb");
         return if $inBulk;
+        Log3($hash->{NAME}, 5, "Setting rgb-color to $rgb using hue");
         return respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $error) if $error;
         return getResponse($hash, 'DefaultConfirmation');
     }
@@ -3120,6 +3124,7 @@ sub _runSetColorCmd {
         return "mapping problem in _ct2rgb" if !defined $rgb;
         $error = AnalyzeCommand($hash, "set $device $mapping->{rgb}->{cmd} $rgb");
         return if $inBulk;
+        Log3($hash->{NAME}, 5, "Setting color-temperature to $ct");
         return respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $error) if $error;
         return getResponse($hash, 'DefaultConfirmation');
     }
@@ -3524,6 +3529,10 @@ __END__
 =pod
 
 =begin ToDo
+
+# Farben:
+  Warum die Abfrage nach rgb? <code>if ( defined $data->{Colortemp} && defined $mapping->{rgb} && looks_like_number($data->{Colortemp}) ) {</code>
+  Gibt auch Lampen, die können nur ct
 
 # PERL WARNING: Useless use of private variable in void context at ./FHEM/10_RHASSPY.pm line 1638, <$fh> line 310.
         # [DEVICE:READING] Einträge ersetzen
