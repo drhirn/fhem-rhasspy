@@ -426,6 +426,11 @@ There are three ways to write them:
 Used by intent *MediaControls*. Tells the intent, which channels are available and which FHEM-command or perl-code to execute.\
 One line per channel.
 
+To use **rhasspyChannels** you have to first create a new user-attribute on the FHEM-device you want to control. You can do this for example with the following command:
+```
+attr <deviceName> userattr rhasspyChannels:textField-long
+```
+
 Example:
 ```
 attr <device> rhasspyChannels orf eins=channel 201
@@ -435,6 +440,12 @@ orf drei=channel 203
 
 ### Attribute rhasspyColors
 Used to change to colors of a light\
+
+To use **rhasspyColors** you have to create this user-attribute first with e.g.:
+```
+attr <deviceName> userattr rhasspyChannels:textField-long
+```
+
 key=value line by line arguments mapping keys to setter strings on the same device.
 
 Example:
@@ -784,11 +795,6 @@ Intent to change radio-/tv channels, favorites, playlists, lightscenes, ...
 
 Instead of using the attribute *rhasspyMapping*, this intent is configured with an own attribute **rhasspyChannels** in the respective device. Reason is the multiple-line-configuration.
 
-To use **rhasspyChannels** you have to create a new user-attribute on the device you want to control. You can do this for example with the following command:
-```
-attr <deviceName> userattr rhasspyChannels:textField-long
-```
-
 Example-Mappings:
 ```
 SWR3=favorite s_w_r_3
@@ -825,10 +831,7 @@ Optional tags:
 
 Intent to change light colors
 
-Because of the multi-line settings, instead of configuring this intent with the attribute *rhasspyMapping*, a separate user-attribute *rhasspyColors* is used. You have to create this user-attribute first with
-```
-attr <deviceName> userattr rhasspyChannels:textField-long
-```
+Because of the multi-line settings, instead of configuring this intent with the attribute *rhasspyMapping*, a separate user-attribute *rhasspyColors* is used.
 
 The content of the *rhasspyColors* uses the following format:\
 `Colorname=cmd`
