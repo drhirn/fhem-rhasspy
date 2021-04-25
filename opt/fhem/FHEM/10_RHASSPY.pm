@@ -3569,10 +3569,6 @@ Denkbare Verwendung:
 # GetTimer implementieren?
 https://forum.fhem.de/index.php/topic,113180.msg1130139.html#msg1130139
 
-# Kopfrechnen 
-ist eine Stärke von Rhasspy. Solch ein Intent benötigt wenig Code.
-https://forum.fhem.de/index.php/topic,113180.msg1130754.html#msg1130754
-
 # Wetterdurchsage
 Ist möglich. Dazu hatte ich einen rudimentären Intent in diesem Thread erstellt. Müsste halt nur erweitert werden.
 https://forum.fhem.de/index.php/topic,113180.msg1130754.html#msg1130754
