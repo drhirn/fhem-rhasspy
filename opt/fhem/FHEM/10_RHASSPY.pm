@@ -324,7 +324,7 @@ sub Define {
     my $defaultRoom = $h->{defaultRoom} // shift @{$anon} // q{default}; 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.4.11';
+    $hash->{MODULE_VERSION} = '0.4.12';
     $hash->{baseUrl} = $Rhasspy;
     #$hash->{helper}{defaultRoom} = $defaultRoom;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
@@ -384,12 +384,18 @@ sub initialize_Language {
         Log3($hash->{NAME}, 1, "JSON decoding error in languagefile $cfg:  $@");
         return "languagefile $cfg seems not to contain valid JSON!";
     }
+    my $slots = $decoded->{slots}; 
 
     if ( defined $decoded->{default} ) {
         $decoded = _combineHashes( $decoded->{default}, $decoded->{user} );
         Log3($hash->{NAME}, 4, "try to use user specific sentences and defaults in languagefile $cfg");
     }
     $hash->{helper}->{lng} = _combineHashes( $hash->{helper}->{lng}, $decoded);
+    
+    return if !$init_done;
+    for my $key (keys %{$slots}) {
+        updateSingleSlot($hash, $key, $slots->{$key});
+    }
 
     return;
 }
@@ -831,7 +837,13 @@ sub _analyze_rhassypAttr {
 
             $hash->{helper}{devicemap}{devices}{$device}{group_specials} = $specials;
         }
-        
+        if ($key eq 'colorForceHue2rgb') {
+            $hash->{helper}{devicemap}{devices}{$device}{color_specials}{forceHue2rgb} = $val;
+        }
+        if ($key eq 'colorCommandMap') {
+            my($unnamed, $named) = parseParams($val);
+            $hash->{helper}{devicemap}{devices}{$device}{color_specials}{CommandMap} = $named;
+        }
     }
 
     #Hash mit {FHEM-Device-Name}{$intent}{$type}?
@@ -1061,7 +1073,7 @@ sub perlExecute {
     return AnalyzePerlCommand( $hash, $cmd );
 }
 
-sub handleConfirmTimer {
+sub RHASSPY_Confirmation {
     my $hash     = shift // return;
     my $mode     = shift; #undef => timeout, 1 => cancellation, #2 => set timer
     my $data     = shift // $hash->{helper}{'.delayed'};
@@ -1070,7 +1082,7 @@ sub handleConfirmTimer {
 
     #timeout Case
     if (!defined $mode) {
-        RemoveInternalTimer( $hash, \&handleConfirmTimer );
+        RemoveInternalTimer( $hash, \&RHASSPY_Confirmation );
         $response = $hash->{helper}{lng}->{responses}->{DefaultConfirmationTimeout};
         #Beta-User: we may need to start a new session first?
         respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
@@ -1081,7 +1093,7 @@ sub handleConfirmTimer {
 
     #cancellation Case
     if ( $mode == 1 ) {
-        RemoveInternalTimer( $hash, \&handleConfirmTimer );
+        RemoveInternalTimer( $hash, \&RHASSPY_Confirmation );
         $response = $hash->{helper}{lng}->{responses}->{ defined $hash->{helper}{'.delayed'} ? 'DefaultCancelConfirmation' : 'SilentCancelConfirmation' };
         respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
         delete $hash->{helper}{'.delayed'};
@@ -1089,11 +1101,11 @@ sub handleConfirmTimer {
         return $hash->{NAME};
     }
     if ( $mode == 2 ) {
-        RemoveInternalTimer( $hash, \&handleConfirmTimer );
+        RemoveInternalTimer( $hash, \&RHASSPY_Confirmation );
         $hash->{helper}{'.delayed'} = $data;
         $response = $hash->{helper}{lng}->{responses}->{DefaultConfirmationReceived} if $response eq 'default';
         
-        InternalTimer(time + $timeout, \&handleConfirmTimer, $hash, 0);
+        InternalTimer(time + $timeout, \&RHASSPY_Confirmation, $hash, 0);
 
         #interactive dialogue as described in https://rhasspy.readthedocs.io/en/latest/reference/#dialoguemanager_continuesession and https://docs.snips.ai/articles/platform/dialog/multi-turn-dialog
         my $ca_string = qq{$hash->{LANGUAGE}.$hash->{fhemId}:ConfirmAction};
@@ -1174,14 +1186,14 @@ sub _combineHashes {
 }
 
 # derived from structure_asyncQueue
-sub asyncQueue {
+sub RHASSPY_asyncQueue {
     my $hash = shift // return;
     my $next_cmd = shift @{$hash->{'.asyncQueue'}};
     if (defined $next_cmd) {
         analyzeAndRunCmd($hash, $next_cmd->{device}, $next_cmd->{cmd}) if defined $next_cmd->{cmd};
         handleIntentSetNumeric($hash, $next_cmd->{SetNumeric}) if defined $next_cmd->{SetNumeric};
         my $async_delay = $next_cmd->{delay} // 0;
-        InternalTimer(time+$async_delay,\&asyncQueue,$hash,0);
+        InternalTimer(time+$async_delay,\&RHASSPY_asyncQueue,$hash,0);
     }
     return;
 }
@@ -2086,13 +2098,20 @@ sub updateSlots {
     for my $gdt (@gdts) {
         last if !$hash->{useGenericAttrs};
         my @names = ();
+        my @groupnames = ();
         my @devs = devspec2array("$hash->{devspec}");
         for my $device (@devs) {
-            push @names, split m{,}, $hash->{helper}{devicemap}{devices}{$device}->{names} if AttrVal($device, 'genericDeviceType', '') eq $gdt;;
+            if (AttrVal($device, 'genericDeviceType', '') eq $gdt) {
+                push @names, split m{,}, $hash->{helper}{devicemap}{devices}{$device}->{names};
+                push @groupnames, split m{,}, $hash->{helper}{devicemap}{devices}{$device}->{groups};
+            }
         }
         @names = get_unique(\@names);
         @names = ('') if !@names && $noEmpty;
         $deviceData->{qq(${language}.${fhemId}.Device-${gdt})} = \@names if @names;
+        @groupnames = get_unique(\@groupnames);
+        @groupnames = ('') if !@groupnames && $noEmpty;
+        $deviceData->{qq(${language}.${fhemId}.Group-${gdt})} = \@groupnames if @groupnames;
     }
 
     my @allKeywords = uniq(@groups, @rooms, @devices);
@@ -2192,7 +2211,7 @@ sub _sendToApi {
         method     => $method,
         data       => $data,
         header     => 'Content-Type: application/json',
-        callback   => \&ParseHttpResponse
+        callback   => \&RHASSPY_ParseHttpResponse
     };
 
     HttpUtils_NonblockingGet($apirequest);
@@ -2200,7 +2219,7 @@ sub _sendToApi {
 }
 
 # Parse the response of the request to the HTTP-API
-sub ParseHttpResponse {
+sub RHASSPY_ParseHttpResponse {
     my $param = shift // return;
     my $err   = shift;
     my $data  = shift;
@@ -2301,12 +2320,12 @@ sub handleCustomIntent {
             my $timeout = ${$error}[1];
             $timeout = defined $timeout && looks_like_number($timeout) ? $timeout : 20;
             $hash->{'.toTrigger'} = ${$error}[1] if defined ${$error}[1];
-            return handleConfirmTimer($hash, 2, $data, $timeout, ${$error}[0]);
+            return RHASSPY_Confirmation($hash, 2, $data, $timeout, ${$error}[0]);
         }
         respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $response);
         return ${$error}[1]; #comma separated list of devices to trigger
     } elsif ( ref $error eq 'HASH' ) {
-        return handleConfirmTimer($hash, 2, $data, 20, $error);
+        return RHASSPY_Confirmation($hash, 2, $data, 20, $error);
     } else {
         $response = $error; # if $error && $error !~ m{Please.define.*first}x;
     }
@@ -2347,7 +2366,7 @@ sub handleIntentShortcuts {
     my $response;
     if ( defined $hash->{helper}{shortcuts}{$data->{input}}{conf_timeout} && !$data->{Confirmation} ) {
         my $timeout = $hash->{helper}{shortcuts}{$data->{input}}{conf_timeout};
-        $response = $hash->{helper}{shortcuts}{$data->{input}}{conf_req};return handleConfirmTimer($hash, 2, $data, $timeout, $response);
+        $response = $hash->{helper}{shortcuts}{$data->{input}}{conf_req};return RHASSPY_Confirmation($hash, 2, $data, $timeout, $response);
     }
     $response = $shortcut->{response} // getResponse($hash, 'DefaultConfirmation');
     my $ret;
@@ -2478,7 +2497,7 @@ sub handleIntentSetOnOffGroup {
         } else {
             my $hlabel = $devices->{$device}->{delay};
             push @{$hash->{".asyncQueue"}}, {device => $device, cmd => $cmd, prio => $devices->{$device}->{prio}, delay => $hlabel};
-            InternalTimer(time+$delaysum,\&asyncQueue,$hash,0) if !$init_delay;
+            InternalTimer(time+$delaysum,\&RHASSPY_asyncQueue,$hash,0) if !$init_delay;
             $init_delay = 1;
         }
     }
@@ -2599,7 +2618,7 @@ sub handleIntentSetNumericGroup {
         } else {
             my $hlabel = $devices->{$device}->{delay};
             push @{$hash->{'.asyncQueue'}}, {device => $device, SetNumeric => $tempdata, prio => $devices->{$device}->{prio}, delay => $hlabel};
-            InternalTimer(time+$delaysum,\&asyncQueue,$hash,0) if !$init_delay;
+            InternalTimer(time+$delaysum,\&RHASSPY_asyncQueue,$hash,0) if !$init_delay;
             $init_delay = 1;
         }
     }
@@ -3021,14 +3040,19 @@ sub handleIntentSetColor {
     # Search for matching device and command
     $device = getDeviceByName($hash, $room, $data->{Device}) if !defined $device;
     my $cmd = getKeyValFromAttr($hash, $device, 'rhasspyColors', $color, undef);
+    my $cmd2;
+    if (defined $hash->{helper}{devicemap}{devices}{$device}{color_specials}
+        && defined $hash->{helper}{devicemap}{devices}{$device}{color_specials}->{CommandMap}) {
+        $cmd2 = $hash->{helper}{devicemap}{devices}{$device}{color_specials}->{CommandMap}->{$color};
+    }
 
     return if $inBulk && !defined $device;
     return respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, getResponse($hash, 'NoDeviceFound')) if !defined $device;
 
-    if ( defined $cmd ) {
+    if ( defined $cmd || defined $cmd2 ) {
         $response = getResponse($hash, 'DefaultConfirmation');
         # Execute Cmd
-        analyzeAndRunCmd($hash, $device, $cmd);
+        analyzeAndRunCmd( $hash, $device, defined $cmd ? $cmd : $cmd2 );
     } else {
         $response = _runSetColorCmd($hash, $device, $data, $inBulk);
     }
@@ -3055,11 +3079,14 @@ sub _runSetColorCmd {
     my $keywords = {hue => 'Hue', sat => 'Saturation', ct => 'Colortemp'};
     for (keys %{$keywords}) {
         my $kw = $keywords->{$_};
+        
+        next if $kw eq 'Hue' && $hash->{helper}{devicemap}{devices}{$device}{color_specials}->{forceHue2rgb} == 1;
+        
         if ( defined $data->{$kw} && defined $mapping->{$_} ) {
-            my $value = ($mapping->{$_}->{maxVal} - $mapping->{$_}->{minVal}) * $data->{$kw} / 360;
+            my $value = round( ($mapping->{$_}->{maxVal} - $mapping->{$_}->{minVal}) * $data->{$kw} / ($kw eq 'Hue' ? 360 : 100) , 0);
             $error = AnalyzeCommand($hash, "set $device $mapping->{$_}->{cmd} $value");
             return if $inBulk;
-            Log3($hash->{NAME}, 5, "Setting color to $value");
+                                                              
             return respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $error) if $error;
             return getResponse($hash, 'DefaultConfirmation');
         }
@@ -3129,7 +3156,8 @@ sub _runSetColorCmd {
         return getResponse($hash, 'DefaultConfirmation');
     }
 
-    return "function to convert between different colorspaces not implemented yet"
+    return if $inBulk;
+    return getResponse($hash, 'NoMappingFound');
 }
 
 #clone from Color.pm
@@ -3199,7 +3227,7 @@ sub handleIntentSetColorGroup {
         } else {
             my $hlabel = $devices->{$device}->{delay};
             push @{$hash->{'.asyncQueue'}}, {device => $device, SetColor => $tempdata, prio => $devices->{$device}->{prio}, delay => $hlabel};
-            InternalTimer(time+$delaysum,\&asyncQueue,$hash,0) if !$init_delay;
+            InternalTimer(time+$delaysum,\&RHASSPY_asyncQueue,$hash,0) if !$init_delay;
             $init_delay = 1;
         }
     }
@@ -3351,7 +3379,7 @@ sub handleIntentConfirmAction {
     Log3($hash->{NAME}, 5, 'handleIntentConfirmAction called');
     
     #cancellation case
-    return handleConfirmTimer($hash, 1, $data) if $data->{Mode} ne 'OK';
+    return RHASSPY_Confirmation($hash, 1, $data) if $data->{Mode} ne 'OK';
     
     #confirmed case
     my $data_old = $hash->{helper}{'.delayed'};
