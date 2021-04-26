@@ -238,6 +238,7 @@ BEGIN {
   GP_Import(qw(
     addToAttrList
     delFromDevAttrList
+    delFromAttrList
     readingsSingleUpdate
     readingsBeginUpdate
     readingsBulkUpdate
@@ -255,6 +256,8 @@ BEGIN {
     InternalTimer
     RemoveInternalTimer
     AssignIoPort
+    CommandAttr
+    CommandDeleteAttr
     IOWrite
     readingFnAttributes
     IsDisabled
@@ -333,7 +336,7 @@ sub Define {
     $hash->{fhemId} = $h->{fhemId} // q{fhem};
     initialize_prefix($hash, $h->{prefix}) if !defined $hash->{prefix} || $hash->{prefix} ne $h->{prefix};
     $hash->{prefix} = $h->{prefix} // q{rhasspy};
-    $hash->{encoding} = $h->{encoding} // q{UTF-8};
+    $hash->{encoding} = $h->{encoding} // q{utf8};
     $hash->{useGenericAttrs} = $h->{useGenericAttrs} // 1;
     $hash->{'.asyncQueue'} = [];
     #Beta-User: Für's Ändern von defaultRoom oder prefix vielleicht (!?!) hilfreich: https://forum.fhem.de/index.php/topic,119150.msg1135838.html#msg1135838 (Rudi zu resolveAttrRename) 
@@ -405,6 +408,7 @@ sub initialize_prefix {
     my $prefix =  shift // q{rhasspy};
     my $old_prefix = $hash->{prefix}; #Beta-User: Marker, evtl. müssen wir uns was für Umbenennungen überlegen...
     
+    return if $prefix eq $old_prefix;
     # provide attributes "rhasspyName" etc. for all devices
     addToAttrList("${prefix}Name");
     addToAttrList("${prefix}Room");
@@ -413,6 +417,19 @@ sub initialize_prefix {
     #addToAttrList("${prefix}Colors:textField-long");
     addToAttrList("${prefix}Group:textField");
     addToAttrList("${prefix}Specials:textField-long");
+    
+    return if !$init_done || !defined $old_prefix;
+    my @devs = devspec2array("$hash->{devspec}");
+    my @rhasspys = devspec2array("TYPE=RHASSPY:FILTER=prefix=$old_prefix");
+
+    for my $detail (qw( Name Room Mapping Group Specials)) { 
+        for my $device (@devs) {
+            my $aval = AttrVal($device, "${old_prefix}$detail", undef); 
+            CommandAttr($hash, "$device ${prefix}$detail $aval") if $aval;
+            CommandDeleteAttr($hash, "$device ${old_prefix}$detail") if @rhasspys < 2;
+        }
+        delFromAttrList("${old_prefix}$detail") if @rhasspys < 2;
+    }
 
     return;
 }
@@ -844,6 +861,17 @@ sub _analyze_rhassypAttr {
             my($unnamed, $named) = parseParams($val);
             $hash->{helper}{devicemap}{devices}{$device}{color_specials}{CommandMap} = $named;
         }
+        if ($key eq 'venetianBlind') {
+            my($unnamed, $named) = parseParams($val);
+            my $specials = {};
+            my $vencmd = $named->{setter} // shift @{$unnamed};
+            my $vendev = $named->{device} // shift @{$unnamed};
+            $specials->{setter} = $vencmd if defined $vencmd;
+            $specials->{device} = $vendev if defined $vendev;
+            $specials->{CustomCommand} = $named->{CustomCommand} if defined $named->{CustomCommand};
+
+            $hash->{helper}{devicemap}{devices}{$device}{venetian_specials} = $specials if defined $vencmd || defined $vendev;
+        }
     }
 
     #Hash mit {FHEM-Device-Name}{$intent}{$type}?
@@ -1031,20 +1059,24 @@ sub _analyze_genDevType_setter {
             color => { cmd => 'color', currentVal => 'color', type => 'color', map => 'percent'},
             sat => { cmd => 'sat', currentVal => 'sat', type => 'sat', map => 'percent'},
             ct => { cmd => 'ct', currentVal => 'ct', type => 'ct', map => 'percent'},
-            rgb => { cmd => 'rgb', currentVal => 'rgb', type => 'rgb'}
+            rgb => { cmd => 'rgb', currentVal => 'rgb', type => 'rgb'},
+            color_temp => { cmd => 'color_temp', currentVal => 'color_temp', type => 'ct', map => 'percent'},
+            RGB => { cmd => 'RGB', currentVal => 'RGB', type => 'rgb'},
+            hex => { cmd => 'hex', currentVal => 'hex', type => 'rgb'},
+            saturation => { cmd => 'saturation', currentVal => 'saturation', type => 'sat', map => 'percent'}
             }
         };
     for my $okey ( keys %{$allKeyMappings} ) {
         my $ikey = $allKeyMappings->{$okey};
         for ( keys %{$ikey} ) {
-            $mapping->{$okey}->{$_} = $ikey->{$_} if $setter =~ m{\b$_([\b:\s]|\Z)}xms;
+            $mapping->{$okey}->{$ikey->{$_}->{type}} = $ikey->{$_} if $setter =~ m{\b$_([\b:\s]|\Z)}xms;
             #for my $col (qw(ct hue color sat)) {
-            if ( $_ =~ m{(ct|hue|color|sat)}xms ) {
-                my $col = $1;
+            if ( $okey eq 'SetColorParms') { #=~ m{\A(ct|hue|color|sat)\z}xms ) {
+                my $col = $_;
                 if ($setter =~ m{\b${col}:[^\s\d]+,(?<min>[0-9.]+),(?<step>[0-9.]+),(?<max>[0-9.]+)\b}xms) {
-                    $mapping->{$okey}->{$col}->{maxVal} = $+{max};
-                    $mapping->{$okey}->{$col}->{minVal} = $+{min};
-                    $mapping->{$okey}->{$col}->{step} = $+{step};
+                    $mapping->{$okey}->{$ikey->{$_}->{type}}->{maxVal} = $+{max};
+                    $mapping->{$okey}->{$ikey->{$_}->{type}}->{minVal} = $+{min};
+                    $mapping->{$okey}->{$ikey->{$_}->{type}}->{step} = $+{step};
                 }
             }
         }
@@ -2755,6 +2787,13 @@ sub handleIntentSetNumeric {
     # execute Cmd
     analyzeAndRunCmd($hash, $device, $cmd, $newVal);
 
+    #venetian blind special
+    my $specials = $hash->{helper}{devicemap}{devices}{$device}{venetian_specials};
+    if ( defined $specials ) {
+        my $vencmd = $specials->{setter} // $cmd;
+        my $vendev = $specials->{device} // $device;
+        analyzeAndRunCmd($hash, $vendev, defined $specials->{CustomCommand} ? $specials->{CustomCommand} :$vencmd , $newVal) if $device ne $vendev || $cmd ne $vencmd;
+    }
     # get response 
     defined $mapping->{response} 
         ? $response = _getValue($hash, $device, $mapping->{response}, $newVal, $room) 
@@ -3079,14 +3118,15 @@ sub _runSetColorCmd {
     my $keywords = {hue => 'Hue', sat => 'Saturation', ct => 'Colortemp'};
     for (keys %{$keywords}) {
         my $kw = $keywords->{$_};
-        
+
         next if $kw eq 'Hue' && $hash->{helper}{devicemap}{devices}{$device}{color_specials}->{forceHue2rgb} == 1;
-        
+
         if ( defined $data->{$kw} && defined $mapping->{$_} ) {
             my $value = round( ($mapping->{$_}->{maxVal} - $mapping->{$_}->{minVal}) * $data->{$kw} / ($kw eq 'Hue' ? 360 : 100) , 0);
+            $value = min(max($mapping->{$_}->{minVal}, $value), $mapping->{$_}->{maxVal});
             $error = AnalyzeCommand($hash, "set $device $mapping->{$_}->{cmd} $value");
             return if $inBulk;
-                                                              
+            Log3($hash->{NAME}, 5, "Setting color to $value");
             return respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $error) if $error;
             return getResponse($hash, 'DefaultConfirmation');
         }
@@ -3135,7 +3175,9 @@ sub _runSetColorCmd {
         };
         my $rgb = $angle2rgb->{$angle}->{rgb};
         return "mapping problem in Hue2rgb" if !defined $rgb;
-        $error = AnalyzeCommand($hash, "set $device $mapping->{rgb}->{cmd} $rgb");
+        my $rgbcmd = $mapping->{rgb}->{cmd}; 
+        $rgb = lc $rgb if $rgbcmd eq 'hex';
+        $error = AnalyzeCommand($hash, "set $device $rgbcmd $rgb");
         return if $inBulk;
         Log3($hash->{NAME}, 5, "Setting rgb-color to $rgb using hue");
         return respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $error) if $error;
@@ -3924,10 +3966,10 @@ yellow=rgb FFFF00</code></p>
   </li>
   <li>
     <a id="RHASSPY-attr-rhasspySpecials"></a><b>rhasspySpecials</b>
-    <p><i>key=value</i> line by line arguments similar to <a href="#RHASSPY-attr-rhasspyTweaks">rhasspyTweaks</a>.</p>
+    <p><i>key:value</i> line by line arguments similar to <a href="#RHASSPY-attr-rhasspyTweaks">rhasspyTweaks</a>.</p>
     <p>Example:</p>
     <p><code>attr lamp1 rhasspySpecials group:async_delay=100 prio=1 group=lights</code></p>
-    <p>Currently only group related stuff is implemented, this could be the place to hold additional options, e.g. for confirmation requests.</p>
+    <p>Currently some colour light options besides group and venetian blind related stuff is implemented, this could be the place to hold additional options, e.g. for confirmation requests. You may use several of the following lines.</p>
     <p>Explanation on the above group line. All arguments are optional:</p>
     <ul>
       <li>group<br>
@@ -3937,6 +3979,24 @@ yellow=rgb FFFF00</code></p>
         Float nummeric value, just as async_delay in structure; the delay will be obeyed prior to the next sending command.</li> 
       <li>prio<br>
         Numeric value, defaults to "0". <i>prio</i> and <i>async_delay</i> will be used to determine the sending order as follows: first devices will be those with lowest prio arg, second sort argument is <i>async_delay</i> with lowest value first </li>
+    </ul>
+    <ul>
+      <li>venetianBlind<br>
+      <p><code>attr blind1 rhasspySpecials venetianBlind:setter=dim device=blind1_slats</code></p>
+      <p>Explanation (one of the two arguments is mandatory):
+      <ul>
+        <li><i>setter</i> is the set command to control slat angle, e.g. <i>positionSlat</i> for CUL_HM or older ZWave type devices</li></p>
+        <li><i>device</i> is needed if the slat command has to be issued towards a different device (applies e.g. to newer ZWave type devices).</li></p>
+        <p>If set, the slat target position will be set to the same level than the main device.</p> </li>
+      </ul>
+    </ul>
+    <ul>
+      <li>colorCommandMap</li> <br>
+        Allows mapping of values from the <i>Color></i> key to individual commands. Example: 
+        <p><code>attr lamp1 rhasspySpecials colorCommandMap:0='rgb FF0000' 120='rgb 00FF00' 240='rgb 0000FF'</code></p>
+      <li>colorForceHue2rgb</li>
+        defaults to "0". If set, a rgb command will be issued, even if the device is capable to handle hue commands.
+        <p><code>attr lamp1 rhasspySpecials colorForceHue2rgb:1</code></p><br>
     </ul>
   </li>
 </ul>
