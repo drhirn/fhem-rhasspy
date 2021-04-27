@@ -36,7 +36,7 @@ use GPUtils qw(:all);
 use JSON;
 use Encode;
 use HttpUtils;
-use utf8;
+#use utf8;
 use List::Util 1.45 qw(max min uniq);
 use Data::Dumper;
 
@@ -336,7 +336,7 @@ sub Define {
     $hash->{fhemId} = $h->{fhemId} // q{fhem};
     initialize_prefix($hash, $h->{prefix}) if !defined $hash->{prefix} || $hash->{prefix} ne $h->{prefix};
     $hash->{prefix} = $h->{prefix} // q{rhasspy};
-    $hash->{encoding} = $h->{encoding} // q{utf8};
+    $hash->{encoding} = $h->{encoding} // q{UTF-8};
     $hash->{useGenericAttrs} = $h->{useGenericAttrs} // 1;
     $hash->{'.asyncQueue'} = [];
     #Beta-User: Für's Ändern von defaultRoom oder prefix vielleicht (!?!) hilfreich: https://forum.fhem.de/index.php/topic,119150.msg1135838.html#msg1135838 (Rudi zu resolveAttrRename) 
@@ -374,7 +374,7 @@ sub initialize_Language {
     my $lang = shift // return;
     my $cfg  = shift // AttrVal($hash->{NAME},'languageFile',undef);
 
-    my $cp = q{UTF-8};
+    my $cp = $hash->{encoding} // q{UTF-8};
 
     #default to english first
     $hash->{helper}->{lng} = $languagevars if !defined $hash->{helper}->{lng} || !$init_done;
@@ -387,6 +387,7 @@ sub initialize_Language {
         Log3($hash->{NAME}, 1, "JSON decoding error in languagefile $cfg:  $@");
         return "languagefile $cfg seems not to contain valid JSON!";
     }
+                                   
     my $slots = $decoded->{slots}; 
 
     if ( defined $decoded->{default} ) {
@@ -859,7 +860,11 @@ sub _analyze_rhassypAttr {
         }
         if ($key eq 'colorCommandMap') {
             my($unnamed, $named) = parseParams($val);
-            $hash->{helper}{devicemap}{devices}{$device}{color_specials}{CommandMap} = $named;
+            $hash->{helper}{devicemap}{devices}{$device}{color_specials}{CommandMap} = $named if defined$named;
+        }
+        if ($key eq 'colorTempMap') {
+            my($unnamed, $named) = parseParams($val);
+            $hash->{helper}{devicemap}{devices}{$device}{color_specials}{Colortemp} = $named if defined$named;
         }
         if ($key eq 'venetianBlind') {
             my($unnamed, $named) = parseParams($val);
@@ -1334,10 +1339,13 @@ sub getRoomName {
 
     #Beta-User: This might be the right place to check, if there's additional logic implemented...
 
-    my $siteId = lc $data->{siteId};
+    my $siteId = $data->{siteId};
+
     my $rreading = makeReadingName("siteId2room_$siteId");
     $siteId =~ s{\A([^.]+).*}{$1}xms;
-    $room = ReadingsVal($hash->{NAME}, $rreading, $siteId);
+    utf8::downgrade($siteId, 1);
+    $room = ReadingsVal($hash->{NAME}, $rreading, lc $siteId);
+    #$room = ReadingsVal($hash->{NAME}, $rreading, $siteId);
     $room = $hash->{defaultRoom} if $room eq 'default' || !(length $room);
     Log3($hash->{NAME}, 5, "room is identified using siteId as $room");
 
@@ -2794,6 +2802,7 @@ sub handleIntentSetNumeric {
         my $vendev = $specials->{device} // $device;
         analyzeAndRunCmd($hash, $vendev, defined $specials->{CustomCommand} ? $specials->{CustomCommand} :$vencmd , $newVal) if $device ne $vendev || $cmd ne $vencmd;
     }
+                                                 
     # get response 
     defined $mapping->{response} 
         ? $response = _getValue($hash, $device, $mapping->{response}, $newVal, $room) 
@@ -3119,9 +3128,18 @@ sub _runSetColorCmd {
     for (keys %{$keywords}) {
         my $kw = $keywords->{$_};
 
-        next if $kw eq 'Hue' && $hash->{helper}{devicemap}{devices}{$device}{color_specials}->{forceHue2rgb} == 1;
+        my $forceRgb = $hash->{helper}{devicemap}{devices}{$device}{color_specials}->{forceHue2rgb} // 0;
+        next if defined $kw && $kw eq 'Hue' && $forceRgb == 1;
 
-        if ( defined $data->{$kw} && defined $mapping->{$_} ) {
+        my $specialmapping = $hash->{helper}{devicemap}{devices}{$device}{color_specials}{$kw};
+        if (defined $data->{$kw} && defined $specialmapping && defined $specialmapping->{$data->{$kw}}) {
+            my $cmd = $specialmapping->{$data->{$kw}};
+            $error = AnalyzeCommand($hash, "set $device $cmd");
+            return if $inBulk;
+            Log3($hash->{NAME}, 5, "Setting $device to $cmd");
+            return respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, $error) if $error;
+            return getResponse($hash, 'DefaultConfirmation');
+        } elsif ( defined $data->{$kw} && defined $mapping->{$_} ) {
             my $value = round( ($mapping->{$_}->{maxVal} - $mapping->{$_}->{minVal}) * $data->{$kw} / ($kw eq 'Hue' ? 360 : 100) , 0);
             $value = min(max($mapping->{$_}->{minVal}, $value), $mapping->{$_}->{maxVal});
             $error = AnalyzeCommand($hash, "set $device $mapping->{$_}->{cmd} $value");
@@ -3616,7 +3634,7 @@ __END__
 # "rhasspySpecials" bzw. rhasspyTweaks als weitere Attribute
 Denkbare Verwendung:
 - siteId2room für mobile Geräte (Denkbare Anwendungsfälle: Auswertung BT-RSSI per Perl, aktives Setzen über ein Reading? Oder einen intent? (tweak)
-- Ansteuerung von Lamellenpositionen (auch an anderem Device?) (special)
+- Ansteuerung von Lamellenpositionen (auch an anderem Device?) (special) (erledigt?)
 - Bestätigungs-Mapping (special)
 
 # Sonstiges, siehe insbes. https://forum.fhem.de/index.php/topic,119447.msg1148832.html#msg1148832
@@ -3624,7 +3642,7 @@ Denkbare Verwendung:
 - "kind" und wie man es füllen könnte (mehr Dialoge)
 - Bestätigungsdialoge - weitere Anwendungsfelder
 - gDT: mehr und bessere mappings?
-- Farbe und Farbtemperatur 
+- Farbe und Farbtemperatur (fast fertig?)
 - Hat man in einem Raum einen Satelliten aber kein Device mit der siteId/Raum, kann man den Satelliten bei z.B. dem Timer nicht ansprechen, weil der Raum nicht in den Slots ist.
   Irgendwie müssen wir die neue siteId in den Slot Rooms bringen
 
@@ -3866,7 +3884,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         <li><b>ct</b> => numeric value for timeout in seconds, default: 15.</li>
       </ul></li>
     </ul>
-  </li><br>
+  </li>
 
   <li>
     <a id="RHASSPY-attr-rhasspyTweaks"></a><b>rhasspyTweaks</b>
@@ -3894,7 +3912,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         <p>By default, RHASSPY will overwrite all generated slots. Setting this to <i>false</i> will change this.</p>
       </li>
     </ul>
-  </li><br>
+  </li>
 
   <li>
     <a id="RHASSPY-attr-forceNext"></a><b>forceNEXT</b>
@@ -3966,37 +3984,41 @@ yellow=rgb FFFF00</code></p>
   </li>
   <li>
     <a id="RHASSPY-attr-rhasspySpecials"></a><b>rhasspySpecials</b>
-    <p><i>key:value</i> line by line arguments similar to <a href="#RHASSPY-attr-rhasspyTweaks">rhasspyTweaks</a>.</p>
-    <p>Example:</p>
-    <p><code>attr lamp1 rhasspySpecials group:async_delay=100 prio=1 group=lights</code></p>
     <p>Currently some colour light options besides group and venetian blind related stuff is implemented, this could be the place to hold additional options, e.g. for confirmation requests. You may use several of the following lines.</p>
-    <p>Explanation on the above group line. All arguments are optional:</p>
+    <p><i>key:value</i> line by line arguments similar to <a href="#RHASSPY-attr-rhasspyTweaks">rhasspyTweaks</a>.</p>
     <ul>
-      <li>group<br>
-        If set, the device will not be directly addressed, but the mentioned group - typically a FHEM <a href="#structure">structure</a> device or a HUEDevice-type group. This has the advantage of saving RF ressources and/or already implemented logics.<br>
-        Note: all addressed devices will be switched, even if they are not member of the rhasspyGroup. Each group should only be addressed once, but it's recommended to put this info in all devices under RHASSPY control in the same external group logic.</li>
-      <li>async_delay<br>
-        Float nummeric value, just as async_delay in structure; the delay will be obeyed prior to the next sending command.</li> 
-      <li>prio<br>
-        Numeric value, defaults to "0". <i>prio</i> and <i>async_delay</i> will be used to determine the sending order as follows: first devices will be those with lowest prio arg, second sort argument is <i>async_delay</i> with lowest value first </li>
-    </ul>
-    <ul>
-      <li>venetianBlind<br>
-      <p><code>attr blind1 rhasspySpecials venetianBlind:setter=dim device=blind1_slats</code></p>
-      <p>Explanation (one of the two arguments is mandatory):
-      <ul>
-        <li><i>setter</i> is the set command to control slat angle, e.g. <i>positionSlat</i> for CUL_HM or older ZWave type devices</li></p>
-        <li><i>device</i> is needed if the slat command has to be issued towards a different device (applies e.g. to newer ZWave type devices).</li></p>
-        <p>If set, the slat target position will be set to the same level than the main device.</p> </li>
-      </ul>
-    </ul>
-    <ul>
-      <li>colorCommandMap</li> <br>
-        Allows mapping of values from the <i>Color></i> key to individual commands. Example: 
+      <li><b>group</b>
+        <p>If set, the device will not be directly addressed, but the mentioned group - typically a FHEM <a href="#structure">structure</a> device or a HUEDevice-type group. This has the advantage of saving RF ressources and/or already implemented logics.<br>
+        Note: all addressed devices will be switched, even if they are not member of the rhasspyGroup. Each group should only be addressed once, but it's recommended to put this info in all devices under RHASSPY control in the same external group logic.<br>
+        All of the following options are optional.</p>
+        <ul>
+          <li><b>async_delay</b><br>
+            Float nummeric value, just as async_delay in structure; the delay will be obeyed prior to the next sending command.</li> 
+          <li><b>prio</b><br>
+            Numeric value, defaults to "0". <i>prio</i> and <i>async_delay</i> will be used to determine the sending order as follows: first devices will be those with lowest prio arg, second sort argument is <i>async_delay</i> with lowest value first.</li>
+        </ul>
+        <p>Example:</p>
+        <p><code>attr lamp1 rhasspySpecials group:async_delay=100 prio=1 group=lights</code></p>
+      </li>
+      <li><b>venetianBlind</b>
+        <p><code>attr blind1 rhasspySpecials venetianBlind:setter=dim device=blind1_slats</code></p>
+        <p>Explanation (one of the two arguments is mandatory):
+        <ul>
+          <li><b>setter</b> is the set command to control slat angle, e.g. <i>positionSlat</i> for CUL_HM or older ZWave type devices</li>
+          <li><b>device</b> is needed if the slat command has to be issued towards a different device (applies e.g. to newer ZWave type devices)</li>
+        </ul>
+        <p>If set, the slat target position will be set to the same level than the main device.</p>
+      </li>
+      <li><b>colorCommandMap</b>
+        <p>Allows mapping of values from the <i>Color></i> key to individual commands.</p>
+        <p>Example:</p>
         <p><code>attr lamp1 rhasspySpecials colorCommandMap:0='rgb FF0000' 120='rgb 00FF00' 240='rgb 0000FF'</code></p>
-      <li>colorForceHue2rgb</li>
-        defaults to "0". If set, a rgb command will be issued, even if the device is capable to handle hue commands.
-        <p><code>attr lamp1 rhasspySpecials colorForceHue2rgb:1</code></p><br>
+      </li>
+      <li><b>colorForceHue2rgb</b>
+        <p>Defaults to "0". If set, a rgb command will be issued, even if the device is capable to handle hue commands.</p>
+        <p>Example:</p>
+        <p><code>attr lamp1 rhasspySpecials colorForceHue2rgb:1</code></p>
+      </li>
     </ul>
   </li>
 </ul>
