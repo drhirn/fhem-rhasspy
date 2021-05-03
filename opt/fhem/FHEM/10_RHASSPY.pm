@@ -89,7 +89,7 @@ my $languagevars = {
     'DefaultConfirmationReceived' => "ok will do it",
     'DefaultConfirmationNoOutstanding' => "no command is awaiting confirmation",
     'DefaultConfirmationRequest' => 'please confirm switching $device $wanted',
-    'RequestChoiceDevice' => 'there are several possible devices, coose between $first_items and $last_item',
+    'RequestChoiceDevice' => 'there are several possible devices, choose between $first_items and $last_item',
     'RequestChoiceRoom' => 'more than one possible device, please choose one of the following rooms $first_items and $last_item',
     'DefaultChoiceNoOutstanding' => "no choice expected",
     'timerSet'   => {
@@ -455,7 +455,9 @@ sub Undefine {
 
 sub Delete {
     my $hash = shift // return;
-    my $prefix = $hash->{prefix} // return;
+    #my $prefix = $hash->{prefix} // return;
+
+    deleteAllRegisteredInternalTimer($hash);
     RemoveInternalTimer($hash);
 
 # DELETE POD AFTER TESTS ARE COMPLETED
@@ -746,11 +748,9 @@ hermes/dialogueManager/configure (JSON)
 
     my @disabled;
     for (@{$toDisable}) {
-        my $id = qq(${language}.${fhemId}.$_);
+        my $id = qq(${language}.${fhemId}:$_);
         my $disable = {intentId => "$id", enable => "$enable"};
         push @disabled, $disable;
-        
-    
     }
     #my $disable = {intentId => [@disabled], enable => "$enable"};
     my $sendData = {
@@ -1151,13 +1151,12 @@ sub RHASSPY_DialogTimeout {
 
     my $identiy = $fnHash->{MODIFIER};
 
-    my $mode     = shift; #undef => timeout, 1 => cancellation, #2 => set timer
     my $data     = shift // $hash->{helper}{'.delayed'}->{$identiy};
     delete $hash->{helper}{'.delayed'}{$identiy};
     deleteSingleRegisteredInternalTimer($identiy, $hash); 
 
     my $siteId = $data->{siteId};
-    my $toDisable = defined $data->{customData} && defined $data->{customData}->{'.ENABLED'} ? $data->{customData}->{'.ENABLED'} : [qw(ConfirmAction CancelAction)];
+    my $toDisable = defined $data->{'.ENABLED'} ? $data->{'.ENABLED'} : [qw(ConfirmAction CancelAction)];
 
     my $response = $hash->{helper}{lng}->{responses}->{DefaultConfirmationTimeout};
     respond ($hash, $data->{requestType}, $data->{sessionId}, $siteId, $response);
@@ -1185,10 +1184,15 @@ sub setDialogTimeout {
 
     #interactive dialogue as described in https://rhasspy.readthedocs.io/en/latest/reference/#dialoguemanager_continuesession and https://docs.snips.ai/articles/platform/dialog/multi-turn-dialog
     my @ca_strings;
-    my $ca_part = qq{$hash->{LANGUAGE}.$hash->{fhemId}:ConfirmAction};
-    push @ca_strings, $ca_part;
-    $ca_part = qq{$hash->{LANGUAGE}.$hash->{fhemId}:CancelAction};
-    push @ca_strings, $ca_part;
+    for (@{$toEnable}) {
+        my $id = qq{$hash->{LANGUAGE}.$hash->{fhemId}:$_};
+        push @ca_strings, $id;
+    }
+    
+    #my $ca_part = qq{$hash->{LANGUAGE}.$hash->{fhemId}:ConfirmAction};
+    #push @ca_strings, $ca_part;
+    #$ca_part = qq{$hash->{LANGUAGE}.$hash->{fhemId}:CancelAction};
+    #push @ca_strings, $ca_part;
     my $reaction = ref $response eq 'HASH' 
         ? $response
         : { text         => $response, 
@@ -3630,7 +3634,7 @@ sub handleIntentCancelAction {
 
     #might lead to problems, if there's more than one timeout running...
     #RemoveInternalTimer( $hash, \&RHASSPY_DialogTimeout );
-    my $identiy = qq($data->{siteId}_$data->{sessionId});
+    my $identiy = qq($data->{sessionId});
     deleteSingleRegisteredInternalTimer($identiy, $hash);
     $response = $hash->{helper}{lng}->{responses}->{ 'DefaultCancelConfirmation' };
     configure_DialogManager($hash, $data->{siteId}, $toDisable, 'false');
@@ -3911,15 +3915,13 @@ sub setRegisteredInternalTimer {
         NAME     => $timerName,
         MODIFIER => $modifier
     };
-    #if ( defined( $hash->{TIMER}{$timerName} ) ) {
-    #    Log3( $hash, 1, "[$hash->{NAME}] possible overwriting of timer $timerName - please delete it first" );
-    #    stacktrace();
-    #    #new for RHASSPY
-    #    $hash->{TIMER}{$timerName} = $fnHash;
-    #}
-    #else {
+    if ( defined( $hash->{TIMER}{$timerName} ) ) {
+        Log3( $hash, 1, "[$hash->{NAME}] possible overwriting of timer $timerName - please delete it first" );
+        stacktrace();
+    }
+    else {
         $hash->{TIMER}{$timerName} = $fnHash;
-    #}
+    }
 
     Log3( $hash, 5, "[$hash->{NAME}] setting  Timer: $timerName " . FmtDateTime($tim) );
     InternalTimer( $tim, $callback, $fnHash, $initFlag );
